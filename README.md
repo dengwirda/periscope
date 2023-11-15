@@ -36,7 +36,7 @@ Input files for various cases can be built from MPAS-format mesh files using the
 utilities provided. A set of example meshes can be downloaded from
 [releases](https://github.com/dengwirda/periscope/releases) of this repository. 
 
-The barotopic jet of [Galewesky et al](doi.org/10.1111/j.1600-0870.2004.00071.x):
+The barotopic jet of [Galewesky et al](https://doi.org/10.1111/j.1600-0870.2004.00071.x):
 
     python3 ICs/jet.py \
     --mesh-file="path+name-to-mpas-mesh-file" \
@@ -44,7 +44,7 @@ The barotopic jet of [Galewesky et al](doi.org/10.1111/j.1600-0870.2004.00071.x)
     --with-pert=True \
     --radius=6371220.
     
-Various [Williamson et al](doi.org/10.1016/S0021-9991(05)80016-6) SWE config.:
+Various [Williamson et al](https://doi.org/10.1016/S0021-9991(05)80016-6) SWE config.'s:
 
     python3 ICs/wtc.py \
     --mesh-file="path+name-to-mpas-mesh-file" \
@@ -52,7 +52,7 @@ Various [Williamson et al](doi.org/10.1016/S0021-9991(05)80016-6) SWE config.:
     --radius=6371220. \
     --test-case=N
     
-Vortex config. of [Roullet & Gaillard](doi.org/10.1029/2021MS002663):
+Vortex config.'s of [Roullet & Gaillard](https://doi.org/10.1029/2021MS002663):
 
     python3 ICs/vtk.py \
     --mesh-file="path+name-to-mpas-mesh-file" \
