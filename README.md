@@ -44,7 +44,7 @@ The barotopic jet of [Galewesky et al](https://doi.org/10.1111/j.1600-0870.2004.
     --with-pert=True \
     --radius=6371220.
     
-Various [Williamson et al](https://doi.org/10.1016/S0021-9991(05)80016-6) SWE config.'s:
+Various [Williamson et al](https://doi.org/10.1016/S0021-9991(05)80016-6) SWE configurations:
 
     python3 ICs/wtc.py \
     --mesh-file="path+name-to-mpas-mesh-file" \
@@ -52,7 +52,7 @@ Various [Williamson et al](https://doi.org/10.1016/S0021-9991(05)80016-6) SWE co
     --radius=6371220. \
     --test-case=N
     
-Vortex config.'s of [Roullet & Gaillard](https://doi.org/10.1029/2021MS002663):
+Vortex-driven configurations of [Roullet & Gaillard](https://doi.org/10.1029/2021MS002663):
 
     python3 ICs/vtk.py \
     --mesh-file="path+name-to-mpas-mesh-file" \
@@ -73,12 +73,12 @@ For example, to build + run the barotropic jet test case using the CVT-optimised
 
     python3 swe.py \
     --mpas-file="bjet_cvt_7.nc" \
+    --numthread=cores \
     --num-steps=2592 \
     --time-step=200. \
     --save-freq=432 \
     --stat-freq=108 \
-    --integrate="RK32-FB"  \
-    --numthread=cores
+    --integrate="RK32-FB"
 
 Output is saved to the `out_bjet_cvt_7.nc` file, which can be opened for visualisation 
 in e.g. paraview.
