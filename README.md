@@ -54,7 +54,7 @@ Various [Williamson et al](https://doi.org/10.1016/S0021-9991(05)80016-6) SWE co
     
 Vortex-driven configurations of [Roullet & Gaillard](https://doi.org/10.1029/2021MS002663):
 
-    python3 ICs/vtk.py \
+    python3 ICs/vtx.py \
     --mesh-file="path+name-to-mpas-mesh-file" \
     --init-file="path+name-to-mpas-init-file" \
     --test-case=N
