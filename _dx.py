@@ -1,0 +1,450 @@
+
+import time
+import math
+import numpy as np
+
+""" SWE spatial discretisation using TRSK-like operators
+"""
+#-- Darren Engwirda
+
+from _fp import flt32_t, flt64_t
+from _fp import reals_t, index_t
+
+from log import tcpu
+
+from mem import variables
+
+HH_TINY        = 1.0E-04
+HH_THIN        = 1.0E+02
+UU_TINY        = 1.0E-12
+PV_TINY        = 1.0E-16
+KE_TINY        = 1.0E-08
+
+def hrmn_mean(xone, xtwo):
+
+#-- harmonic mean of two vectors (ie. biased toward lesser)
+
+    return +2.0 * xone * xtwo / (xone + xtwo)
+
+
+def scalingVk(mesh, trsk, cnfg):
+
+#-- local gridsize scaling on div^k and del^k operators
+
+    dx_edge = mesh.edge.dlen
+    dx_dual = trsk.dual_edge_sums * dx_edge / 3.
+    
+    dx_cell = trsk.cell_vert_sums * dx_dual
+    dx_cell/= mesh.cell.topo
+
+    s2_cell = (dx_cell / cnfg.dx_damp_r) ** 1
+    s4_cell = (dx_cell / cnfg.dx_damp_r) ** 3
+    
+    dx_edge = trsk.edge_cell_sums * dx_cell / 2.
+
+    s2_edge = (dx_edge / cnfg.dx_damp_r) ** 1
+    s4_edge = (dx_edge / cnfg.dx_damp_r) ** 3
+
+    return s2_edge, s4_edge, \
+           s2_cell, s4_cell
+
+
+def diag_vars(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
+
+#-- compute diagnostic variables from the current state
+
+    ff_dual = flow.ff_vert
+    ff_edge = flow.ff_edge
+    ff_cell = flow.ff_cell
+
+    vv_edge = computeVV(mesh, trsk, cnfg, uu_edge)
+
+    hh_dual, hh_edge, h2_edge = compute_H(
+        mesh, trsk, cnfg, hh_cell, uu_edge)
+
+    ke_cell, ke_bias = computeKE(
+        mesh, trsk, cnfg, 
+        hh_cell, h2_edge, hh_dual, 
+        uu_edge, vv_edge,
+        +0.5 * cnfg.time_step)
+
+    rv_dual, pv_dual, \
+    rv_cell, pv_cell, \
+    pv_edge, pv_bias = computePV(
+        mesh, trsk, cnfg, 
+        hh_cell, h2_edge, hh_dual, uu_edge, vv_edge,
+        ff_dual, ff_edge, ff_cell, 
+        +0.5 * cnfg.time_step)
+
+    return hh_edge, hh_dual, ke_cell, ke_bias, \
+           rv_cell, pv_cell, \
+           rv_dual, pv_dual, pv_edge, pv_bias
+
+
+def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
+
+#-- compute the discrete energy and enstrophy invariants
+
+    ff_dual = flow.ff_vert
+    ff_edge = flow.ff_edge
+    ff_cell = flow.ff_cell
+
+    zb_cell = flow.zb_cell
+
+    vv_edge = computeVV(mesh, trsk, cnfg, uu_edge)
+
+    hh_dual, hh_edge, h2_edge = compute_H(
+        mesh, trsk, cnfg, hh_cell, uu_edge)
+
+    ke_edge = uu_edge ** 2
+    ke_edge*= hh_edge * mesh.edge.area
+    
+    pe_cell = flow.grav * (
+        hh_cell * 0.5 + zb_cell - np.min(zb_cell))
+
+    pe_cell*= hh_cell * mesh.cell.area
+
+    kk_sums = math.fsum(ke_edge) \
+            + math.fsum(pe_cell)
+
+    rv_dual, pv_dual, rv_cell, pv_cell, \
+    pv_edge, pv_bias = computePV(
+        mesh, trsk, cnfg, 
+        hh_cell, h2_edge, hh_dual, uu_edge, vv_edge,
+        ff_dual, ff_edge, ff_cell, 
+        +0.5 * cnfg.time_step)
+
+   #pv_sums = 0.5 * math.fsum(
+   #    mesh.edge.area * hh_edge * pv_edge ** 2)
+
+    pv_sums = 0.5 * math.fsum(
+        mesh.vert.area * hh_dual * pv_dual ** 2)
+
+    return kk_sums, pv_sums
+
+
+def upwinding(mesh, trsk, cnfg, 
+        sw_dual, ss_dual, ss_cell, lo_edge, hi_edge,
+        uu_edge, vv_edge, 
+        ss_edge, up_bias,
+        delta_t, sv_tiny, uu_tiny,
+        up_kind, up_min_, up_max_):
+
+#-- streamline upwind eval.'s
+
+    ttic = time.time()
+
+    ss_edge, up_bias = _upwinding(
+        mesh, trsk, cnfg, 
+        sw_dual, ss_dual, ss_cell, 
+        lo_edge, hi_edge, uu_edge, vv_edge,
+        ss_edge, up_bias, 
+        delta_t, sv_tiny, uu_tiny, 
+        up_kind, up_min_, up_max_)
+    
+    ttoc = time.time()
+    tcpu.upwinding = tcpu.upwinding + (ttoc - ttic)
+
+    return ss_edge, up_bias
+
+
+def compute_H(mesh, trsk, cnfg, hh_cell, uu_edge):
+
+#-- compute discrete thickness
+
+    ttic = time.time()
+    
+    hh_dual, hh_edge, h2_edge = \
+        _computeHH(
+            mesh, trsk, cnfg, 
+                HH_THIN, hh_cell, uu_edge)
+    
+    ttoc = time.time()
+    tcpu.compute_H = tcpu.compute_H + (ttoc - ttic)
+
+    return hh_dual, hh_edge, h2_edge
+    
+
+def computeKE(mesh, trsk, cnfg, 
+        hh_cell, hh_edge, hh_dual, uu_edge, vv_edge,
+        delta_t):
+
+#-- reconstruct kinetic energy
+
+    ttic = time.time()
+
+    up_edge = variables.ke_bias
+ 
+    ke_cell = _computeKE(
+        mesh, trsk, cnfg, uu_edge, vv_edge)
+        
+    ttoc = time.time()
+    tcpu.computeKE = tcpu.computeKE + (ttoc - ttic)
+
+    return ke_cell, up_edge
+
+
+def _build_PV(mesh, trsk, cnfg, 
+        hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, 
+        ff_dual, ff_edge, ff_cell,
+        delta_t):
+           
+#-- compute discrete vorticity
+              
+    ttic = time.time()
+              
+    rv_dual, pv_dual, \
+    rv_cell, pv_cell, \
+    lo_dual, lo_edge, hi_edge = _computePV(
+        mesh, trsk, cnfg, 
+        hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, 
+        ff_dual, ff_edge, ff_cell)
+    
+    ttoc = time.time()
+    tcpu.computePV = tcpu.computePV + (ttoc - ttic)
+
+    return rv_dual, pv_dual, rv_cell, pv_cell, \
+           lo_dual, lo_edge, hi_edge
+              
+              
+def computePV(mesh, trsk, cnfg, 
+        hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, 
+        ff_dual, ff_edge, ff_cell,
+        delta_t):
+  
+#-- compute discrete vorticity
+  
+    rv_dual, pv_dual, \
+    rv_cell, pv_cell, lo_dual, \
+    lo_edge, hi_edge = _build_PV(
+        mesh, trsk, cnfg, 
+        hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, 
+        ff_dual, ff_edge, ff_cell, 
+        delta_t)
+            
+    pv_edge = variables.pv_edge
+    up_edge = variables.pv_bias
+            
+    pv_edge, up_edge = upwinding(
+        mesh, trsk, cnfg, 
+        lo_dual, pv_dual, pv_cell, lo_edge, hi_edge,
+        uu_edge, vv_edge, 
+        pv_edge, up_edge,
+        delta_t, PV_TINY, UU_TINY, 
+        cnfg.pv_upwind, 
+        cnfg.pv_min_up, cnfg.pv_max_up)
+          
+    return rv_dual, pv_dual, rv_cell, pv_cell, \
+           pv_edge, up_edge
+              
+              
+def computeVV(mesh, trsk, cnfg, uu_edge):
+
+#-- get tangential velocity
+
+    ttic = time.time()
+
+    vv_edge = _computeVV(mesh, trsk, cnfg, uu_edge)
+
+    ttoc = time.time()
+    tcpu.computeVV = tcpu.computeVV + (ttoc - ttic)
+
+    return vv_edge
+              
+              
+def addtendUH(mesh, trsk, cnfg, hh_edge, uu_edge, 
+                                hh_tend):
+
+#-- div. for thickness flux
+
+    ttic = time.time()
+
+    hh_tend = _advect_UH(
+        mesh, trsk, cnfg, 
+            hh_edge, uu_edge, hh_tend)
+
+    ttoc = time.time()
+    tcpu.advect_UH = tcpu.advect_UH + (ttoc - ttic)
+
+    return hh_tend
+    
+              
+def addtendUV(mesh, trsk, cnfg, hh_edge, uu_edge, 
+                                pv_edge, ke_cell,
+                                uu_tend):
+
+#-- energy-neutral UV. flux
+
+    ttic = time.time()
+
+    uu_tend = _advect_UV(
+        mesh, trsk, cnfg, hh_edge, 
+            uu_edge, pv_edge, ke_cell, uu_tend)
+
+    ttoc = time.time()
+    tcpu.advect_UV = tcpu.advect_UV + (ttoc - ttic)
+
+    return uu_tend
+    
+    
+def addtendGZ(mesh, trsk, cnfg, hh_cell, zb_cell, 
+                                gg_cell, uu_tend):
+
+#-- get z pressure gradient
+
+    ttic = time.time()
+
+    uu_tend = _computeGZ(
+        mesh, trsk, cnfg, 
+            hh_cell, zb_cell, gg_cell, uu_tend)
+        
+    ttoc = time.time()
+    tcpu.computeGZ = tcpu.computeGZ + (ttoc - ttic)
+
+    return uu_tend
+    
+
+def addtendDU(mesh, trsk, cnfg, uu_edge, uu_tend):
+
+#-- damping div^k operators
+
+    if (cnfg.du_damp_k == 0): return uu_tend
+
+    ttic = time.time()
+    
+    uu_tend = _computeDU(
+        mesh, trsk, cnfg, uu_edge, uu_tend)
+
+    ttoc = time.time()
+    tcpu.computeDU = tcpu.computeDU + (ttoc - ttic)
+
+    return uu_tend
+
+
+def addtendVU(mesh, trsk, cnfg, uu_edge, uu_tend):
+
+#-- viscous del^k operators
+
+    if (cnfg.vu_damp_k == 0): return uu_tend
+
+    ttic = time.time()
+            
+    uu_tend = _computeVU(
+        mesh, trsk, cnfg, uu_edge, uu_tend)
+
+    ttoc = time.time()
+    tcpu.computeVU = tcpu.computeVU + (ttoc - ttic)
+
+    return uu_tend
+    
+    
+def addtendVH(mesh, trsk, cnfg, hh_cell, zb_cell, 
+                                gg_cell, hh_tend):
+
+#-- diffusive del^k operators
+
+    if (cnfg.vh_damp_k == 0): return hh_tend
+
+    ttic = time.time()
+
+    hh_tend = _computeVH(
+        mesh, trsk, cnfg, 
+            hh_cell, zb_cell, gg_cell, hh_tend)
+    
+    ttoc = time.time()
+    tcpu.computeVH = tcpu.computeVH + (ttoc - ttic)
+
+    return hh_tend
+
+
+def computeCd(mesh, trsk, cnfg, hh_cell, uu_edge):
+
+#-- loglaw bottom drag term
+
+    ttic = time.time()
+
+    vv_edge = computeVV(
+            mesh, trsk, cnfg, uu_edge)
+            
+    cd_edge = _computeCd(
+        mesh, trsk, cnfg, 
+            HH_TINY, hh_cell, uu_edge, vv_edge)
+            
+    ttoc = time.time()
+    tcpu.computeCd = tcpu.computeCd + (ttoc - ttic)
+
+    return cd_edge
+
+
+try:
+    from _kx import _upwinding
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
+try:
+    from _kx import _computeHH
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
+try:
+    from _kx import _computeKE
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
+try:
+    from _kx import _computePV
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
+try:
+    from _kx import _computeVV
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
+try:
+    from _kx import _advect_UH
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
+try:
+    from _kx import _advect_UV
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
+try:
+    from _kx import _computeGZ
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
+try:
+    from _kx import _computeDU
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
+try:
+    from _kx import _computeVU
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
+try:
+    from _kx import _computeVH
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
+try:
+    from _kx import _computeCd
+
+except ImportError:
+    raise RuntimeError("Cython back-end not found")
+
