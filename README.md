@@ -20,7 +20,7 @@ While not currently intended for massively parallel HPC workflows, `PERISCOPE` i
 written to exploit thread-based parallelism via `OpenMP`, suitable for single-node
 systems.
 
-To run the shallow-water solver:
+To run the shallow-water solver (see `swe.py --help`):
 
     python3 swe.py \
     --mesh-file="path+name-to-mpas-mesh+init-file" \
@@ -30,7 +30,7 @@ To run the shallow-water solver:
     --save-freq=output-freq-th-steps
 
 Solver output is saved to an MPAS-'ish' NetCDF file that can be visualised via
-e.g. paraview. See `swe.py --help` for additional detail.
+e.g. paraview.
 
 Input files for various cases can be built from MPAS-format mesh files using the 
 utilities provided. A set of example meshes can be downloaded from
