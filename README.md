@@ -5,11 +5,11 @@ variable resolution unstructured meshes.
 
 <p align="center"> <img src = "../main/img/merger_b.jpg"> </p>
 
-Presently, the nonlinear rotating shallow water equations are solved on spherical 
-domains (either the full sphere or regional pieces thereof), with support for 
-various boundary conditions, drag laws and forcing types. A staggered mesh mimetic 
-finite volume discretisation is employed that maintains the energy (and to a 
-lesser extent enstrophy) balances associated with geophysical flows.
+Presently, a nonlinear rotating shallow water model is available &mdash; solved on 
+spherical domains (either the full sphere or regional pieces thereof), with 
+support for various boundary conditions, drag laws and forcing types. A staggered 
+mesh mimetic finite volume discretisation is employed that maintains the energy 
+(and to a lesser extent enstrophy) balances associated with geophysical flows.
 
 `PERISCOPE` is implemented using a mix of `Python` and `Cython` and must first be 
 compiled:
@@ -30,21 +30,21 @@ To run the shallow-water solver:
     --save-freq=output-freq-th-steps
 
 Solver output is saved to an MPAS-'ish' NetCDF file that can be visualised via
-e.g. paraview.
+e.g. paraview. See `swe.py --help` for additional detail.
 
 Input files for various cases can be built from MPAS-format mesh files using the 
 utilities provided. A set of example meshes can be downloaded from
 [releases](https://github.com/dengwirda/periscope/releases) of this repository. 
 
-- The barotopic jet of [Galewesky et al](doi.org/10.1111/j.1600-0870.2004.00071.x):
+The barotopic jet of [Galewesky et al](doi.org/10.1111/j.1600-0870.2004.00071.x):
 
     python3 ICs/jet.py \
     --mesh-file="path+name-to-mpas-mesh-file" \
     --init-file="path+name-to-mpas-init-file" \
     --with-pert=True \
     --radius=6371220.
-
-- Various [Williamson et al](doi.org/10.1016/S0021-9991(05)80016-6) SWE config.:
+    
+Various [Williamson et al](doi.org/10.1016/S0021-9991(05)80016-6) SWE config.:
 
     python3 ICs/wtc.py \
     --mesh-file="path+name-to-mpas-mesh-file" \
@@ -52,14 +52,14 @@ utilities provided. A set of example meshes can be downloaded from
     --radius=6371220. \
     --test-case=N
     
-- Vortex config. of [Roullet & Gaillard](doi.org/10.1029/2021MS002663):
+Vortex config. of [Roullet & Gaillard](doi.org/10.1029/2021MS002663):
 
     python3 ICs/vtk.py \
     --mesh-file="path+name-to-mpas-mesh-file" \
     --init-file="path+name-to-mpas-init-file" \
     --test-case=N
 
-As well as a range of other flows. See the cases in `ICs` for details.
+As well as a range of other flows &mdash; see the cases in `ICs` for details.
 
 For example, to build + run the barotropic jet test case using the CVT-optimised 
 'level-7' icosahedral mesh provided in `PERISCOPE`'s
