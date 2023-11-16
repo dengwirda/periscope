@@ -7,9 +7,23 @@ variable resolution unstructured meshes.
 
 Presently, a nonlinear rotating shallow water model is available &mdash; solved on 
 spherical domains (either the full sphere or regional pieces thereof), with 
-support for various boundary conditions, drag laws and forcing types. A staggered 
-mesh mimetic finite volume discretisation is employed that maintains the energy 
-(and to a lesser extent enstrophy) balances associated with geophysical flows.
+support for various boundary conditions, drag laws and forcing types. 
+
+$$
+\frac{\partial h}{\partial t} + \nabla \cdot (u h) = S_{h}\ ,
+$$
+
+$$
+\frac{\partial u}{\partial t} + (u \cdot \nabla) u + f u^{\perp} = -\nabla \Big(g(h + z_{b}) + \phi_{u}\Big) - c_{d}\ u + \nu_{k} \nabla^{k} u + \frac{1}{h} \tau_{u}\ ,
+$$
+
+$$
+c_{d} = c_{1} + (c_{2} + c_{l}) \frac{\|u\|}{h}\ , \quad c_{l} = \frac{\kappa^{2}}{\log^{2}\Big(1+\frac{h}{2 z_{0}}\Big)}\ .
+$$
+
+A staggered, unstructured mesh mimetic finite-volume / difference discretisation 
+is employed that maintains the energy (and to a lesser extent enstrophy) balances 
+associated with geophysical flows.
 
 `PERISCOPE` is implemented using a mix of `Python` and `Cython` and must first be 
 compiled:
