@@ -1587,8 +1587,11 @@ def _computeCd(mesh, trsk, cnfg,
     np.ndarray[REALS_t, ndim=1] vv_edge
               ):
     
-    cdef REALS_t VONK = 0.4
+#-- cd = cd_lin + (cd_sqr + cd_log) * |u| / h
     
+    cdef REALS_t VONK = 0.4  # von karman
+    
+    cdef REALS_t ZERO = 0.0
     cdef REALS_t HALF = 0.5
     cdef REALS_t TWO_ = 2.0
     cdef REALS_t ONE_ = 1.0
@@ -1605,6 +1608,9 @@ def _computeCd(mesh, trsk, cnfg,
     cdef REALS_t loglaw_z0 = cnfg.loglaw_z0
     cdef REALS_t loglaw_hi = cnfg.loglaw_hi
     cdef REALS_t loglaw_lo = cnfg.loglaw_lo
+    
+    cdef REALS_t sqrlaw_cd = cnfg.sqrlaw_cd
+    cdef REALS_t linlaw_cd = cnfg.linlaw_cd
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -1634,30 +1640,36 @@ def _computeCd(mesh, trsk, cnfg,
 
         hh_edge = TWO_ * HH_CELL[cel1] * \
                          HH_CELL[cel2] / \
-               (HH_CELL[cel1] + HH_CELL[cel2])
+                (HH_CELL[cel1] + HH_CELL[cel2])
                
-        hh_edge = max(hh_tiny, hh_edge)
-               
-        # NB. log(1+z/z0) "fix" to loglaw
-        CD_EDGE[edge] = (VONK / log_r (
-            ONE_ + HALF * hh_edge / loglaw_z0)
-            )
-            
-        CD_EDGE[edge]*= CD_EDGE[edge]
-            
-        CD_EDGE[edge] = \
-            min(CD_EDGE[edge], loglaw_hi)
-            
-        CD_EDGE[edge] = \
-            max(CD_EDGE[edge], loglaw_lo)
-        
         ke_edge = HALF * (
             UU_EDGE[edge] * UU_EDGE[edge] 
           + VV_EDGE[edge] * VV_EDGE[edge]
             )
-
+               
+        hh_edge = max(hh_tiny, hh_edge)
+        
+        CD_EDGE[edge] = ZERO
+   
+        if (loglaw_z0 > ZERO):            
+            # NB. log(1+z/z0) "fix" to loglaw
+            CD_EDGE[edge] = (VONK / log_r (
+                ONE_ + HALF * hh_edge / loglaw_z0)
+                )
+                
+            CD_EDGE[edge]*= CD_EDGE[edge]
+                
+            CD_EDGE[edge] = \
+                min(CD_EDGE[edge], loglaw_hi)
+                
+            CD_EDGE[edge] = \
+                max(CD_EDGE[edge], loglaw_lo)
+        
+        CD_EDGE[edge]+= sqrlaw_cd
+        
         CD_EDGE[edge]*= sqrt_r(TWO_ * ke_edge) / hh_edge
+        
+        CD_EDGE[edge]+= linlaw_cd
     
     return cd_edge
-
 

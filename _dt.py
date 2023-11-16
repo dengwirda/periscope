@@ -104,7 +104,7 @@ def step_RK22(mesh, trsk, flow, cnfg,
     u1_edge = adv_x_fst(
         cnfg, uu_edge, k1_step, ru_edge, cu_edge, u1_edge)
 
-    if (cnfg.calc_drag and cnfg.loglaw_z0 > 0.):
+    if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
             mesh, trsk, cnfg, h1_cell, u1_edge)
 
@@ -155,7 +155,7 @@ def step_RK22(mesh, trsk, flow, cnfg,
     u2_edge, cu_edge = adv_x_cmp(
         cnfg, uu_edge, k2_step, ru_edge, cu_edge, u2_edge)
     
-    if (cnfg.calc_drag and cnfg.loglaw_z0 > 0.):
+    if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
             mesh, trsk, cnfg, hb_cell, um_edge)
 
@@ -250,7 +250,7 @@ def step_RK32(mesh, trsk, flow, cnfg,
     u1_edge = adv_x_fst(
         cnfg, uu_edge, k1_step, ru_edge, cu_edge, u1_edge)
 
-    if (cnfg.calc_drag and cnfg.loglaw_z0 > 0.):
+    if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
             mesh, trsk, cnfg, h1_cell, u1_edge)
 
@@ -298,7 +298,7 @@ def step_RK32(mesh, trsk, flow, cnfg,
     u2_edge = adv_x_fst(
         cnfg, uu_edge, k2_step, ru_edge, cu_edge, u2_edge)
 
-    if (cnfg.calc_drag and cnfg.loglaw_z0 > 0.):
+    if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
             mesh, trsk, cnfg, h2_cell, u2_edge)
 
@@ -342,7 +342,7 @@ def step_RK32(mesh, trsk, flow, cnfg,
     u3_edge, cu_edge = adv_x_cmp(
         cnfg, uu_edge, k3_step, ru_edge, cu_edge, u3_edge)
    
-    if (cnfg.calc_drag and cnfg.loglaw_z0 > 0.):
+    if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
             mesh, trsk, cnfg, hb_cell, u2_edge)
 

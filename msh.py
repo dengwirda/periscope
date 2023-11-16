@@ -632,6 +632,7 @@ def load_flow(name, mesh=None, lean=False):
 
     data = Dataset(name, "r")
 
+    one_ = +1
     step = int(data.dimensions["Time"].size)
     ncel = int(data.dimensions["nCells"].size)
     nedg = int(data.dimensions["nEdges"].size)
@@ -646,16 +647,22 @@ def load_flow(name, mesh=None, lean=False):
         flow.grav = flt32_t(9.80616)
 
     flow.hh_cell = np.zeros(
-        (+1, ncel, nlev), dtype=reals_t)
+        (one_, ncel, nlev), dtype=reals_t)
 
     flow.zb_cell = np.zeros((ncel), dtype=reals_t)
     flow.is_mask = np.zeros((ncel), dtype=bool)
+    
     flow.ff_cell = np.zeros((ncel), dtype=reals_t)
     flow.ff_edge = np.zeros((nedg), dtype=reals_t)
     flow.ff_vert = np.zeros((nvrt), dtype=reals_t)
 
     flow.uu_edge = np.zeros(
-        (+1, nedg, nlev), dtype=reals_t)
+        (one_, nedg, nlev), dtype=reals_t)
+        
+    flow.Su_edge = np.zeros(
+        (one_, nedg, nlev), dtype=reals_t)
+    flow.Sh_cell = np.zeros(
+        (one_, ncel, nlev), dtype=reals_t)
     
     if ("h" in data.variables.keys()):
         flow.hh_cell[0, :, :] = \
@@ -702,6 +709,11 @@ def load_flow(name, mesh=None, lean=False):
     
     if ("uu_edge" in data.variables.keys()):
         flow.uu_edge = np.array(data.variables["uu_edge"])
+    
+    if ("Su_edge" in data.variables.keys()):
+        flow.Su_edge = np.array(data.variables["Su_edge"])
+    if ("Sh_cell" in data.variables.keys()):
+        flow.Sh_cell = np.array(data.variables["Sh_cell"])
     
     if (lean is True): return flow
       
@@ -759,7 +771,7 @@ def sort_flow(flow, mesh=None, lean=False):
     if (mesh is None): return flow
 
     flow.hh_cell = flow.hh_cell[:, mesh.cell.ifwd - 1, :]
-
+    
     flow.zb_cell = flow.zb_cell[mesh.cell.ifwd - 1]
     
     flow.is_mask = flow.is_mask[mesh.cell.ifwd - 1]
@@ -771,6 +783,9 @@ def sort_flow(flow, mesh=None, lean=False):
     flow.ff_cell = flow.ff_cell[mesh.cell.ifwd - 1]
     
     flow.uu_edge = flow.uu_edge[:, mesh.edge.ifwd - 1, :]
+    
+    flow.Su_edge = flow.Su_edge[:, mesh.edge.ifwd - 1, :]
+    flow.Sh_cell = flow.Sh_cell[:, mesh.cell.ifwd - 1, :]
     
     if (lean is True): return flow
     

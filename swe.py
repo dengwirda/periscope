@@ -29,13 +29,13 @@ from _dt import step_eqns
 def swe(cnfg):
 
     print(
-    "#" + "==========================================" * 2 + "\n" + 
+    "#"+"=========================================="*2+"\n" + 
     "#              o                     \n" +
     "#   ,_   _  _  `  .   _, __  ,_   _  \n" +
     "# _/|_)_(/_/ (_(_/_)_(__(_)_/|_)_(/_ \n" +
     "#  /|                       /|       \n" +
     "# (/                       (/        \n" +
-    "#" + "==========================================" * 2 + "\n"
+    "#"+"=========================================="*2+"\n"
          )
     
     cnfg.save_freq = min(
@@ -59,6 +59,10 @@ def swe(cnfg):
         cnfg.ke_upwind = "NONE"
     if ("CENTRE" in cnfg.pv_scheme): 
         cnfg.pv_upwind = "NONE"
+    
+    cnfg.anylaw_cd = max([
+        cnfg.linlaw_cd, cnfg.sqrlaw_cd, cnfg.loglaw_z0
+        ] )
     
     name = cnfg.mesh_file
     path, file = os.path.split(name)
@@ -284,7 +288,7 @@ if (__name__ == "__main__"):
         help="Path to user INITIAL conditions file.")
         
     parser.add_argument(
-        "--forc-file", dest="forc_file", type=str,
+        "--srcs-file", dest="srcs_file", type=str,
         required=False, 
         help="Path to user FORCING tendencies file.")
 
@@ -451,6 +455,18 @@ if (__name__ == "__main__"):
         default=1.E+00,
         required=False,
         help="DEL^k(U) div. amplifier {MUL. = +1.E+00}.")
+
+    parser.add_argument(
+        "--linlaw-cd", dest="linlaw_cd", type=float,
+        default=0.E+00,
+        required=False,
+        help="Linear-law Cd coefficient {Cd = +0.E+00}.")
+        
+    parser.add_argument(
+        "--sqrlaw-cd", dest="sqrlaw_cd", type=float,
+        default=0.E+00,
+        required=False,
+        help="Square-law Cd coefficient {Cd = +0.E+00}.")
 
     parser.add_argument(
         "--loglaw-z0", dest="loglaw_z0", type=float,
