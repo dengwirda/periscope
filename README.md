@@ -18,7 +18,7 @@ $$
 $$
 
 $$
-c_{d} = c_{1} + (c_{2} + c_{l}) \frac{\|u\|}{h}\ , \quad c_{l} = \frac{\kappa^{2}}{\log^{2}\Big(1+\frac{h}{2 z_{0}}\Big)}\ .
+c_{d} = c_{1} + (c_{2} + c_{l}) \frac{1}{h} \|u\|\ , \quad c_{l} = \frac{\kappa^{2}}{\log^{2}\Big(1+\frac{h}{2 z_{0}}\Big)}\ .
 $$
 
 A staggered, unstructured mesh mimetic finite-volume / difference discretisation 
