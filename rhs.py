@@ -99,6 +99,11 @@ def rhs_slw_u(mesh, trsk, flow, cnfg, hh_cell, uu_edge, ru_edge):
     
     ru_edge = addtendVU(mesh, trsk, cnfg, uu_edge, ru_edge)
     
+    
+    #!!
+    ru_edge-= flow.Tu_edge[0, :, 0] / hh_edge
+    
+    
     ru_edge[mesh.edge.mask] = reals_t(0.0)
     
     return ru_edge

@@ -51,9 +51,6 @@ def load_mesh(name, rsph=None):
     mesh.edge.zpos = np.array(data.variables["zEdge"]) * scal
     mesh.edge.xlon = np.array(data.variables["lonEdge"])
     mesh.edge.ylat = np.array(data.variables["latEdge"])
-    mesh.edge.beta = np.array(data.variables["angleEdge"])
-    mesh.edge.cos_ = np.cos(mesh.edge.beta)
-    mesh.edge.sin_ = np.sin(mesh.edge.beta)
     mesh.edge.vert = \
         np.array(data.variables["verticesOnEdge"])
     mesh.edge.wmul = \
@@ -78,44 +75,33 @@ def load_mesh(name, rsph=None):
         np.array(data.variables["cellsOnVertex"])
 
     mesh.edge.wmul = np.asarray(
-        mesh.edge.wmul, dtype=reals_t)
+        (mesh.edge.wmul), dtype=reals_t)
 
+    # masking at boundaries of mesh; edges/duals via cells
+    mesh.cell.mask = np.full(
+        (mesh.cell.size), False, dtype=bool)
+    mesh.edge.mask = np.full(
+        (mesh.edge.size), False, dtype=bool)
+    mesh.edge.mask[np.logical_or.reduce((
+        mesh.edge.cell[:, 0] <= 0,
+        mesh.edge.cell[:, 1] <= 0))] = True
+    mesh.vert.mask = np.full(
+        (mesh.vert.size), False, dtype=bool)
+    mesh.vert.mask[np.logical_or.reduce((
+        mesh.vert.cell[:, 0] <= 0,
+        mesh.vert.cell[:, 1] <= 0,
+        mesh.vert.cell[:, 2] <= 0))] = True
+
+    # compute the areas, normals and intersection of cells
     mesh.edge.xprp, mesh.edge.yprp, mesh.edge.zprp, \
     mesh.edge.xnrm, mesh.edge.ynrm, mesh.edge.znrm= \
         mesh_vecs(mesh)
 
-    mesh.cell.xmid = \
-        cell_quad(mesh, mesh.cell.xpos, mesh.vert.xpos)
-    mesh.cell.ymid = \
-        cell_quad(mesh, mesh.cell.ypos, mesh.vert.ypos)
-    mesh.cell.zmid = \
-        cell_quad(mesh, mesh.cell.zpos, mesh.vert.zpos)
-
-    mesh.cell.xmid, mesh.cell.ymid, mesh.cell.zmid, \
-    mesh.cell.mlon, mesh.cell.mlat = to_sphere(
-        mesh, mesh.cell.xmid, mesh.cell.ymid, mesh.cell.zmid)
-
-    mesh.edge.xmid = \
-        edge_quad(mesh, mesh.cell.xpos, mesh.vert.xpos)
-    mesh.edge.ymid = \
-        edge_quad(mesh, mesh.cell.ypos, mesh.vert.ypos)
-    mesh.edge.zmid = \
-        edge_quad(mesh, mesh.cell.zpos, mesh.vert.zpos)
-
-    mesh.edge.xmid, mesh.edge.ymid, mesh.edge.zmid, \
-    mesh.edge.mlon, mesh.edge.mlat = to_sphere(
-        mesh, mesh.edge.xmid, mesh.edge.ymid, mesh.edge.zmid)
-
-    mesh.vert.xmid = \
-        dual_quad(mesh, mesh.cell.xpos, mesh.vert.xpos)
-    mesh.vert.ymid = \
-        dual_quad(mesh, mesh.cell.ypos, mesh.vert.ypos)
-    mesh.vert.zmid = \
-        dual_quad(mesh, mesh.cell.zpos, mesh.vert.zpos)
-
-    mesh.vert.xmid, mesh.vert.ymid, mesh.vert.zmid, \
-    mesh.vert.mlon, mesh.vert.mlat = to_sphere(
-        mesh, mesh.vert.xmid, mesh.vert.ymid, mesh.vert.zmid)
+    mesh.edge.vlen, \
+    mesh.edge.dlen = mesh_arcs (mesh)
+    
+    mesh.edge.beta, mesh.edge.sin_, mesh.edge.cos_= \
+        mesh_sine(mesh)
 
     mesh.vert.kite = mesh_kite (mesh)
     mesh.edge.tail = mesh_tail (mesh)
@@ -124,9 +110,6 @@ def load_mesh(name, rsph=None):
     mesh.cell.area = cell_area (mesh)
     mesh.vert.area = np.sum(mesh.vert.kite, axis=1)
     mesh.edge.area = np.sum(mesh.edge.wing, axis=1)
-    
-    mesh.edge.vlen, \
-    mesh.edge.dlen = mesh_arcs (mesh)
     
     # can set this as 2 * A_e / l_e instead of the TRSK-CV
     # operators, as per Weller
@@ -437,16 +420,16 @@ def mesh_vecs(mesh):
         ) )
 
     xhat[mask] = (
-        mesh.cell.xpos[mesh.edge.cell[mask, 1] - 1] -
-        mesh.edge.xpos[mask]
+        mesh.edge.xpos[mask] - 
+        mesh.cell.xpos[mesh.edge.cell[mask, 1] - 1]
     )
     yhat[mask] = (
-        mesh.cell.ypos[mesh.edge.cell[mask, 1] - 1] -
-        mesh.edge.ypos[mask]
+        mesh.edge.ypos[mask] - 
+        mesh.cell.ypos[mesh.edge.cell[mask, 1] - 1]
     )
     zhat[mask] = (
-        mesh.cell.zpos[mesh.edge.cell[mask, 1] - 1] -
-        mesh.edge.zpos[mask]
+        mesh.edge.zpos[mask] - 
+        mesh.cell.zpos[mesh.edge.cell[mask, 1] - 1]
     )
     
     mask = np.logical_and.reduce((
@@ -471,8 +454,74 @@ def mesh_vecs(mesh):
     xnrm = np.asarray (xhat / lhat, dtype=reals_t)
     ynrm = np.asarray (yhat / lhat, dtype=reals_t)
     znrm = np.asarray (zhat / lhat, dtype=reals_t)
-
+    
     return xprp, yprp, zprp, xnrm, ynrm, znrm
+  
+  
+def mesh_sine(mesh):
+
+#-- compute edge-to-east angles
+
+    beta = np.zeros(mesh.edge.size, dtype=flt64_t)
+
+    dphi = mesh.edge.vlen / mesh.rsph / 2.
+
+    mask = mesh.edge.ylat >= 0.
+    
+    xnew = mesh.rsph * np.cos(mesh.edge.xlon[mask]) * \
+                       np.cos(mesh.edge.ylat[mask] - dphi[mask])
+    ynew = mesh.rsph * np.sin(mesh.edge.xlon[mask]) * \
+                       np.cos(mesh.edge.ylat[mask] - dphi[mask])
+    znew = mesh.rsph * np.sin(mesh.edge.ylat[mask] - dphi[mask])
+  
+    xone = mesh.vert.xpos[mesh.edge.vert[mask, 0] - 1] - \
+           mesh.edge.xpos[mask]        
+    yone = mesh.vert.ypos[mesh.edge.vert[mask, 0] - 1] - \
+           mesh.edge.ypos[mask]
+    zone = mesh.vert.zpos[mesh.edge.vert[mask, 0] - 1] - \
+           mesh.edge.zpos[mask]
+           
+    xtwo = xnew - mesh.edge.xpos[mask]
+    ytwo = ynew - mesh.edge.ypos[mask]
+    ztwo = znew - mesh.edge.zpos[mask]
+ 
+    len1 = np.sqrt(xone ** 2 + yone ** 2 + zone ** 2)
+    len2 = np.sqrt(xtwo ** 2 + ytwo ** 2 + ztwo ** 2)
+ 
+    beta[mask] = np.arccos(
+        (xone * xtwo + yone * ytwo + zone * ztwo) / len1 / len2)
+ 
+    mask = mesh.edge.ylat <  0.
+
+    xnew = mesh.rsph * np.cos(mesh.edge.xlon[mask]) * \
+                       np.cos(mesh.edge.ylat[mask] + dphi[mask])
+    ynew = mesh.rsph * np.sin(mesh.edge.xlon[mask]) * \
+                       np.cos(mesh.edge.ylat[mask] + dphi[mask])
+    znew = mesh.rsph * np.sin(mesh.edge.ylat[mask] + dphi[mask])
+  
+    xone = mesh.vert.xpos[mesh.edge.vert[mask, 1] - 1] - \
+           mesh.edge.xpos[mask]        
+    yone = mesh.vert.ypos[mesh.edge.vert[mask, 1] - 1] - \
+           mesh.edge.ypos[mask]
+    zone = mesh.vert.zpos[mesh.edge.vert[mask, 1] - 1] - \
+           mesh.edge.zpos[mask]
+           
+    xtwo = xnew - mesh.edge.xpos[mask]
+    ytwo = ynew - mesh.edge.ypos[mask]
+    ztwo = znew - mesh.edge.zpos[mask]
+ 
+    len1 = np.sqrt(xone ** 2 + yone ** 2 + zone ** 2)
+    len2 = np.sqrt(xtwo ** 2 + ytwo ** 2 + ztwo ** 2)
+ 
+    beta[mask] = np.arccos(
+        (xone * xtwo + yone * ytwo + zone * ztwo) / len1 / len2)
+
+    sin_ = np.asarray(np.sin(beta), dtype=reals_t)
+    cos_ = np.asarray(np.cos(beta), dtype=reals_t)
+    
+    beta = np.asarray(beta, dtype=reals_t)
+
+    return beta, sin_, cos_
     
 
 def sort_mesh(mesh, sort=None):
@@ -517,15 +566,13 @@ def sort_mesh(mesh, sort=None):
     mesh.cell.xpos = mesh.cell.xpos[mesh.cell.ifwd - 1]
     mesh.cell.ypos = mesh.cell.ypos[mesh.cell.ifwd - 1]
     mesh.cell.zpos = mesh.cell.zpos[mesh.cell.ifwd - 1]
-    mesh.cell.xmid = mesh.cell.xmid[mesh.cell.ifwd - 1]
-    mesh.cell.ymid = mesh.cell.ymid[mesh.cell.ifwd - 1]
-    mesh.cell.zmid = mesh.cell.zmid[mesh.cell.ifwd - 1]
     mesh.cell.xlon = mesh.cell.xlon[mesh.cell.ifwd - 1]
     mesh.cell.ylat = mesh.cell.ylat[mesh.cell.ifwd - 1]
     mesh.cell.vert = mesh.cell.vert[mesh.cell.ifwd - 1]
     mesh.cell.edge = mesh.cell.edge[mesh.cell.ifwd - 1]
     mesh.cell.cell = mesh.cell.cell[mesh.cell.ifwd - 1]
     mesh.cell.topo = mesh.cell.topo[mesh.cell.ifwd - 1]
+    mesh.cell.mask = mesh.cell.mask[mesh.cell.ifwd - 1]
 
 #-- 2. sort duals via pseudo-linear cell-wise ordering
 
@@ -553,14 +600,12 @@ def sort_mesh(mesh, sort=None):
     mesh.vert.xpos = mesh.vert.xpos[mesh.vert.ifwd - 1]
     mesh.vert.ypos = mesh.vert.ypos[mesh.vert.ifwd - 1]
     mesh.vert.zpos = mesh.vert.zpos[mesh.vert.ifwd - 1]
-    mesh.vert.xmid = mesh.vert.xmid[mesh.vert.ifwd - 1]
-    mesh.vert.ymid = mesh.vert.ymid[mesh.vert.ifwd - 1]
-    mesh.vert.zmid = mesh.vert.zmid[mesh.vert.ifwd - 1]
     mesh.vert.xlon = mesh.vert.xlon[mesh.vert.ifwd - 1]
     mesh.vert.ylat = mesh.vert.ylat[mesh.vert.ifwd - 1]
     mesh.vert.kite = mesh.vert.kite[mesh.vert.ifwd - 1]
     mesh.vert.edge = mesh.vert.edge[mesh.vert.ifwd - 1]
     mesh.vert.cell = mesh.vert.cell[mesh.vert.ifwd - 1]
+    mesh.vert.mask = mesh.vert.mask[mesh.vert.ifwd - 1]
 
 #-- 3. sort edges via pseudo-linear cell-wise ordering
 
@@ -592,9 +637,6 @@ def sort_mesh(mesh, sort=None):
     mesh.edge.xpos = mesh.edge.xpos[mesh.edge.ifwd - 1]
     mesh.edge.ypos = mesh.edge.ypos[mesh.edge.ifwd - 1]
     mesh.edge.zpos = mesh.edge.zpos[mesh.edge.ifwd - 1]
-    mesh.edge.xmid = mesh.edge.xmid[mesh.edge.ifwd - 1]
-    mesh.edge.ymid = mesh.edge.ymid[mesh.edge.ifwd - 1]
-    mesh.edge.zmid = mesh.edge.zmid[mesh.edge.ifwd - 1]
     mesh.edge.xprp = mesh.edge.xprp[mesh.edge.ifwd - 1]
     mesh.edge.yprp = mesh.edge.yprp[mesh.edge.ifwd - 1]
     mesh.edge.zprp = mesh.edge.zprp[mesh.edge.ifwd - 1]
@@ -617,6 +659,7 @@ def sort_mesh(mesh, sort=None):
     mesh.edge.cell = mesh.edge.cell[mesh.edge.ifwd - 1]
     mesh.edge.edge = mesh.edge.edge[mesh.edge.ifwd - 1]
     mesh.edge.topo = mesh.edge.topo[mesh.edge.ifwd - 1]
+    mesh.edge.mask = mesh.edge.mask[mesh.edge.ifwd - 1]
 
     return mesh
 
@@ -659,9 +702,12 @@ def load_flow(name, mesh=None, lean=False):
     flow.uu_edge = np.zeros(
         (one_, nedg, nlev), dtype=reals_t)
         
-    flow.Su_edge = np.zeros(
+    flow.Tu_edge = np.zeros(
         (one_, nedg, nlev), dtype=reals_t)
+            
     flow.Sh_cell = np.zeros(
+        (one_, ncel, nlev), dtype=reals_t)
+    flow.Ph_cell = np.zeros(
         (one_, ncel, nlev), dtype=reals_t)
     
     if ("h" in data.variables.keys()):
@@ -710,10 +756,13 @@ def load_flow(name, mesh=None, lean=False):
     if ("uu_edge" in data.variables.keys()):
         flow.uu_edge = np.array(data.variables["uu_edge"])
     
-    if ("Su_edge" in data.variables.keys()):
-        flow.Su_edge = np.array(data.variables["Su_edge"])
+    if ("Tu_edge" in data.variables.keys()):
+        flow.Tu_edge = np.array(data.variables["Tu_edge"])
+        
     if ("Sh_cell" in data.variables.keys()):
         flow.Sh_cell = np.array(data.variables["Sh_cell"])
+    if ("Ph_cell" in data.variables.keys()):
+        flow.Ph_cell = np.array(data.variables["Ph_cell"])
     
     if (lean is True): return flow
       
@@ -784,8 +833,10 @@ def sort_flow(flow, mesh=None, lean=False):
     
     flow.uu_edge = flow.uu_edge[:, mesh.edge.ifwd - 1, :]
     
-    flow.Su_edge = flow.Su_edge[:, mesh.edge.ifwd - 1, :]
+    flow.Tu_edge = flow.Tu_edge[:, mesh.edge.ifwd - 1, :]
+    
     flow.Sh_cell = flow.Sh_cell[:, mesh.cell.ifwd - 1, :]
+    flow.Ph_cell = flow.Ph_cell[:, mesh.cell.ifwd - 1, :]
     
     if (lean is True): return flow
     

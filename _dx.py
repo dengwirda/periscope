@@ -31,19 +31,36 @@ def scalingVk(mesh, trsk, cnfg):
 
 #-- local gridsize scaling on div^k and del^k operators
 
-    dx_edge = mesh.edge.dlen
-    dx_dual = trsk.dual_edge_sums * dx_edge / 3.
-    
-    dx_cell = trsk.cell_vert_sums * dx_dual
-    dx_cell/= mesh.cell.topo
+    # diam. of equiv. circle
+    dx_cell = 2. * np.sqrt(mesh.cell.area / np.pi)
 
-    s2_cell = (dx_cell / cnfg.dx_damp_r) ** 1
-    s4_cell = (dx_cell / cnfg.dx_damp_r) ** 3
-    
-    dx_edge = trsk.edge_cell_sums * dx_cell / 2.
+    # smooth near grid-scale
+    dx_edge = trsk.edge_wing_sums * dx_cell
+    dx_edge/= mesh.edge.area
 
-    s2_edge = (dx_edge / cnfg.dx_damp_r) ** 1
-    s4_edge = (dx_edge / cnfg.dx_damp_r) ** 3
+    dx_cell = trsk.cell_wing_sums * dx_edge
+    dx_cell/= mesh.cell.area
+
+    if (cnfg.ref_scale > 0.0):
+        s2_cell = (dx_cell / cnfg.ref_scale) ** 1
+        s4_cell = (dx_cell / cnfg.ref_scale) ** 3
+    else:
+        s2_cell = np.ones(
+            (mesh.cell.size), dtype=reals_t)
+        s4_cell = np.ones(
+            (mesh.cell.size), dtype=reals_t)
+    
+    dx_edge = trsk.edge_wing_sums * dx_cell
+    dx_edge/= mesh.edge.area
+
+    if (cnfg.ref_scale > 0.0):
+        s2_edge = (dx_edge / cnfg.ref_scale) ** 1
+        s4_edge = (dx_edge / cnfg.ref_scale) ** 3
+    else:
+        s2_edge = np.ones(
+            (mesh.edge.size), dtype=reals_t)
+        s4_edge = np.ones(
+            (mesh.edge.size), dtype=reals_t)
 
     return s2_edge, s4_edge, \
            s2_cell, s4_cell
@@ -308,7 +325,7 @@ def addtendDU(mesh, trsk, cnfg, uu_edge, uu_tend):
 
 #-- damping div^k operators
 
-    if (cnfg.du_damp_k == 0): return uu_tend
+    if (cnfg.du_visc_k == 0): return uu_tend
 
     ttic = time.time()
     
@@ -325,7 +342,7 @@ def addtendVU(mesh, trsk, cnfg, uu_edge, uu_tend):
 
 #-- viscous del^k operators
 
-    if (cnfg.vu_damp_k == 0): return uu_tend
+    if (cnfg.uu_visc_k == 0): return uu_tend
 
     ttic = time.time()
             
@@ -343,7 +360,7 @@ def addtendVH(mesh, trsk, cnfg, hh_cell, zb_cell,
 
 #-- diffusive del^k operators
 
-    if (cnfg.vh_damp_k == 0): return hh_tend
+    if (cnfg.hh_diff_k == 0): return hh_tend
 
     ttic = time.time()
 

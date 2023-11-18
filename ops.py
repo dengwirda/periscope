@@ -716,8 +716,8 @@ def dual_lsqr_mats(mesh):
         mesh.edge.yprp, mesh.edge.zprp)).T
 
     dnrm = np.vstack((
-        mesh.vert.xmid, 
-        mesh.vert.ymid, mesh.vert.zmid)).T
+        mesh.vert.xpos, 
+        mesh.vert.ypos, mesh.vert.zpos)).T
     
     dnrm = dnrm / mesh.rsph
     
@@ -852,8 +852,8 @@ def cell_lsqr_mats(mesh):
         mesh.edge.ynrm, mesh.edge.znrm)).T
 
     cnrm = np.vstack((
-        mesh.cell.xmid,
-        mesh.cell.ymid, mesh.cell.zmid)).T
+        mesh.cell.xpos,
+        mesh.cell.ypos, mesh.cell.zpos)).T
     
     cnrm = cnrm / mesh.rsph
        
@@ -865,6 +865,9 @@ def cell_lsqr_mats(mesh):
         (np.max(mesh.cell.topo) + 1,
          np.max(mesh.cell.topo) + 1,
          mesh.cell.size), dtype=flt64_t)
+         
+    wval = mesh.edge.area.T
+    wval[mesh.edge.mask] *= 2.0  # bnd edges
 
     for edge in range(np.max(mesh.cell.topo) + 1):
 
@@ -882,9 +885,7 @@ def cell_lsqr_mats(mesh):
         mask[cidx[np.logical_not(have)]] = False
         eidx = eidx[have]
 
-        area = mesh.edge.area[eidx].T
-
-        Wmat[edge, edge, mask] = area
+        Wmat[edge, edge, mask] = wval[eidx]
 
         Amat[edge,    :, mask] = edir[eidx]
     
@@ -997,9 +998,12 @@ def edge_lsqr_mats(mesh):
          np.max(mesh.edge.topo) + 1, 
          mesh.edge.size), dtype=flt64_t)
 
+    wval = mesh.edge.area.T
+    wval[mesh.edge.mask] *= 2.0  # bnd edges
+
     for edge in range(np.max(mesh.edge.topo) + 1):
 
-        Wmat[edge, edge, :] = mesh.edge.area.T
+        Wmat[edge, edge, :] = wval
 
     for edge in range(np.max(mesh.edge.topo) + 0):
 
@@ -1013,9 +1017,7 @@ def edge_lsqr_mats(mesh):
         mask[enum[np.logical_not(have)]] = False
         eidx = eidx[have]
 
-        area = mesh.edge.area[eidx].T
-
-        Wmat[edge, edge, mask] = area
+        Wmat[edge, edge, mask] = wval[eidx]
 
         Amat[edge,    :, mask] = ndir[eidx]
         Bmat[edge,    :, mask] = pdir[eidx]

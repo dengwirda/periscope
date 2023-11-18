@@ -207,6 +207,25 @@ def init_file(name, cnfg, save, mesh, flow):
     data["ff_vert"].long_name = "Coriolis parameter on duals"
     data["ff_vert"][:] = flow.ff_vert
 
+    data.createVariable("h2_diff", "f4", ("nCells"))
+    data["h2_diff"].long_name = "DEL^2(H) diffusion coefficient"
+    data.createVariable("h4_diff", "f4", ("nCells"))
+    data["h4_diff"].long_name = "DEL^4(H) diffusion coefficient"
+    
+    data.createVariable("d2_visc", "f4", ("nVertices"))
+    data["d2_visc"].long_name = \
+        "DIV^2(U) viscosity coefficient, remapped to duals"
+    data.createVariable("d4_visc", "f4", ("nVertices"))
+    data["d4_visc"].long_name = \
+        "DIV^4(U) viscosity coefficient, remapped to duals"
+    
+    data.createVariable("u2_visc", "f4", ("nVertices"))
+    data["u2_visc"].long_name = \
+        "DEL^2(U) viscosity coefficient, remapped to duals"
+    data.createVariable("u4_visc", "f4", ("nVertices"))
+    data["u4_visc"].long_name = \
+        "DEL^4(U) viscosity coefficient, remapped to duals"
+    
     data.createVariable(
         "u0_edge", "f4", ("nEdges", "nVertLevels"))
     data["u0_edge"].long_name = "Normal velocity initial conditions" 
@@ -244,12 +263,12 @@ def init_file(name, cnfg, save, mesh, flow):
     data.createVariable(
         "ke_bias", "f4", ("Time", "nVertices", "nVertLevels"))
     data["ke_bias"].long_name = \
-        "Upwind-bias for KE, averaged to duals"
+        "Upwind-bias for KE, remapped to duals"
     """
     data.createVariable(
         "pv_bias", "f4", ("Time", "nVertices", "nVertLevels"))
     data["pv_bias"].long_name = \
-        "Upwind-bias for PV, averaged to duals"
+        "Upwind-bias for PV, remapped to duals"
 
     data.createVariable(
         "ke_cell", "f4", ("Time", "nCells", "nVertLevels"))

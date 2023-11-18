@@ -1088,11 +1088,11 @@ def _computeDU(mesh, trsk, cnfg,
     cdef REALS_t *UU_EDGE = &uu_edge[0]
     cdef REALS_t *UU_TEND = &uu_tend[0]
     
-    cdef REALS_t[::1] d2_damp = cnfg.du_damp_2
-    cdef REALS_t *D2_DAMP = &d2_damp[0]
+    cdef REALS_t[::1] d2_visc = cnfg.du_visc_2
+    cdef REALS_t *D2_VISC = &d2_visc[0]
     
-    cdef REALS_t[::1] d4_damp = cnfg.du_damp_4
-    cdef REALS_t *D4_DAMP = &d4_damp[0]
+    cdef REALS_t[::1] d4_visc = cnfg.du_visc_4
+    cdef REALS_t *D4_VISC = &d4_visc[0]
     
     cdef INDEX_t[::1] cell_flux_xptr = \
         trsk.cell_flux_sums.indptr
@@ -1173,7 +1173,7 @@ def _computeDU(mesh, trsk, cnfg,
             xidx = CELL_FLUX_XIDX[iptr]
                 
             DU_CELL[cell]+= (xval * D2_EDGE[xidx]
-                                  * D4_DAMP[xidx])
+                                  * D4_VISC[xidx])
      
         DU_CELL[cell]/= MESH_CELL_AREA[cell]
 
@@ -1192,8 +1192,8 @@ def _computeDU(mesh, trsk, cnfg,
             D4_EDGE[edge]+= (xval * DU_CELL[xidx])
             
         UU_TEND[edge]-= (
-            D2_DAMP[edge] * D2_EDGE[edge]
-          - D4_DAMP[edge] * D4_EDGE[edge]
+            D2_VISC[edge] * D2_EDGE[edge]
+          - D4_VISC[edge] * D4_EDGE[edge]
             )
             
     put_vec_e  (d4_edge)       
@@ -1221,17 +1221,16 @@ def _computeVU(mesh, trsk, cnfg,
     cdef INDEX_t NEDG = mesh.edge.size
     cdef INDEX_t NCEL = mesh.cell.size
     
-    cdef REALS_t cnfg_vu_du_mul = cnfg.vu_du_mul
     cdef REALS_t cnfg_wall_slip = cnfg.wall_slip
     
     cdef REALS_t *UU_EDGE = &uu_edge[0]
     cdef REALS_t *UU_TEND = &uu_tend[0]
     
-    cdef REALS_t[::1] v2_damp = cnfg.vu_damp_2
-    cdef REALS_t *V2_DAMP = &v2_damp[0]
+    cdef REALS_t[::1] v2_visc = cnfg.uu_visc_2
+    cdef REALS_t *V2_VISC = &v2_visc[0]
     
-    cdef REALS_t[::1] v4_damp = cnfg.vu_damp_4
-    cdef REALS_t *V4_DAMP = &v4_damp[0]
+    cdef REALS_t[::1] v4_visc = cnfg.uu_visc_4
+    cdef REALS_t *V4_VISC = &v4_visc[0]
     
     cdef INDEX_t[::1] cell_flux_xptr = \
         trsk.cell_flux_sums.indptr
@@ -1314,8 +1313,7 @@ def _computeVU(mesh, trsk, cnfg,
             xidx = CELL_FLUX_XIDX[iptr]
                 
             DU_CELL[cell]+= (xval * UU_EDGE[xidx])
-     
-        DU_CELL[cell]*= cnfg_vu_du_mul     
+        
         DU_CELL[cell]/= MESH_CELL_AREA[cell]
         
     for vert in prange(0, NVRT, nogil=True, 
@@ -1376,9 +1374,8 @@ def _computeVU(mesh, trsk, cnfg,
             xidx = CELL_FLUX_XIDX[iptr]
                 
             DU_CELL[cell]+= (xval * V2_EDGE[xidx]
-                                  * V4_DAMP[xidx])
+                                  * V4_VISC[xidx])
      
-        DU_CELL[cell]*= cnfg_vu_du_mul
         DU_CELL[cell]/= MESH_CELL_AREA[cell]
 
     for vert in prange(0, NVRT, nogil=True, 
@@ -1393,7 +1390,7 @@ def _computeVU(mesh, trsk, cnfg,
             xidx = DUAL_CURL_XIDX[iptr]
                 
             RV_DUAL[vert]+= (xval * V2_EDGE[xidx]
-                                  * V4_DAMP[xidx])
+                                  * V4_VISC[xidx])
      
         RV_DUAL[vert]/= MESH_DUAL_AREA[vert]
         
@@ -1421,8 +1418,8 @@ def _computeVU(mesh, trsk, cnfg,
             V4_EDGE[edge]-= (xval * RV_DUAL[xidx])
             
         UU_TEND[edge]-= (
-            V2_DAMP[edge] * V2_EDGE[edge]
-          - V4_DAMP[edge] * V4_EDGE[edge]
+            V2_VISC[edge] * V2_EDGE[edge]
+          - V4_VISC[edge] * V4_EDGE[edge]
             )
                      
     put_vec_e  (v4_edge)       
@@ -1456,11 +1453,11 @@ def _computeVH(mesh, trsk, cnfg,
     cdef FLT32_t *ZB_CELL = &zb_cell[0]
     cdef REALS_t *HH_TEND = &hh_tend[0]
     
-    cdef REALS_t[::1] v2_damp = cnfg.vh_damp_2
-    cdef REALS_t *V2_DAMP = &v2_damp[0]
+    cdef REALS_t[::1] v2_diff = cnfg.hh_diff_2
+    cdef REALS_t *V2_DIFF = &v2_diff[0]
     
-    cdef REALS_t[::1] v4_damp = cnfg.vh_damp_4
-    cdef REALS_t *V4_DAMP = &v4_damp[0]
+    cdef REALS_t[::1] v4_diff = cnfg.hh_diff_4
+    cdef REALS_t *V4_DIFF = &v4_diff[0]
     
     cdef INDEX_t[::1] cell_flux_xptr = \
         trsk.cell_flux_sums.indptr
@@ -1548,7 +1545,7 @@ def _computeVH(mesh, trsk, cnfg,
                 
             HZ_EDGE[edge]+= \
                 xval * gg_cell * (
-                    V2_CELL[xidx] * V4_DAMP[xidx])
+                    V2_CELL[xidx] * V4_DIFF[xidx])
                     
         HZ_EDGE[edge]*= MESH_EDGE_MASK[edge]
         
@@ -1569,8 +1566,8 @@ def _computeVH(mesh, trsk, cnfg,
         V4_CELL[cell]/= MESH_CELL_AREA[cell]
         
         HH_TEND[cell]-= (
-            V2_DAMP[cell] * V2_CELL[cell]
-          - V4_DAMP[cell] * V4_CELL[cell]
+            V2_DIFF[cell] * V2_CELL[cell]
+          - V4_DIFF[cell] * V4_CELL[cell]
             )
     
     put_vec_c  (v4_cell)       
