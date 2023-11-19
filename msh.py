@@ -308,7 +308,7 @@ def mesh_wing(mesh):
             mesh.vert.ylat[mesh.edge.vert[mask, 0] - 1])).T
     )
     
-    mask = mesh.edge.cell[:, 0] >= 1
+    mask = mesh.edge.cell[:, 1] >= 1
     wing[mask, 1] = tria_area(
         mesh.rsph,
         np.vstack((
@@ -573,6 +573,7 @@ def sort_mesh(mesh, sort=None):
     mesh.cell.cell = mesh.cell.cell[mesh.cell.ifwd - 1]
     mesh.cell.topo = mesh.cell.topo[mesh.cell.ifwd - 1]
     mesh.cell.mask = mesh.cell.mask[mesh.cell.ifwd - 1]
+    mesh.cell.area = mesh.cell.area[mesh.cell.ifwd - 1]
 
 #-- 2. sort duals via pseudo-linear cell-wise ordering
 
@@ -606,6 +607,7 @@ def sort_mesh(mesh, sort=None):
     mesh.vert.edge = mesh.vert.edge[mesh.vert.ifwd - 1]
     mesh.vert.cell = mesh.vert.cell[mesh.vert.ifwd - 1]
     mesh.vert.mask = mesh.vert.mask[mesh.vert.ifwd - 1]
+    mesh.vert.area = mesh.vert.area[mesh.vert.ifwd - 1]
 
 #-- 3. sort edges via pseudo-linear cell-wise ordering
 
@@ -660,6 +662,7 @@ def sort_mesh(mesh, sort=None):
     mesh.edge.edge = mesh.edge.edge[mesh.edge.ifwd - 1]
     mesh.edge.topo = mesh.edge.topo[mesh.edge.ifwd - 1]
     mesh.edge.mask = mesh.edge.mask[mesh.edge.ifwd - 1]
+    mesh.edge.area = mesh.edge.area[mesh.edge.ifwd - 1]
 
     return mesh
 
@@ -736,6 +739,7 @@ def load_flow(name, mesh=None, lean=False):
         flow.is_mask = np.array(data.variables["is_mask"])
         flow.is_mask = flow.is_mask != 0  # to bool
         
+    #!! these indices may not exist...
     flow.uu_mask = np.logical_or.reduce((
         flow.is_mask[mesh.edge.cell[:, 0] - 1],
         flow.is_mask[mesh.edge.cell[:, 1] - 1]

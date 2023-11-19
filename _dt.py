@@ -330,7 +330,7 @@ def step_RK32(mesh, trsk, flow, cnfg,
 
     ttic = time.time()
 
-    hb_cell = sum_3_way(
+    hb_cell = sym_3_way(
         cnfg, hb_cell, 0.0 + 1.0 * BETA, h3_cell,
                        1.0 - 2.0 * BETA, h2_cell,
                        0.0 + 1.0 * BETA, hh_cell)

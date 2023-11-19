@@ -37,10 +37,19 @@ def scalingVk(mesh, trsk, cnfg):
     # smooth near grid-scale
     dx_edge = trsk.edge_wing_sums * dx_cell
     dx_edge/= mesh.edge.area
-
     dx_cell = trsk.cell_wing_sums * dx_edge
     dx_cell/= mesh.cell.area
-
+    
+    dx_edge = trsk.edge_wing_sums * dx_cell
+    dx_edge/= mesh.edge.area
+    dx_cell = trsk.cell_wing_sums * dx_edge
+    dx_cell/= mesh.cell.area
+    
+    dx_edge = trsk.edge_wing_sums * dx_cell
+    dx_edge/= mesh.edge.area
+    dx_cell = trsk.cell_wing_sums * dx_edge
+    dx_cell/= mesh.cell.area
+    
     if (cnfg.ref_scale > 0.0):
         s2_cell = (dx_cell / cnfg.ref_scale) ** 1
         s4_cell = (dx_cell / cnfg.ref_scale) ** 3

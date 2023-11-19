@@ -159,20 +159,20 @@ def trsk_mats(mesh):
         )
         
     mesh.vert.area = reals_t(mesh.vert.area)
-
+    
     mesh.edge.area = (
         0.5 * trsk.edge_wing_sums * crhs +
         0.5 * trsk.edge_tail_sums * vrhs
         )
 
     mesh.edge.area = reals_t(mesh.edge.area)
-
+    
     mesh.quad = base()
     mesh.quad.area = trsk.edge_vert_sums \
                    * mesh.vert.area
 
     mesh.quad.area = reals_t(mesh.quad.area)
-         
+       
     mesh.cell.area = (
         0.5 * trsk.cell_wing_sums * erhs +
         0.5 * trsk.cell_kite_sums * vrhs
@@ -866,7 +866,7 @@ def cell_lsqr_mats(mesh):
          np.max(mesh.cell.topo) + 1,
          mesh.cell.size), dtype=flt64_t)
          
-    wval = mesh.edge.area.T
+    wval = mesh.edge.area.copy().T
     wval[mesh.edge.mask] *= 2.0  # bnd edges
 
     for edge in range(np.max(mesh.cell.topo) + 1):
@@ -998,7 +998,7 @@ def edge_lsqr_mats(mesh):
          np.max(mesh.edge.topo) + 1, 
          mesh.edge.size), dtype=flt64_t)
 
-    wval = mesh.edge.area.T
+    wval = mesh.edge.area.copy().T
     wval[mesh.edge.mask] *= 2.0  # bnd edges
 
     for edge in range(np.max(mesh.edge.topo) + 1):

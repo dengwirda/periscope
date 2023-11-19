@@ -9,6 +9,8 @@ from scipy.integrate import quadrature
 import xarray
 import argparse
 
+from map import map
+
 sys.path.insert(
     1, os.path.join(sys.path[0], '..'))
 
@@ -20,7 +22,7 @@ from ops import trsk_mats
 # SWE test cases for linear wave problems
 # Authors: Darren Engwirda
 
-def init(name, save, rsph, case, xmid, ymid, hmag):
+def init(name, save, rsph, _ics, case, xmid, ymid, hmag):
 
 #------------------------------------ load an MPAS mesh file
 
@@ -53,8 +55,11 @@ def init(name, save, rsph, case, xmid, ymid, hmag):
 
     if (case == 3):
         tsu1(name, save, rsph, mesh, trsk, xmid, ymid, hmag)
+        
+    if (case == 4):
+        tsu2(name, save, rsph, mesh, trsk, _ics)
 
-    if (case >= 4):
+    if (case >= 5):
         ValueError("Unsupported test-case.")
 
     return
@@ -311,6 +316,89 @@ def tsu1(name, save, rsph, mesh, trsk, xmid, ymid, hmag):
     init.to_netcdf(save, format="NETCDF4")
 
     return
+    
+    
+def tsu2(name, save, rsph, mesh, trsk, _ics):
+
+#-- earth-topography tsunami-wave test-case w obs 
+
+    erot = 7.292E-05            # Earth's omega
+    grav = 9.80616              # gravity
+    
+    data = xarray.open_dataset(name)
+
+    if ("bed_elevation" not in data.variables.keys()):
+        raise ValueError("Elevation data not found.")
+
+    if ("ice_thickness" not in data.variables.keys()):
+        raise ValueError("Elevation data not found.")
+
+    zb_cell = np.asarray(
+        data["bed_elevation"][:], dtype=np.float64)
+    zb_cell+= np.asarray(
+        data["ice_thickness"][:], dtype=np.float64)
+
+    zb_cell = np.minimum(-1., zb_cell)
+    
+    uu_edge = np.zeros(mesh.edge.size, dtype=np.float64)
+
+    dz_data = np.loadtxt(_ics)
+
+    mask = dz_data[:, 0] > 0.
+    xlon = dz_data[mask, 1] * np.pi / 180.
+    ylat = dz_data[mask, 2] * np.pi / 180.
+    dlev = dz_data[mask, 3]
+
+    zt_cell = map(mesh, xlon, ylat, dlev)
+
+    hh_cell = np.maximum(1., -zb_cell + zt_cell)
+    
+#-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
+
+    print("Output written to:", save)
+
+    init = xarray.open_dataset(name)
+    init.attrs.update({"sphere_radius": mesh.rsph})
+    init.attrs.update({"config_gravity": grav})
+    init["xCell"] = (("nCells"), mesh.cell.xpos)
+    init["yCell"] = (("nCells"), mesh.cell.ypos)
+    init["zCell"] = (("nCells"), mesh.cell.zpos)
+    init["areaCell"] = (("nCells"), mesh.cell.area)
+
+    init["xEdge"] = (("nEdges"), mesh.edge.xpos)
+    init["yEdge"] = (("nEdges"), mesh.edge.ypos)
+    init["zEdge"] = (("nEdges"), mesh.edge.zpos)
+    init["dvEdge"] = (("nEdges"), mesh.edge.vlen)
+    init["dcEdge"] = (("nEdges"), mesh.edge.clen)
+
+    init["xVertex"] = (("nVertices"), mesh.vert.xpos)
+    init["yVertex"] = (("nVertices"), mesh.vert.ypos)
+    init["zVertex"] = (("nVertices"), mesh.vert.zpos)
+    init["areaTriangle"] = (("nVertices"), mesh.vert.area)
+    init["kiteAreasOnVertex"] = (
+        ("nVertices", "vertexDegree"), mesh.vert.kite)
+
+    init["hh_cell"] = (
+        ("Time", "nCells", "nVertLevels"),
+        np.reshape(hh_cell, (1, mesh.cell.size, 1)))
+    init["zb_cell"] = (("nCells"), zb_cell)
+
+    init["uu_edge"] = (
+        ("Time", "nEdges", "nVertLevels"),
+        np.reshape(uu_edge, (1, mesh.edge.size, 1)))
+
+    init["ff_cell"] = (("nCells"),
+        2.00E+00 * erot * np.sin(mesh.cell.ylat))
+    init["ff_edge"] = (("nEdges"),
+        2.00E+00 * erot * np.sin(mesh.edge.ylat))
+    init["ff_vert"] = (("nVertices"),
+        2.00E+00 * erot * np.sin(mesh.vert.ylat))
+
+    print(init)
+
+    init.to_netcdf(save, format="NETCDF4")
+
+    return
 
 
 if (__name__ == "__main__"):
@@ -329,6 +417,10 @@ if (__name__ == "__main__"):
     parser.add_argument(
         "--test-case", dest="test_case", type=int,
         required=True, help="Test case number (1-3).")
+
+    parser.add_argument(
+        "--xydz-file", dest="xydz_file", type=str,
+        required=False, help="Path to user _dz file.")
 
     parser.add_argument(
         "--radius", dest="radius", type=float,
@@ -358,6 +450,7 @@ if (__name__ == "__main__"):
     init(name=args.mesh_file,
          save=args.init_file,
          rsph=args.radius,
+         _ics=args.xydz_file,
          case=args.test_case,
          xmid=args.wave_xmid,
          ymid=args.wave_ymid,

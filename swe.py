@@ -265,25 +265,31 @@ def swe(cnfg):
     xt_dual = trsk.dual_tail_sums * cnfg.du_visc_2
     xt_dual/= mesh.vert.area
     
-    data.variables["d2_visc"][:] = xt_dual
+    data.variables["d2_visc"][:] = \
+               xt_dual[mesh.vert.irev - 1]
     
     xt_dual = trsk.dual_tail_sums * cnfg.du_visc_4
     xt_dual/= mesh.vert.area
     
-    data.variables["d4_visc"][:] = xt_dual ** 2
+    data.variables["d4_visc"][:] = \
+               xt_dual[mesh.vert.irev - 1] ** 2
     
     xt_dual = trsk.dual_tail_sums * cnfg.uu_visc_2
     xt_dual/= mesh.vert.area
     
-    data.variables["u2_visc"][:] = xt_dual
+    data.variables["u2_visc"][:] = \
+               xt_dual[mesh.vert.irev - 1]
     
     xt_dual = trsk.dual_tail_sums * cnfg.uu_visc_4
     xt_dual/= mesh.vert.area
     
-    data.variables["u4_visc"][:] = xt_dual ** 2
+    data.variables["u4_visc"][:] = \
+               xt_dual[mesh.vert.irev - 1] ** 2
     
-    data.variables["h2_diff"][:] = (cnfg.hh_diff_2)
-    data.variables["h4_diff"][:] = (cnfg.hh_diff_4)
+    data.variables["h2_diff"][:] = \
+        cnfg.hh_diff_2[mesh.cell.irev - 1]
+    data.variables["h4_diff"][:] = \
+        cnfg.hh_diff_4[mesh.cell.irev - 1] ** 2
     
     data.close()
 
