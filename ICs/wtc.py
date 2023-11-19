@@ -10,7 +10,7 @@ import xarray
 import argparse
 
 sys.path.insert(
-    1, os.path.join(sys.path[0], '..'))
+    1, os.path.join(sys.path[0], ".."))
 
 from stb import strtobool
 

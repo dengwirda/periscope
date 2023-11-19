@@ -115,6 +115,29 @@ A number of test cases are available to run out-of-the-box:
     --no-advect=TRUE \
     --no-rotate=TRUE \
     --numthread=cores
+    
+### `Tohoku tsunami wave`
+
+    python3 wav.py \
+    --mesh-file="mesh_pac_10_1p875km.nc" \
+    --init-file="tok_10_1p875km.nc" \
+    --test-case=4 \
+    --xydz-file="fujii.txydz"
+    
+    python3 swe.py \ 
+    --mesh-file="tok_10_1p875km.nc" \
+    --num-steps=1920 \
+    --time-step=15. \
+    --save-freq=40 \
+    --stat-freq=40 \
+    --wall-slip=1. \
+    --hh-scheme="UPWIND" \
+    --uu-visc-4=1.E+11 \
+    --hh-diff-4=1.E+11 \
+    --loglaw-z0=0.001 \
+    --loglaw-lo=0.0025 \
+    --loglaw-hi=10. \
+    --numthread=cores
 
 ### `Merging vortex pair`
 

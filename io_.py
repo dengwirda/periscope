@@ -42,6 +42,7 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
         np.reshape(xt_cell[
             mesh.cell.irev - 1], (1, mesh.cell.size, 1))
 
+    """
     xt_edge = uu_edge * hh_edge
     xt_cell = trsk.cell_flux_sums * xt_edge
     xt_cell/= mesh.cell.area
@@ -50,7 +51,6 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
         np.reshape(xt_cell[
             mesh.cell.irev - 1], (1, mesh.cell.size, 1))
 
-    """
     xt_dual = trsk.dual_tail_sums * ke_bias
     xt_dual/= mesh.vert.area
 
@@ -253,13 +253,12 @@ def init_file(name, cnfg, save, mesh, flow):
         "du_cell", "f4", ("Time", "nCells", "nVertLevels"))
     data["du_cell"].long_name = \
         "Divergence of velocity on cells"
-        
+    """ 
     data.createVariable(
         "uh_cell", "f4", ("Time", "nCells", "nVertLevels"))
     data["uh_cell"].long_name = \
         "Divergence of thickness flux on cells"
 
-    """
     data.createVariable(
         "ke_bias", "f4", ("Time", "nVertices", "nVertLevels"))
     data["ke_bias"].long_name = \

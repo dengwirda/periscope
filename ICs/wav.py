@@ -9,15 +9,15 @@ from scipy.integrate import quadrature
 import xarray
 import argparse
 
-from map import map
-
 sys.path.insert(
-    1, os.path.join(sys.path[0], '..'))
+    1, os.path.join(sys.path[0], ".."))
 
 from stb import strtobool
 
 from msh import load_mesh, cell_quad, dual_quad
 from ops import trsk_mats
+
+from map import maptocell
 
 # SWE test cases for linear wave problems
 # Authors: Darren Engwirda
@@ -349,9 +349,9 @@ def tsu2(name, save, rsph, mesh, trsk, _ics):
     ylat = dz_data[mask, 2] * np.pi / 180.
     dlev = dz_data[mask, 3]
 
-    zt_cell = map(mesh, xlon, ylat, dlev)
+    zt_cell = maptocell(mesh, xlon, ylat, dlev)
 
-    hh_cell = np.maximum(1., -zb_cell + zt_cell)
+    hh_cell = np.maximum(1., zt_cell - zb_cell)
     
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
