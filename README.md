@@ -10,20 +10,16 @@ spherical domains (either the full sphere or regional pieces thereof), with
 support for various boundary conditions, drag laws and forcing types. 
 
 $$
-\frac{\partial h}{\partial t} + \nabla \cdot (u h) = \nu_{k}^{h}\nabla^{k}g(h + z_{b}) + S_{h}\ ,
+\frac{\partial h}{\partial t} + \nabla \cdot (u h) = D_{h} + S_{h}\ ,
 $$
 
 $$
 \frac{\partial u}{\partial t} + (u \cdot \nabla) u + f u^{\perp} = 
-    -\nabla \Big(g(h + z_{b}) + \phi_{u}\Big) - c_{d} u + \nu_{k}^{u} \nabla^{k} u + \frac{1}{h} \tau_{u} + S_{u}\ ,
+    -\nabla \Big(g(h + z_{b}) + \phi_{u}\Big) - c_{d} u + D_{u} + \frac{1}{h} \tau_{u} + S_{u}\ ,
 $$
 
 $$
-c_{d} = c_{1} + (c_{2} + c_{l}) \frac{1}{h} \|u\|\ , 
-$$
-
-$$
-c_{l} = \kappa^{2}\ \log^{-2}\Big(1+\frac{h}{2 z_{0}}\Big)\ .
+c_{d} = c_{1} + (c_{2} + c_{l}) \frac{1}{h} \|u\|\ .
 $$
 
 See `MODELS.md` for additional detail regarding the formulation.
