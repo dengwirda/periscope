@@ -10,11 +10,12 @@ spherical domains (either the full sphere or regional pieces thereof), with
 support for various boundary conditions, drag laws and forcing types. 
 
 $$
-\frac{\partial h}{\partial t} + \nabla \cdot (u h) = S_{h}\ ,
+\frac{\partial h}{\partial t} + \nabla \cdot (u h) = = \nu_{k}^{h}\nabla^{k}g(h + z_{b}) + S_{h}\ ,
 $$
 
 $$
-\frac{\partial u}{\partial t} + (u \cdot \nabla) u + f u^{\perp} = -\nabla \Big(g(h + z_{b}) + \phi_{u}\Big) - c_{d}\ u + \nu_{k} \nabla^{k} u + \frac{1}{h} \tau_{u}\ ,
+\frac{\partial u}{\partial t} + (u \cdot \nabla) u + f u^{\perp} = 
+    -\nabla \Big(g(h + z_{b}) + \phi_{u}\Big) - c_{d} u + \nu_{k}^{u} \nabla^{k} u + \frac{1}{h} \tau_{u} + S_{u}\ ,
 $$
 
 $$
@@ -24,6 +25,8 @@ $$
 $$
 c_{l} = \kappa^{2}\ \log^{-2}\Big(1+\frac{h}{2 z_{0}}\Big)\ .
 $$
+
+See `MODELS.md` for additional detail regarding the formulation.
 
 A staggered, unstructured mesh mimetic finite-volume / difference discretisation 
 is employed that maintains the energy (and to a lesser extent enstrophy) balances 
