@@ -39,8 +39,13 @@ if (__name__ == "__main__"):
     args = parser.parse_args()
     
     # March 11, 05:46:23
+    # Add 3-mins, which is 1/2 of the 6-min earthquake
     init = 31. + 28. + 11. + \
-        (5. * 60. * 60. + 46. * 60. + 23.) / 24. / 60./ 60.
+        (5. * 60. * 60. + 
+        46. * 60. + 
+        23. + 
+        180.
+        ) / 24. / 60./ 60.
     
     print("Loading the mesh file...")
     
