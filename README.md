@@ -10,7 +10,7 @@ spherical domains (either the full sphere or regional pieces thereof), with
 support for various boundary conditions, drag laws and forcing types. 
 
 $$
-\frac{\partial h}{\partial t} + \nabla \cdot (u h) = = \nu_{k}^{h}\nabla^{k}g(h + z_{b}) + S_{h}\ ,
+\frac{\partial h}{\partial t} + \nabla \cdot (u h) = \nu_{k}^{h}\nabla^{k}g(h + z_{b}) + S_{h}\ ,
 $$
 
 $$
