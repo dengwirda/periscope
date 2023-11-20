@@ -82,7 +82,7 @@ if (__name__ == "__main__"):
     plt.xlabel("Hours since event")
     
     plt.savefig(os.path.splitext(args.mesh_file)[0] + "_21413.png", 
-                bbox_inches="tight")
+                bbox_inches="tight", dpi=300)
     
     dart = np.loadtxt(os.path.join(HERE,
         "dart52402_20110301to20110320_meter.txt"))
@@ -118,7 +118,7 @@ if (__name__ == "__main__"):
     plt.xlabel("Hours since event")
     
     plt.savefig(os.path.splitext(args.mesh_file)[0] + "_52402.png", 
-                bbox_inches="tight")
+                bbox_inches="tight", dpi=300)
     
     dart = np.loadtxt(os.path.join(HERE,
         "dart21416_20110301to20110320_meter.txt"))
@@ -154,7 +154,7 @@ if (__name__ == "__main__"):
     plt.xlabel("Hours since event")
     
     plt.savefig(os.path.splitext(args.mesh_file)[0] + "_21416.png", 
-                bbox_inches="tight")
+                bbox_inches="tight", dpi=300)
     
     if args.show_plot: plt.show()
     
