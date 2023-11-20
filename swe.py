@@ -41,7 +41,7 @@ def swe(cnfg):
     cnfg.save_freq = min(
         cnfg.iteration, cnfg.save_freq)
     cnfg.stat_freq = min(
-        cnfg.save_freq, cnfg.stat_freq)
+        cnfg.iteration, cnfg.stat_freq)
     
     cnfg.calc_slow = True
     cnfg.calc_fast = True
