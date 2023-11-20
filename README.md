@@ -38,8 +38,8 @@ compiled:
     python3 setup.py build_ext --inplace
     
 While not currently intended for massively parallel HPC workflows, `PERISCOPE` is
-written to exploit thread-based parallelism via `OpenMP`, suitable for single-node
-systems.
+written to exploit thread-based parallelism via `OpenMP` and is well suited to run 
+on single-node systems.
 
 To run the shallow-water solver (see `swe.py --help`):
 
@@ -80,7 +80,7 @@ Vortex-driven configurations of [Roullet & Gaillard](https://doi.org/10.1029/202
     --init-file="path+name-to-mpas-init-file" \
     --test-case=N
 
-As well as a range of other flows &mdash; see the cases in `ICs` for details.
+as well as a range of other flows &mdash; see the cases in `ICs` for details.
 
 For example, to build + run the barotropic jet test case using the CVT-optimised 
 'level-7' icosahedral mesh provided in `PERISCOPE`'s
