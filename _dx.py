@@ -104,7 +104,7 @@ def diag_vars(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
 
     return hh_edge, hh_dual, ke_cell, ke_bias, \
            rv_cell, pv_cell, \
-           rv_dual, pv_dual, pv_edge, pv_bias,
+           rv_dual, pv_dual, pv_edge, pv_bias, \
            vv_edge
 
 
