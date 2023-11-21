@@ -55,6 +55,8 @@ def swe(cnfg):
     cnfg.pv_upwind = cnfg.pv_upwind.upper()
     cnfg.pv_scheme = cnfg.pv_scheme.upper()
     
+    cnfg.save_vars = cnfg.save_vars.lower()
+    
     if ("CENTRE" in cnfg.ke_scheme): 
         cnfg.ke_upwind = "NONE"
     if ("CENTRE" in cnfg.pv_scheme): 
@@ -349,6 +351,13 @@ if (__name__ == "__main__"):
         required=False, 
         default=np.iinfo(int).max, 
         help="Evaluate statistics at each FREQ-th step.")
+
+    parser.add_argument(
+        "--save-vars", dest="save_vars", type=str,
+        default=
+        "uu_edge,hh_cell,ke_cell,du_cell,rv_dual,pv_dual",
+        required=False,
+        help="Variables to save to file.")
 
     parser.add_argument(
         "--equations", dest="equations", type=str,

@@ -14,68 +14,111 @@ from log import tcpu
 
 from _dx import diag_vars
 
+class base: pass
+save = base()
+save.uu_edge = False  # True to write to file
+save.vv_edge = False
+save.hh_cell = False
+save.hh_edge = False
+save.hh_dual = False
+save.du_cell = False
+save.uh_cell = False
+save.ke_bias = False
+save.ke_cell = False
+save.pv_bias = False
+save.pv_dual = False
+save.rv_dual = False
+save.pv_cell = False
+save.rv_cell = False
+
 def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
 
     hh_edge, hh_dual, ke_cell, ke_bias, \
     rv_cell, pv_cell, rv_dual, pv_dual, \
-    pv_edge, pv_bias = diag_vars (
-        mesh, trsk, flow, cnfg, hh_cell, uu_edge)
+    pv_edge, pv_bias, vv_edge = diag_vars (
+        mesh, trsk, flow, cnfg, hh_cell, uu_edge
+        )
 
     ttic = time.time()
 
-    data = nc.Dataset(
-        save, "a", format="NETCDF4")
+    data = nc.Dataset(save, "a", format="NETCDF4")
 
     # xt variables are tmp scratch
 
-    data.variables["uu_edge"][step, :, :] = \
-        np.reshape(uu_edge[
-            mesh.edge.irev - 1], (1, mesh.edge.size, 1))
-    data.variables["hh_cell"][step, :, :] = \
-        np.reshape(hh_cell[
-            mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+    if (save.uu_edge):
+        data.variables["uu_edge"][step, :, :] = \
+            np.reshape(uu_edge[
+                mesh.edge.irev - 1], (1, mesh.edge.size, 1))
+                
+    if (save.vv_edge):
+        data.variables["vv_edge"][step, :, :] = \
+            np.reshape(vv_edge[
+                mesh.edge.irev - 1], (1, mesh.edge.size, 1))
+                
+    if (save.hh_cell):         
+        data.variables["hh_cell"][step, :, :] = \
+            np.reshape(hh_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+                
+    if (save.hh_edge):         
+        data.variables["hh_edge"][step, :, :] = \
+            np.reshape(hh_edge[
+                mesh.edge.irev - 1], (1, mesh.edge.size, 1))
+                
+    if (save.hh_dual):         
+        data.variables["hh_dual"][step, :, :] = \
+            np.reshape(hh_dual[
+                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
 
-    xt_cell = trsk.cell_flux_sums * uu_edge
-    xt_cell/= mesh.cell.area
+    if (save.du_cell):
+        xt_cell = trsk.cell_flux_sums * uu_edge
+        xt_cell/= mesh.cell.area
 
-    data.variables["du_cell"][step, :, :] = \
-        np.reshape(xt_cell[
-            mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+        data.variables["du_cell"][step, :, :] = \
+            np.reshape(xt_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
 
-    """
-    xt_edge = uu_edge * hh_edge
-    xt_cell = trsk.cell_flux_sums * xt_edge
-    xt_cell/= mesh.cell.area
+    if (save.uh_cell):
+        xt_edge = uu_edge * hh_edge
+        xt_cell = trsk.cell_flux_sums * xt_edge
+        xt_cell/= mesh.cell.area
 
-    data.variables["uh_cell"][step, :, :] = \
-        np.reshape(xt_cell[
-            mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+        data.variables["uh_cell"][step, :, :] = \
+            np.reshape(xt_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
 
-    xt_dual = trsk.dual_tail_sums * ke_bias
-    xt_dual/= mesh.vert.area
+    if (save.ke_cell):
+        data.variables["ke_cell"][step, :, :] = \
+            np.reshape(ke_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1)) 
 
-    data.variables["ke_bias"][step, :, :] = \
-        np.reshape(xt_dual[
-            mesh.vert.irev - 1], (1, mesh.vert.size, 1))
-    """
+    if (save.pv_bias)
+        xt_dual = trsk.dual_tail_sums * pv_bias
+        xt_dual/= mesh.vert.area
 
-    data.variables["ke_cell"][step, :, :] = \
-        np.reshape(ke_cell[
-            mesh.cell.irev - 1], (1, mesh.cell.size, 1)) 
-
-    xt_dual = trsk.dual_tail_sums * pv_bias
-    xt_dual/= mesh.vert.area
-
-    data.variables["pv_bias"][step, :, :] = \
-        np.reshape(xt_dual[
-            mesh.vert.irev - 1], (1, mesh.vert.size, 1))
-            
-    data.variables["pv_dual"][step, :, :] = \
-        np.reshape(pv_dual[
-            mesh.vert.irev - 1], (1, mesh.vert.size, 1))
-    data.variables["rv_dual"][step, :, :] = \
-        np.reshape(rv_dual[
-            mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+        data.variables["pv_bias"][step, :, :] = \
+            np.reshape(xt_dual[
+                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+    
+    if (save.pv_dual):        
+        data.variables["pv_dual"][step, :, :] = \
+            np.reshape(pv_dual[
+                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+    
+    if (save.rv_dual):
+        data.variables["rv_dual"][step, :, :] = \
+            np.reshape(rv_dual[
+                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                
+    if (save.pv_cell):        
+        data.variables["pv_cell"][step, :, :] = \
+            np.reshape(pv_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+    
+    if (save.rv_cell):
+        data.variables["rv_cell"][step, :, :] = \
+            np.reshape(rv_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
 
     data.close()
     
@@ -242,42 +285,87 @@ def init_file(name, cnfg, save, mesh, flow):
     data["en_sums"].long_name = \
         "Rotational invariant: total PV**2 over time"
 
-    data.createVariable(
-        "uu_edge", "f4", ("Time", "nEdges", "nVertLevels"))
-    data["uu_edge"].long_name = "Normal velocity on edges"    
-    data.createVariable(
-        "hh_cell", "f4", ("Time", "nCells", "nVertLevels"))    
-    data["hh_cell"].long_name = "Layer thickness on cells"
+    if ("uu_edge" in cnfg.save_vars):
+        data.createVariable(
+            "uu_edge", "f4", ("Time", "nEdges", "nVertLevels"))
+        data["uu_edge"].long_name = "Normal velocity on edges" 
+        save.uu_edge = True
+    
+    if ("hh_cell" in cnfg.save_vars):   
+        data.createVariable(
+            "hh_cell", "f4", ("Time", "nCells", "nVertLevels"))    
+        data["hh_cell"].long_name = "Layer thickness on cells"
+        save.hh_cell = True
+        
+    if ("hh_edge" in cnfg.save_vars):   
+        data.createVariable(
+            "hh_edge", "f4", ("Time", "nEdges", "nVertLevels"))    
+        data["hh_edge"].long_name = "Layer thickness on edges"
+        save.hh_edge = True
+        
+    if ("hh_dual" in cnfg.save_vars):   
+        data.createVariable(
+            "hh_dual", "f4", ("Time", "nVertices", "nVertLevels"))    
+        data["hh_dual"].long_name = "Layer thickness on vertices"
+        save.hh_dual = True
 
-    data.createVariable(
-        "du_cell", "f4", ("Time", "nCells", "nVertLevels"))
-    data["du_cell"].long_name = \
-        "Divergence of velocity on cells"
-    """ 
-    data.createVariable(
-        "uh_cell", "f4", ("Time", "nCells", "nVertLevels"))
-    data["uh_cell"].long_name = \
-        "Divergence of thickness flux on cells"
+    if ("du_cell" in cnfg.save_vars):
+        data.createVariable(
+            "du_cell", "f4", ("Time", "nCells", "nVertLevels"))
+        data["du_cell"].long_name = \
+            "Divergence of velocity on cells"
+        save.du_cell = True
+    
+    if ("uh_cell" in cnfg.save_vars):
+        data.createVariable(
+            "uh_cell", "f4", ("Time", "nCells", "nVertLevels"))
+        data["uh_cell"].long_name = \
+            "Divergence of thickness flux on cells"
+        save.uh_cell = True
 
-    data.createVariable(
-        "ke_bias", "f4", ("Time", "nVertices", "nVertLevels"))
-    data["ke_bias"].long_name = \
-        "Upwind-bias for KE, remapped to duals"
-    """
-    data.createVariable(
-        "pv_bias", "f4", ("Time", "nVertices", "nVertLevels"))
-    data["pv_bias"].long_name = \
-        "Upwind-bias for PV, remapped to duals"
+    if ("ke_bias" in cnfg.save_vars):
+        data.createVariable(
+            "ke_bias", "f4", ("Time", "nVertices", "nVertLevels"))
+        data["ke_bias"].long_name = \
+            "Upwind-bias for KE, remapped to duals"
+        save.ke_bias = True
+    
+    if ("pv_bias" in cnfg.save_vars):
+        data.createVariable(
+            "pv_bias", "f4", ("Time", "nVertices", "nVertLevels"))
+        data["pv_bias"].long_name = \
+            "Upwind-bias for PV, remapped to duals"
+        save.pv_bias = True
 
-    data.createVariable(
-        "ke_cell", "f4", ("Time", "nCells", "nVertLevels"))
-    data["ke_cell"].long_name = "Kinetic energy on cells"
-    data.createVariable(
-        "pv_dual", "f4", ("Time", "nVertices", "nVertLevels"))
-    data["pv_dual"].long_name = "Potential vorticity on duals"
-    data.createVariable(
-        "rv_dual", "f4", ("Time", "nVertices", "nVertLevels"))
-    data["rv_dual"].long_name = "Relative vorticity on duals"
+    if ("ke_cell" in cnfg.save_vars):
+        data.createVariable(
+            "ke_cell", "f4", ("Time", "nCells", "nVertLevels"))
+        data["ke_cell"].long_name = "Kinetic energy on cells"
+        save.ke_cell = True
+        
+    if ("pv_dual" in cnfg.save_vars):
+        data.createVariable(
+            "pv_dual", "f4", ("Time", "nVertices", "nVertLevels"))
+        data["pv_dual"].long_name = "Potential vorticity on duals"
+        save.pv_dual = True       
+    
+    if ("rv_dual" in cnfg.save_vars):
+        data.createVariable(
+            "rv_dual", "f4", ("Time", "nVertices", "nVertLevels"))
+        data["rv_dual"].long_name = "Relative vorticity on duals"
+        save.rv_dual = True
+        
+    if ("pv_cell" in cnfg.save_vars):
+        data.createVariable(
+            "pv_cell", "f4", ("Time", "nCells", "nVertLevels"))
+        data["pv_cell"].long_name = "Potential vorticity on cells"
+        save.pv_cell = True       
+    
+    if ("rv_cell" in cnfg.save_vars):
+        data.createVariable(
+            "rv_cell", "f4", ("Time", "nCells", "nVertLevels"))
+        data["rv_cell"].long_name = "Relative vorticity on cells"
+        save.rv_cell = True
 
     data.close()
     
