@@ -60,6 +60,7 @@ if (__name__ == "__main__"):
     time = dart[:, 0]
     zlev = dart[:, 9]
     zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
+    zlev-= np.nanmean(zlev)  # correct any const. bias
     mask = np.logical_and.reduce((
         time >= init + 1. / 24.,  # skip seismic waves
         time <= init + 8. / 24. ))
@@ -96,6 +97,7 @@ if (__name__ == "__main__"):
     time = dart[:, 0]
     zlev = dart[:, 9]
     zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
+    zlev-= np.nanmean(zlev)  # correct any const. bias
     mask = np.logical_and.reduce((
         time >= init + 3. / 24.,  # skip seismic waves
         time <= init + 8. / 24. ))
@@ -132,6 +134,7 @@ if (__name__ == "__main__"):
     time = dart[:, 0]
     zlev = dart[:, 9]
     zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
+    zlev-= np.nanmean(zlev)  # correct any const. bias
     mask = np.logical_and.reduce((
         time >= init + 2. / 24.,  # skip seismic waves
         time <= init + 8. / 24. ))

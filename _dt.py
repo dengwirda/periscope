@@ -371,54 +371,15 @@ def step_RK32(mesh, trsk, flow, cnfg,
 
 
 try:
+    # load cython kernels, if compiled
     from _kt import _set_x_vec as set_x_vec
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kt import _cpy_x_vec as cpy_x_vec
-    
-except ImportError:
-    raise RuntimeError("Cython back-end not found")    
-    
-try:
     from _kt import _adv_x_fst as adv_x_fst
-    
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-                
-try:
     from _kt import _adv_x_cmp as adv_x_cmp
-    
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-        
-try:
     from _kt import _inv_x_1st as inv_x_1st
-    
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-        
-try:
     from _kt import _inv_x_2nd as inv_x_2nd
-    
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kt import _sum_2_way as sum_2_way
-    
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kt import _sum_3_way as sum_3_way
-    
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-        
-try:
     from _kt import _sym_3_way as sym_3_way
     
 except ImportError:

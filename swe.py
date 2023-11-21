@@ -131,16 +131,6 @@ def swe(cnfg):
     flow.ff_edge*= (not cnfg.no_rotate)
     flow.ff_vert*= (not cnfg.no_rotate)
     
-    flow.zb_cell = np.asarray(
-        flow.zb_cell, dtype=flt32_t)
-
-    flow.ff_cell = np.asarray(
-        flow.ff_cell, dtype=flt32_t)
-    flow.ff_edge = np.asarray(
-        flow.ff_edge, dtype=flt32_t)
-    flow.ff_vert = np.asarray(
-        flow.ff_vert, dtype=flt32_t)
-    
     # always round IC's to flt32_t
     hh_cell = np.ascontiguousarray(
              hh_cell, dtype=flt32_t)
@@ -255,6 +245,10 @@ def swe(cnfg):
     print("*computeDU (sec):", round(tcpu.computeDU, 2))
     print("*computeVU (sec):", round(tcpu.computeVU, 2))
     print("*computeVH (sec):", round(tcpu.computeVH, 2))
+    print("*computeHr (sec):", round(tcpu.computeHr, 2))
+    print("*computeUr (sec):", round(tcpu.computeUr, 2))
+    print("*computeTU (sec):", round(tcpu.computeTU, 2))
+    print("*computePi (sec):", round(tcpu.computePi, 2))
     print("*computeCd (sec):", round(tcpu.computeCd, 2))
 
     data = nc.Dataset(save, "a", format="NETCDF4")
@@ -437,10 +431,7 @@ if (__name__ == "__main__"):
         "--ke-scheme", dest="ke_scheme", type=str,
         default="CENTRE",
         required=False, 
-        help="KE.-grad formulation = {CENTRE}, " +
-                                     "CENTRE+SKINNY, " +
-                                     "UPWIND, " + 
-                                     "UPWIND+SKINNY.")
+        help="KE.-grad formulation = {CENTRE}, SKINNY.")
 
     parser.add_argument(
         "--hh-expect", dest="hh_expect", type=float,

@@ -695,45 +695,55 @@ def load_flow(name, mesh=None, lean=False):
     flow.hh_cell = np.zeros(
         (one_, ncel, nlev), dtype=reals_t)
 
-    flow.zb_cell = np.zeros((ncel), dtype=reals_t)
+    flow.zb_cell = np.zeros((ncel), dtype=flt32_t)
     flow.is_mask = np.zeros((ncel), dtype=bool)
     
-    flow.ff_cell = np.zeros((ncel), dtype=reals_t)
-    flow.ff_edge = np.zeros((nedg), dtype=reals_t)
-    flow.ff_vert = np.zeros((nvrt), dtype=reals_t)
+    flow.ff_cell = np.zeros((ncel), dtype=flt32_t)
+    flow.ff_edge = np.zeros((nedg), dtype=flt32_t)
+    flow.ff_vert = np.zeros((nvrt), dtype=flt32_t)
 
     flow.uu_edge = np.zeros(
         (one_, nedg, nlev), dtype=reals_t)
         
-    flow.Tu_edge = np.zeros(
-        (one_, nedg, nlev), dtype=reals_t)
+    flow.Tu_edge = None  # external stress
+    flow.Pi_cell = None  # applied geopotential
             
-    flow.Sh_cell = np.zeros(
-        (one_, ncel, nlev), dtype=reals_t)
-    flow.Ph_cell = np.zeros(
-        (one_, ncel, nlev), dtype=reals_t)
-    
-    if ("h" in data.variables.keys()):
-        flow.hh_cell[0, :, :] = \
-            np.array(data.variables["h"][-1, :, :])
-    if ("h_s" in data.variables.keys()):
-        flow.zb_cell = np.array(data.variables["h_s"])
-
-    if ("fCell" in data.variables.keys()):
-        flow.ff_cell = np.array(data.variables["fCell"])
-    if ("fEdge" in data.variables.keys()):
-        flow.ff_edge = np.array(data.variables["fEdge"])
-    if ("fVertex" in data.variables.keys()):
-        flow.ff_vert = np.array(data.variables["fVertex"])
+    flow.zs_cell = None  # sponge-layer signals
+    flow.hr_cell = None
+    flow.us_edge = None
+    flow.ur_edge = None
     
     if ("u" in data.variables.keys()):
-        flow.uu_edge[0, :, :] = \
-            np.array(data.variables["u"][-1, :, :])
+        flow.uu_edge = np.asarray(
+            data.variables["u"][:], dtype=reals_t)
+    if ("h" in data.variables.keys()):
+        flow.hh_cell = np.asarray(
+            data.variables["h"][:], dtype=reals_t)
+            
+    if ("h_s" in data.variables.keys()):
+        flow.zb_cell = np.asarray(
+            data.variables["h_s"][:], dtype=flt32_t)
+
+    if ("fCell" in data.variables.keys()):
+        flow.ff_cell = np.asarray(
+            data.variables["fCell"][:], dtype=flt32_t)
+    if ("fEdge" in data.variables.keys()):
+        flow.ff_edge = np.asarray(
+            data.variables["fEdge"][:], dtype=flt32_t)
+    if ("fVertex" in data.variables.keys()):
+        flow.ff_vert = np.asarray(
+            data.variables["fVertex"][:], dtype=flt32_t)
     
+    if ("uu_edge" in data.variables.keys()):
+        flow.uu_edge = np.asarray(
+            data.variables["uu_edge"][:], dtype=reals_t)
     if ("hh_cell" in data.variables.keys()):
-        flow.hh_cell = np.array(data.variables["hh_cell"])
+        flow.hh_cell = np.asarray(
+            data.variables["hh_cell"][:], dtype=reals_t)
+            
     if ("zb_cell" in data.variables.keys()):
-        flow.zb_cell = np.array(data.variables["zb_cell"])
+        flow.zb_cell = np.asarray(
+            data.variables["zb_cell"][:], dtype=flt32_t)
         
     if ("is_mask" in data.variables.keys()):
         flow.is_mask = np.array(data.variables["is_mask"])
@@ -744,6 +754,7 @@ def load_flow(name, mesh=None, lean=False):
         flow.is_mask[mesh.edge.cell[:, 0] - 1],
         flow.is_mask[mesh.edge.cell[:, 1] - 1]
         ) )
+        
     flow.rv_mask = np.logical_or.reduce((
         flow.is_mask[mesh.vert.cell[:, 0] - 1],
         flow.is_mask[mesh.vert.cell[:, 1] - 1],
@@ -751,22 +762,36 @@ def load_flow(name, mesh=None, lean=False):
         ) )
         
     if ("ff_cell" in data.variables.keys()):
-        flow.ff_cell = np.array(data.variables["ff_cell"])
+        flow.ff_cell = np.asarray(
+            data.variables["ff_cell"][:], dtype=flt32_t)
     if ("ff_edge" in data.variables.keys()):
-        flow.ff_edge = np.array(data.variables["ff_edge"])
+        flow.ff_edge = np.asarray(
+            data.variables["ff_edge"][:], dtype=flt32_t)
     if ("ff_vert" in data.variables.keys()):
-        flow.ff_vert = np.array(data.variables["ff_vert"])
-    
-    if ("uu_edge" in data.variables.keys()):
-        flow.uu_edge = np.array(data.variables["uu_edge"])
+        flow.ff_vert = np.asarray(
+            data.variables["ff_vert"][:], dtype=flt32_t)
     
     if ("Tu_edge" in data.variables.keys()):
-        flow.Tu_edge = np.array(data.variables["Tu_edge"])
+        flow.Tu_edge = np.asarray(
+            data.variables["Tu_edge"][:], dtype=flt32_t)
+    
+    if ("Pi_cell" in data.variables.keys()):
+        flow.Pi_cell = np.asarray(
+            data.variables["Pi_cell"][:], dtype=flt32_t)
         
-    if ("Sh_cell" in data.variables.keys()):
-        flow.Sh_cell = np.array(data.variables["Sh_cell"])
-    if ("Ph_cell" in data.variables.keys()):
-        flow.Ph_cell = np.array(data.variables["Ph_cell"])
+    if ("zs_cell" in data.variables.keys()):
+        flow.zs_cell = np.asarray(
+            data.variables["zs_cell"][:], dtype=flt32_t)
+    if ("hr_cell" in data.variables.keys()):
+        flow.hr_cell = np.asarray(
+            data.variables["hr_cell"][:], dtype=flt32_t)
+               
+    if ("us_edge" in data.variables.keys()):
+        flow.us_edge = np.asarray(
+            data.variables["us_edge"][:], dtype=flt32_t)
+    if ("ur_edge" in data.variables.keys()):
+        flow.ur_edge = np.asarray(
+            data.variables["ur_edge"][:], dtype=flt32_t)
     
     if (lean is True): return flow
       
@@ -775,46 +800,30 @@ def load_flow(name, mesh=None, lean=False):
 
     flow.ke_cell = np.zeros(
         (+1, ncel, nlev), dtype=reals_t)
-    flow.ke_dual = np.zeros(
-        (+1, nvrt, nlev), dtype=reals_t)
 
-    flow.rv_cell = np.zeros(
-        (+1, ncel, nlev), dtype=reals_t)
-    flow.pv_cell = np.zeros(
-        (+1, ncel, nlev), dtype=reals_t)
     flow.rv_dual = np.zeros(
         (+1, nvrt, nlev), dtype=reals_t)
     flow.pv_dual = np.zeros(
         (+1, nvrt, nlev), dtype=reals_t)
 
     if ("v" in data.variables.keys()):
-        flow.vv_edge[0, :, :] = \
-            np.array(data.variables["v"][-1, :, :])
+        flow.vv_edge = np.asarray(
+            data.variables["v"][:], dtype=reals_t)
 
     if ("vv_edge" in data.variables.keys()):
-        flow.vv_edge[0, :, :] = \
-            np.array(data.variables["vv_edge"][-1, :, :])
+        flow.vv_edge = np.asarray(
+            data.variables["vv_edge"][:], dtype=reals_t)
 
     if ("ke_cell" in data.variables.keys()):
-        flow.ke_cell[0, :, :] = \
-            np.array(data.variables["ke_cell"][-1, :, :])
-    if ("ke_dual" in data.variables.keys()):
-        flow.ke_dual[0, :, :] = \
-            np.array(data.variables["ke_dual"][-1, :, :])
-
-    if ("rv_cell" in data.variables.keys()):
-        flow.rv_cell[0, :, :] = \
-            np.array(data.variables["rv_cell"][-1, :, :])
-    if ("pv_cell" in data.variables.keys()):
-        flow.pv_cell[0, :, :] = \
-            np.array(data.variables["pv_cell"][-1, :, :])
-
+        flow.ke_cell = np.asarray(
+            data.variables["ke_cell"][:], dtype=reals_t)
+            
     if ("rv_dual" in data.variables.keys()):
-        flow.rv_dual[0, :, :] = \
-            np.array(data.variables["rv_dual"][-1, :, :])
+        flow.rv_dual = np.asarray(
+            data.variables["rv_dual"][:], dtype=reals_t)
     if ("pv_dual" in data.variables.keys()):
-        flow.pv_dual[0, :, :] = \
-            np.array(data.variables["pv_dual"][-1, :, :])
+        flow.pv_dual = np.asarray(
+            data.variables["pv_dual"][:], dtype=reals_t)
 
     return flow
     
@@ -823,8 +832,6 @@ def sort_flow(flow, mesh=None, lean=False):
 
     if (mesh is None): return flow
 
-    flow.hh_cell = flow.hh_cell[:, mesh.cell.ifwd - 1, :]
-    
     flow.zb_cell = flow.zb_cell[mesh.cell.ifwd - 1]
     
     flow.is_mask = flow.is_mask[mesh.cell.ifwd - 1]
@@ -835,24 +842,50 @@ def sort_flow(flow, mesh=None, lean=False):
     flow.ff_edge = flow.ff_edge[mesh.edge.ifwd - 1]
     flow.ff_cell = flow.ff_cell[mesh.cell.ifwd - 1]
     
-    flow.uu_edge = flow.uu_edge[:, mesh.edge.ifwd - 1, :]
+    if (flow.hh_cell is not None):
+        flow.hh_cell = \
+            flow.hh_cell[:, mesh.cell.ifwd - 1, :]
+    if (flow.uu_edge is not None):
+        flow.uu_edge = \
+            flow.uu_edge[:, mesh.edge.ifwd - 1, :]
     
-    flow.Tu_edge = flow.Tu_edge[:, mesh.edge.ifwd - 1, :]
+    if (flow.Tu_edge is not None):
+        flow.Tu_edge = \
+            flow.Tu_edge[:, mesh.edge.ifwd - 1, :]
+    if (flow.Pi_cell is not None):
+        flow.Pi_cell = \
+            flow.Pi_cell[:, mesh.cell.ifwd - 1, :]
     
-    flow.Sh_cell = flow.Sh_cell[:, mesh.cell.ifwd - 1, :]
-    flow.Ph_cell = flow.Ph_cell[:, mesh.cell.ifwd - 1, :]
+    if (flow.zs_cell is not None):
+        flow.zs_cell = \
+            flow.hs_cell[:, mesh.cell.ifwd - 1, :]
+    if (flow.hr_cell is not None):
+        flow.hr_cell = \
+            flow.hr_cell[:, mesh.cell.ifwd - 1, :]
+            
+    if (flow.us_edge is not None):
+        flow.us_edge = \
+            flow.us_edge[:, mesh.edge.ifwd - 1, :]
+    if (flow.ur_edge is not None):
+        flow.ur_edge = \
+            flow.ur_edge[:, mesh.edge.ifwd - 1, :]
     
     if (lean is True): return flow
     
-    flow.vv_edge = flow.vv_edge[:, mesh.edge.ifwd - 1, :]
+    if (flow.vv_edge is not None):
+        flow.vv_edge = \
+            flow.vv_edge[:, mesh.edge.ifwd - 1, :]
 
-    flow.ke_cell = flow.ke_cell[:, mesh.cell.ifwd - 1, :]
-    flow.ke_dual = flow.ke_dual[:, mesh.vert.ifwd - 1, :]
+    if (flow.ke_cell is not None):
+        flow.ke_cell = \
+            flow.ke_cell[:, mesh.cell.ifwd - 1, :]
 
-    flow.rv_cell = flow.rv_cell[:, mesh.cell.ifwd - 1, :]
-    flow.rv_dual = flow.rv_dual[:, mesh.vert.ifwd - 1, :]
-    flow.pv_cell = flow.pv_cell[:, mesh.cell.ifwd - 1, :]
-    flow.pv_dual = flow.pv_dual[:, mesh.vert.ifwd - 1, :]
+    if (flow.rv_dual is not None):
+        flow.rv_dual = \
+            flow.rv_dual[:, mesh.vert.ifwd - 1, :]
+    if (flow.pv_dual is not None):
+        flow.pv_dual = \
+            flow.pv_dual[:, mesh.vert.ifwd - 1, :]
 
     return flow
     

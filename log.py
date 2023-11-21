@@ -19,5 +19,9 @@ tcpu.computeVV = 0.0E+00
 tcpu.computeDU = 0.0E+00
 tcpu.computeVU = 0.0E+00
 tcpu.computeVH = 0.0E+00
+tcpu.computeHr = 0.0E+00
+tcpu.computeUr = 0.0E+00
+tcpu.computeTU = 0.0E+00
+tcpu.computePi = 0.0E+00
 tcpu.computeCd = 0.0E+00
 

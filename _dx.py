@@ -382,6 +382,67 @@ def addtendVH(mesh, trsk, cnfg, hh_cell, zb_cell,
     tcpu.computeVH = tcpu.computeVH + (ttoc - ttic)
 
     return hh_tend
+    
+    
+def addtendHr(mesh, trsk, cnfg, hh_cell, zb_cell,
+                                hs_cell, hr_cell, 
+                                hh_tend):
+
+#-- forcing from sponge-layer
+
+    if (hs_cell is None): return hh_tend
+    if (hr_cell is None): return hh_tend
+
+    ttic = time.time()
+
+    hh_tend = _computeHr(
+        mesh, trsk, cnfg, hh_cell, 
+            zb_cell, hs_cell, hr_cell, hh_tend)
+    
+    ttoc = time.time()
+    tcpu.computeHr = tcpu.computeHr + (ttoc - ttic)
+
+    return hh_tend
+    
+    
+def addtendUr(mesh, trsk, cnfg, uu_edge, 
+                                us_edge, ur_edge, 
+                                uu_tend):
+
+#-- forcing from sponge-layer
+
+    if (us_edge is None): return uu_tend
+    if (ur_edge is None): return uu_tend
+
+    ttic = time.time()
+
+    uu_tend = _computeUr(
+        mesh, trsk, cnfg, 
+            uu_edge, us_edge, ur_edge, uu_tend)
+    
+    ttoc = time.time()
+    tcpu.computeUr = tcpu.computeUr + (ttoc - ttic)
+
+    return uu_tend
+    
+    
+def addtendTU(mesh, trsk, cnfg, Tu_edge, hh_edge, 
+                                uu_tend):
+
+#-- forcing from external tau
+
+    if (Tu_edge is None): return uu_tend
+
+    ttic = time.time()
+
+    uu_tend = _computeTU(
+        mesh, trsk, cnfg, 
+            Tu_edge, hh_edge, uu_tend)
+    
+    ttoc = time.time()
+    tcpu.computeTU = tcpu.computeTU + (ttoc - ttic)
+
+    return uu_tend
 
 
 def computeCd(mesh, trsk, cnfg, hh_cell, uu_edge):
@@ -404,74 +465,24 @@ def computeCd(mesh, trsk, cnfg, hh_cell, uu_edge):
 
 
 try:
+    # load cython kernels, if compiled
     from _kx import _upwinding
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kx import _computeHH
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kx import _computeKE
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kx import _computePV
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kx import _computeVV
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kx import _advect_UH
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kx import _advect_UV
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kx import _computeGZ
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kx import _computeDU
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kx import _computeVU
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
     from _kx import _computeVH
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
-
-try:
+    from _kx import _computeHr
+    from _kx import _computeUr
+    from _kx import _computeTU
     from _kx import _computeCd
 
 except ImportError:
     raise RuntimeError("Cython back-end not found")
+
 

@@ -1576,6 +1576,115 @@ def _computeVH(mesh, trsk, cnfg,
     
     return hh_tend
     
+
+def _computeHr(mesh, trsk, cnfg, 
+    np.ndarray[REALS_t, ndim=1] hh_cell,
+    np.ndarray[FLT32_t, ndim=1] zb_cell,
+    np.ndarray[FLT32_t, ndim=1] zs_cell,
+    np.ndarray[FLT32_t, ndim=1] hr_cell,
+    np.ndarray[REALS_t, ndim=1] hh_tend
+              ):
+    
+#-- sponge-layer forcing for h: xi * (z* - z)
+    
+    cdef INDEX_t edge, cell, iptr, xidx
+    cdef REALS_t xval
+    
+    cdef INDEX_t cnfg_numthread = cnfg.numthread
+    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    
+    cdef INDEX_t NVRT = mesh.vert.size
+    cdef INDEX_t NEDG = mesh.edge.size
+    cdef INDEX_t NCEL = mesh.cell.size
+    
+    cdef REALS_t *HH_CELL = &hh_cell[0]
+    cdef FLT32_t *ZB_CELL = &zb_cell[0]
+    cdef FLT32_t *ZS_CELL = &zs_cell[0]
+    cdef FLT32_t *HR_CELL = &hr_cell[0]
+    cdef REALS_t *HH_TEND = &hh_tend[0]
+    
+    for cell in prange(0, NCEL, nogil=True, 
+            schedule="static", 
+            num_threads=cnfg_numthread, 
+            chunksize=cnfg_chunksize):
+            
+        HH_TEND[cell]-= HR_CELL[cell] * (
+                ZS_CELL[cell] - 
+                HH_CELL[cell] - ZB_CELL[cell]
+                )
+    
+    return hh_tend
+    
+    
+def _computeUr(mesh, trsk, cnfg, 
+    np.ndarray[REALS_t, ndim=1] uu_edge,
+    np.ndarray[FLT32_t, ndim=1] us_edge,
+    np.ndarray[FLT32_t, ndim=1] ur_edge,
+    np.ndarray[REALS_t, ndim=1] uu_tend
+              ):
+    
+#-- sponge-layer forcing for u: xi * (u* - u)
+    
+    cdef INDEX_t edge, cell, iptr, xidx
+    cdef REALS_t xval
+    
+    cdef INDEX_t cnfg_numthread = cnfg.numthread
+    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    
+    cdef INDEX_t NVRT = mesh.vert.size
+    cdef INDEX_t NEDG = mesh.edge.size
+    cdef INDEX_t NCEL = mesh.cell.size
+    
+    cdef REALS_t *UU_EDGE = &uu_edge[0]
+    cdef FLT32_t *US_EDGE = &us_edge[0]
+    cdef FLT32_t *UR_EDGE = &ur_edge[0]
+    cdef REALS_t *UU_TEND = &uu_tend[0]
+    
+    for edge in prange(0, NEDG, nogil=True, 
+            schedule="static", 
+            num_threads=cnfg_numthread, 
+            chunksize=cnfg_chunksize):
+            
+        UU_TEND[edge]-= UR_EDGE[edge] * (
+                US_EDGE[edge] - UU_EDGE[edge]
+                )
+    
+    return uu_tend
+    
+    
+def _computeTU(mesh, trsk, cnfg, 
+    np.ndarray[FLT32_t, ndim=1] Tu_edge,
+    np.ndarray[REALS_t, ndim=1] hh_edge,
+    np.ndarray[REALS_t, ndim=1] uu_tend
+              ):
+    
+#-- forcing due to external stresses: tau / h
+    
+    cdef INDEX_t edge, cell, iptr, xidx
+    cdef REALS_t xval
+    
+    cdef INDEX_t cnfg_numthread = cnfg.numthread
+    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    
+    cdef INDEX_t NVRT = mesh.vert.size
+    cdef INDEX_t NEDG = mesh.edge.size
+    cdef INDEX_t NCEL = mesh.cell.size
+    
+    cdef FLT32_t *TU_EDGE = &Tu_edge[0]
+    cdef REALS_t *HH_EDGE = &hh_edge[0]
+    cdef REALS_t *UU_TEND = &uu_tend[0]
+    
+    for edge in prange(0, NEDG, nogil=True, 
+            schedule="static", 
+            num_threads=cnfg_numthread, 
+            chunksize=cnfg_chunksize):
+            
+        UU_TEND[edge]-= (
+                TU_EDGE[edge] / HH_EDGE[edge]
+                )
+    
+    return uu_tend
+    
     
 def _computeCd(mesh, trsk, cnfg, 
         const REALS_t hh_tiny,
