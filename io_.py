@@ -92,7 +92,7 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
             np.reshape(ke_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1)) 
 
-    if (save.pv_bias)
+    if (save.pv_bias):
         xt_dual = trsk.dual_tail_sums * pv_bias
         xt_dual/= mesh.vert.area
 
