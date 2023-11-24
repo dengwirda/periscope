@@ -109,7 +109,7 @@ def rhs_slw_u(mesh, trsk, flow, cnfg, hh_cell, uu_edge, uu_tend):
         ff_dual, ff_edge, ff_cell, 
         +1. / 2. * cnfg.time_step)
 
-    uu_tend = addtendUV(mesh, trsk, cnfg, hh_edge, uu_edge, 
+    uu_tend = addtendUV(mesh, trsk, cnfg, hh_edge, uu_edge,
                                           pv_edge, ke_cell, 
                                           uu_tend)
 

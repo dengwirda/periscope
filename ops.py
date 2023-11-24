@@ -186,6 +186,7 @@ def trsk_mats(mesh):
     ttic = time.time()
     
     # least-squares vector reconst. operators
+    """
     trsk.dual_lsqr_xnrm, \
     trsk.dual_lsqr_ynrm, \
     trsk.dual_lsqr_znrm, \
@@ -196,6 +197,7 @@ def trsk_mats(mesh):
     trsk.cell_lsqr_xnrm, \
     trsk.cell_lsqr_ynrm, \
     trsk.cell_lsqr_znrm = cell_lsqr_fxyz(mesh)
+    """
     
     trsk.edge_lsqr_xnrm, \
     trsk.edge_lsqr_ynrm, \

@@ -1,4 +1,5 @@
 
+import time
 import numpy as np
 from netCDF4 import Dataset
 from scipy.sparse import csr_matrix, spdiags
@@ -16,6 +17,8 @@ def load_mesh(name, rsph=None):
     # Authors: Darren Engwirda
 
     class base: pass
+
+    ttic = time.time()
 
     data = Dataset(name, "r")
 
@@ -74,8 +77,13 @@ def load_mesh(name, rsph=None):
     mesh.vert.cell = \
         np.array(data.variables["cellsOnVertex"])
 
-    mesh.edge.wmul = np.asarray(
-        (mesh.edge.wmul), dtype=reals_t)
+    mesh.edge.wmul = \
+        np.asarray(mesh.edge.wmul, dtype=reals_t)
+        
+    ttoc = time.time()
+    print("-FILE done (sec):", round(ttoc - ttic, 2))
+    
+    ttic = time.time()
 
     # masking at boundaries of mesh; edges/duals via cells
     mesh.cell.mask = np.full(
@@ -92,20 +100,45 @@ def load_mesh(name, rsph=None):
         mesh.vert.cell[:, 1] <= 0,
         mesh.vert.cell[:, 2] <= 0))] = True
 
+    ttoc = time.time()
+    print("-MASK done (sec):", round(ttoc - ttic, 2))
+
+    ttic = time.time()
+
     # compute the areas, normals and intersection of cells
     mesh.edge.xprp, mesh.edge.yprp, mesh.edge.zprp, \
     mesh.edge.xnrm, mesh.edge.ynrm, mesh.edge.znrm= \
         mesh_vecs(mesh)
 
+    ttoc = time.time()
+    print("-VECS done (sec):", round(ttoc - ttic, 2))
+
+    ttic = time.time()
+
     mesh.edge.vlen, \
     mesh.edge.dlen = mesh_arcs (mesh)
+    
+    ttoc = time.time()
+    print("-ARCS done (sec):", round(ttoc - ttic, 2))
+    
+    ttic = time.time()
     
     mesh.edge.beta, mesh.edge.sin_, mesh.edge.cos_= \
         mesh_sine(mesh)
 
+    ttoc = time.time()
+    print("-SINE done (sec):", round(ttoc - ttic, 2))
+
+    ttic = time.time()
+
     mesh.vert.kite = mesh_kite (mesh)
     mesh.edge.tail = mesh_tail (mesh)
     mesh.edge.wing = mesh_wing (mesh)
+
+    ttoc = time.time()
+    print("-MAPS done (sec):", round(ttoc - ttic, 2))
+
+    ttic = time.time()
 
     mesh.cell.area = cell_area (mesh)
     mesh.vert.area = np.sum(mesh.vert.kite, axis=1)
@@ -118,6 +151,9 @@ def load_mesh(name, rsph=None):
 
     # local characteristic edge length, for AUST upwinding
     mesh.edge.slen = 0.5 * np.sqrt( mesh.edge.area * 2.0 )
+
+    ttoc = time.time()
+    print("-AREA done (sec):", round(ttoc - ttic, 2))
 
     return mesh
 
@@ -532,24 +568,30 @@ def sort_mesh(mesh, sort=None):
     """
     # Authors: Darren Engwirda
 
-    mesh.cell.ifwd = np.arange(0, mesh.cell.size) + 1
-    mesh.cell.irev = np.arange(0, mesh.cell.size) + 1
-    mesh.edge.ifwd = np.arange(0, mesh.edge.size) + 1
-    mesh.edge.irev = np.arange(0, mesh.edge.size) + 1
-    mesh.vert.ifwd = np.arange(0, mesh.vert.size) + 1
-    mesh.vert.irev = np.arange(0, mesh.vert.size) + 1
+    mesh.cell.ifwd = np.arange(
+        +0, mesh.cell.size, dtype=index_t) + 1
+    mesh.cell.irev = np.arange(
+        +0, mesh.cell.size, dtype=index_t) + 1
+    mesh.edge.ifwd = np.arange(
+        +0, mesh.edge.size, dtype=index_t) + 1
+    mesh.edge.irev = np.arange(
+        +0, mesh.edge.size, dtype=index_t) + 1
+    mesh.vert.ifwd = np.arange(
+        +0, mesh.vert.size, dtype=index_t) + 1
+    mesh.vert.irev = np.arange(
+        +0, mesh.vert.size, dtype=index_t) + 1
 
     if (sort is None): return mesh
 
 #-- 1. sort cells via RCM ordering of adjacency matrix
 
-    mesh.cell.ifwd = \
-        reverse_cuthill_mckee(cell_adj_(mesh)) + 1
+    mesh.cell.ifwd = reverse_cuthill_mckee(
+        cell_adj_(mesh), symmetric_mode=True) + 1
     
     mesh.cell.irev = \
         np.zeros(mesh.cell.size, dtype=index_t)
-    mesh.cell.irev[
-        mesh.cell.ifwd - 1] = np.arange(mesh.cell.size) + 1
+    mesh.cell.irev[mesh.cell.ifwd - 1] = \
+        np.arange(mesh.cell.size, dtype=index_t) + 1
 
     mask = mesh.cell.cell > 0
     mesh.cell.cell[mask] = \
@@ -587,8 +629,8 @@ def sort_mesh(mesh, sort=None):
 
     mesh.vert.irev = \
         np.zeros(mesh.vert.size, dtype=index_t)
-    mesh.vert.irev[
-        mesh.vert.ifwd - 1] = np.arange(mesh.vert.size) + 1
+    mesh.vert.irev[mesh.vert.ifwd - 1] = \
+        np.arange(mesh.vert.size, dtype=index_t) + 1
 
     mask = mesh.cell.vert > 0
     mesh.cell.vert[mask] = \
@@ -621,8 +663,8 @@ def sort_mesh(mesh, sort=None):
 
     mesh.edge.irev = \
         np.zeros(mesh.edge.size, dtype=index_t)
-    mesh.edge.irev[
-        mesh.edge.ifwd - 1] = np.arange(mesh.edge.size) + 1
+    mesh.edge.irev[mesh.edge.ifwd - 1] = \
+        np.arange(mesh.edge.size, dtype=index_t) + 1
 
     mask = mesh.cell.edge > 0
     mesh.cell.edge[mask] = \
@@ -894,7 +936,6 @@ def cell_adj_(mesh):
 
 #-- form cellwise sparse adjacency graph
 
-    xvec = np.array([], dtype=index_t)
     ivec = np.array([], dtype=index_t)
     jvec = np.array([], dtype=index_t)
 
@@ -910,13 +951,11 @@ def cell_adj_(mesh):
         cidx = cidx[mask]
         aidx = aidx[mask]
 
-        vals = np.ones(aidx.size, dtype=index_t)
-
         ivec = np.hstack((ivec, cidx))
         jvec = np.hstack((jvec, aidx))
-        xvec = np.hstack((xvec, vals))
 
-    return csr_matrix((xvec, (ivec, jvec)))
+    return csr_matrix((
+        np.ones(ivec.size, dtype=np.int8), (ivec, jvec)))
 
 
 def tria_area(rs, pa, pb, pc):

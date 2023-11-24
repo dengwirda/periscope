@@ -296,7 +296,7 @@ def addtendUH(mesh, trsk, cnfg, hh_edge, uu_edge,
     return hh_tend
     
               
-def addtendUV(mesh, trsk, cnfg, hh_edge, uu_edge, 
+def addtendUV(mesh, trsk, cnfg, hh_edge, uu_edge,
                                 pv_edge, ke_cell,
                                 uu_tend):
 

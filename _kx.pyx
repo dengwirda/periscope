@@ -877,7 +877,7 @@ def _advect_UH(mesh, trsk, cnfg,
     
 def _advect_UV(mesh, trsk, cnfg, 
     np.ndarray[REALS_t, ndim=1] hh_edge,
-    np.ndarray[REALS_t, ndim=1] uu_edge, 
+    np.ndarray[REALS_t, ndim=1] uu_edge,
     np.ndarray[REALS_t, ndim=1] pv_edge,
     np.ndarray[REALS_t, ndim=1] ke_cell,
     np.ndarray[REALS_t, ndim=1] uu_tend
@@ -951,12 +951,13 @@ def _advect_UV(mesh, trsk, cnfg,
             xval = EDGE_FLUX_XVAL[iptr]
             xidx = EDGE_FLUX_XIDX[iptr]
                 
-            UV_FLUX = UV_FLUX - HALF * xval * \
+            UV_FLUX = UV_FLUX - xval * \
                 UU_EDGE[xidx] * \
                 HH_EDGE[xidx] * \
-                    (PV_EDGE[edge] + PV_EDGE[xidx])
-                    
-        UU_TEND[edge]+= KE_GRAD + UV_FLUX
+                    (PV_EDGE[edge] + PV_EDGE[xidx]
+                    )
+            
+        UU_TEND[edge]+= KE_GRAD + (HALF * UV_FLUX)
         
     return uu_tend
     

@@ -165,7 +165,7 @@ def init_file(name, cnfg, save, mesh, flow):
     data["yCell"][:] = mesh.cell.ypos
     data.createVariable("zCell", "f8", ("nCells"))
     data["zCell"][:] = mesh.cell.zpos
-    data.createVariable("areaCell", "f8", ("nCells"))
+    data.createVariable("areaCell", "f4", ("nCells"))
     data["areaCell"][:] = mesh.cell.area
     data.createVariable(
         "verticesOnCell", "i4", ("nCells", "maxEdges"))
@@ -199,7 +199,7 @@ def init_file(name, cnfg, save, mesh, flow):
         "verticesOnEdge", "i4", ("nEdges", "TWO"))
     data["verticesOnEdge"][:, :] = mesh.edge.vert
     data.createVariable(
-        "weightsOnEdge", "f8", ("nEdges", "maxEdges2"))
+        "weightsOnEdge", "f4", ("nEdges", "maxEdges2"))
     data["weightsOnEdge"][:, :] = mesh.edge.wmul
     data.createVariable(
         "cellsOnEdge", "i4", ("nEdges", "TWO"))
@@ -220,10 +220,10 @@ def init_file(name, cnfg, save, mesh, flow):
     data["yVertex"][:] = mesh.vert.ypos
     data.createVariable("zVertex", "f8", ("nVertices"))
     data["zVertex"][:] = mesh.vert.zpos
-    data.createVariable("areaTriangle", "f8", ("nVertices"))
+    data.createVariable("areaTriangle", "f4", ("nVertices"))
     data["areaTriangle"][:] = mesh.vert.area
     data.createVariable(
-        "kiteAreasOnVertex", "f8", ("nVertices", "vertexDegree"))
+        "kiteAreasOnVertex", "f4", ("nVertices", "vertexDegree"))
     data["kiteAreasOnVertex"][:, :] = mesh.vert.kite
     data.createVariable(
         "edgesOnVertex", "i4", ("nVertices", "vertexDegree"))
