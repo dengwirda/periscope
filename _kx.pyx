@@ -371,7 +371,7 @@ def _computeHH(mesh, trsk, cnfg,
     cdef INDEX_t vert, edge, iptr, xidx
     cdef INDEX_t cel1, cel2
     cdef REALS_t xval
-    cdef REALS_t HH_WIND, HH_BIAS
+    cdef REALS_t HH_WIND
     
     cdef REALS_t ZERO = 0.0
     cdef REALS_t HALF = 0.5
@@ -381,6 +381,9 @@ def _computeHH(mesh, trsk, cnfg,
     
     cdef INDEX_t cnfg_numthread = cnfg.numthread
     cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    
+    cdef REALS_t up_max_ = cnfg.hh_max_up
+    cdef REALS_t up_min_ = cnfg.hh_min_up
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -431,10 +434,12 @@ def _computeHH(mesh, trsk, cnfg,
     cdef np.ndarray[REALS_t] hh_dual = variables.hh_dual
     cdef np.ndarray[REALS_t] hh_edge = variables.hh_edge
     cdef np.ndarray[REALS_t] h2_edge = variables.h2_edge
+    cdef np.ndarray[REALS_t] up_bias = variables.hh_bias
     
     cdef REALS_t *HH_DUAL = &hh_dual[0]
     cdef REALS_t *HH_EDGE = &hh_edge[0]
     cdef REALS_t *H2_EDGE = &h2_edge[0]
+    cdef REALS_t *UP_BIAS = &up_bias[0]
    
     if (cnfg.hh_scheme == "CENTRE"):
     
@@ -460,6 +465,7 @@ def _computeHH(mesh, trsk, cnfg,
                 chunksize=cnfg_chunksize):
         #-- compute edge-centred thickness
             HH_EDGE[edge] = ZERO
+            UP_BIAS[edge] = ZERO
             for iptr in range(EDGE_WING_XPTR[edge +0], 
                               EDGE_WING_XPTR[edge +1]):
                     
@@ -528,17 +534,21 @@ def _computeHH(mesh, trsk, cnfg,
             else:
                 HH_WIND = HH_CELL[cel2]
                    
-            HH_BIAS = HALF * fabs_r(
+            UP_BIAS[edge] = HALF * fabs_r(
                 HH_CELL[cel2] - HH_CELL[cel1]) \
                     / min(HH_CELL[cel1], 
                           HH_CELL[cel2])
             
-            HH_BIAS = min(ONE_, HH_BIAS)
-            HH_BIAS = max(ZERO, HH_BIAS)
+            UP_BIAS[edge] = \
+                min(up_max_, UP_BIAS[edge])
+            UP_BIAS[edge] = \
+                max(up_min_, UP_BIAS[edge])
+            
+            UP_BIAS[edge]*=  UP_BIAS[edge]
             
             HH_EDGE[edge] = \
-                HH_BIAS * HH_WIND \
-                    + (ONE_ - HH_BIAS)* HH_EDGE[edge]
+                UP_BIAS[edge] * HH_WIND + \
+                (ONE_ - UP_BIAS[edge])* HH_EDGE[edge]
              
         #-- compute for PV; simpson's rule       
             H2_EDGE[edge] = HH_EDGE[edge] * FOUR
@@ -551,7 +561,7 @@ def _computeHH(mesh, trsk, cnfg,
                 
             H2_EDGE[edge]/= SIX_
 
-    return hh_dual, hh_edge, h2_edge
+    return hh_dual, hh_edge, h2_edge, up_bias
 
     
 def _computeKE(mesh, trsk, cnfg, 

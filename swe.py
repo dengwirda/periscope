@@ -396,7 +396,19 @@ if (__name__ == "__main__"):
         "--wall-slip", dest="wall_slip", type=float,
         default=0.0,
         required=False,
-        help="No-slip/free-slip factor = {+0}, +1.")
+        help="Not-slip/free-slip factor = {+0.}, +1.")
+        
+    parser.add_argument(
+        "--hh-min-up", dest="hh_min_up", type=float,
+        default=0.0,
+        required=False,
+        help="Upwind HH.-edge bias {BIAS = +0./ 1.}.")
+
+    parser.add_argument(
+        "--hh-max-up", dest="hh_max_up", type=float,
+        default=1.0,
+        required=False,
+        help="Upwind HH.-edge bias {BIAS = +1./ 1.}.")
         
     parser.add_argument(
         "--hh-scheme", dest="hh_scheme", type=str,
@@ -413,15 +425,15 @@ if (__name__ == "__main__"):
 
     parser.add_argument(
         "--pv-min-up", dest="pv_min_up", type=float,
-        default=1./40.,
+        default=1./80.,
         required=False,
-        help="Upwind PV.-flux bias {BIAS = +1./40.}.")
+        help="Upwind PV.-flux bias {BIAS = +1./80.}.")
 
     parser.add_argument(
         "--pv-max-up", dest="pv_max_up", type=float,
-        default=3./ 4.,
+        default=7./ 8.,
         required=False,
-        help="Upwind PV.-flux bias {BIAS = +3./ 4.}.")
+        help="Upwind PV.-flux bias {BIAS = +7./ 8.}.")
     
     parser.add_argument(
         "--pv-scheme", dest="pv_scheme", type=str,

@@ -84,7 +84,7 @@ def diag_vars(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
 
     vv_edge = computeVV(mesh, trsk, cnfg, uu_edge)
 
-    hh_dual, hh_edge, h2_edge = compute_H(
+    hh_dual, hh_edge, h2_edge, hh_bias = compute_H(
         mesh, trsk, cnfg, hh_cell, uu_edge)
 
     ke_cell, ke_bias = computeKE(
@@ -101,7 +101,8 @@ def diag_vars(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
         ff_dual, ff_edge, ff_cell, 
         +0.5 * cnfg.time_step)
 
-    return hh_edge, hh_dual, ke_cell, ke_bias, \
+    return hh_edge, hh_dual, hh_bias, \
+           ke_cell, ke_bias, \
            rv_cell, pv_cell, \
            rv_dual, pv_dual, pv_edge, pv_bias, \
            vv_edge
@@ -119,7 +120,7 @@ def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
 
     vv_edge = computeVV(mesh, trsk, cnfg, uu_edge)
 
-    hh_dual, hh_edge, h2_edge = compute_H(
+    hh_dual, hh_edge, h2_edge, hh_bias = compute_H(
         mesh, trsk, cnfg, hh_cell, uu_edge)
 
     ke_edge = uu_edge ** 2
@@ -180,14 +181,14 @@ def compute_H(mesh, trsk, cnfg, hh_cell, uu_edge):
 
     ttic = time.time()
     
-    hh_dual, hh_edge, h2_edge = \
+    hh_dual, hh_edge, h2_edge, hh_bias = \
         _computeHH(
             mesh, trsk, cnfg, hh_cell, uu_edge)
     
     ttoc = time.time()
     tcpu.compute_H = tcpu.compute_H + (ttoc - ttic)
 
-    return hh_dual, hh_edge, h2_edge
+    return hh_dual, hh_edge, h2_edge, hh_bias
     
 
 def computeKE(mesh, trsk, cnfg, 

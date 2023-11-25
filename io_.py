@@ -18,6 +18,7 @@ class base: pass
 out_ = base()
 out_.uu_edge = False  # True to write to file
 out_.vv_edge = False
+out_.hh_bias = False
 out_.hh_cell = False
 out_.hh_edge = False
 out_.hh_dual = False
@@ -33,7 +34,8 @@ out_.rv_cell = False
 
 def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
 
-    hh_edge, hh_dual, ke_cell, ke_bias, \
+    hh_edge, hh_dual, hh_bias, \
+    ke_cell, ke_bias, \
     rv_cell, pv_cell, rv_dual, pv_dual, \
     pv_edge, pv_bias, vv_edge = diag_vars (
         mesh, trsk, flow, cnfg, hh_cell, uu_edge
@@ -54,6 +56,14 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
         data.variables["vv_edge"][step, :, :] = \
             np.reshape(vv_edge[
                 mesh.edge.irev - 1], (1, mesh.edge.size, 1))
+                
+    if (out_.hh_bias):
+        xt_dual = trsk.dual_tail_sums * hh_bias
+        xt_dual/= mesh.vert.area
+
+        data.variables["hh_bias"][step, :, :] = \
+            np.reshape(xt_dual[
+                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
                 
     if (out_.hh_cell):         
         data.variables["hh_cell"][step, :, :] = \
@@ -336,6 +346,13 @@ def init_file(name, cnfg, save, mesh, flow):
         data["uh_cell"].long_name = \
             "Divergence of thickness flux on cells"
         out_.uh_cell = True
+
+    if ("hh_bias" in cnfg.save_vars):
+        data.createVariable(
+            "hh_bias", "f4", ("Time", "nVertices", "nVertLevels"))
+        data["hh_bias"].long_name = \
+            "Upwind-bias for HH, remapped to duals"
+        out_.hh_bias = True
 
     if ("ke_bias" in cnfg.save_vars):
         data.createVariable(

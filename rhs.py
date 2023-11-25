@@ -38,7 +38,7 @@ def rhs_fst_h(mesh, trsk, flow, cnfg, hh_cell, uu_edge, hh_tend):
     hr_cell = flow.hr_cell
     if hr_cell is not None: hr_cell = hr_cell[0, :, 0]
 
-    hh_dual, hh_edge, h2_edge = \
+    hh_dual, hh_edge, h2_edge, hh_bias = \
               compute_H(mesh, trsk, cnfg, hh_cell, uu_edge)
 
     hh_tend = addtendUH(mesh, trsk, cnfg, hh_edge, uu_edge, 
@@ -92,7 +92,7 @@ def rhs_slw_u(mesh, trsk, flow, cnfg, hh_cell, uu_edge, uu_tend):
 
     vv_edge = computeVV(mesh, trsk, cnfg, uu_edge)
 
-    hh_dual, hh_edge, h2_edge = \
+    hh_dual, hh_edge, h2_edge, hh_bias = \
               compute_H(mesh, trsk, cnfg, hh_cell, uu_edge)
 
     ke_cell, ke_bias = computeKE(
