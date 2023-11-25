@@ -79,12 +79,7 @@ def load_mesh(name, rsph=None):
 
     mesh.edge.wmul = \
         np.asarray(mesh.edge.wmul, dtype=reals_t)
-        
-    ttoc = time.time()
-    print("-FILE done (sec):", round(ttoc - ttic, 2))
     
-    ttic = time.time()
-
     # masking at boundaries of mesh; edges/duals via cells
     mesh.cell.mask = np.full(
         (mesh.cell.size), False, dtype=bool)
@@ -101,8 +96,8 @@ def load_mesh(name, rsph=None):
         mesh.vert.cell[:, 2] <= 0))] = True
 
     ttoc = time.time()
-    print("-MASK done (sec):", round(ttoc - ttic, 2))
-
+    print("-FILE done (sec):", round(ttoc - ttic, 2))
+    
     ttic = time.time()
 
     # compute the areas, normals and intersection of cells

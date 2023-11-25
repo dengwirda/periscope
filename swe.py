@@ -24,7 +24,7 @@ from mem import init_pool
 from io_ import init_file, save_step
 
 from _dx import invariant, scalingVk, HH_TINY
-from _dt import step_eqns
+from _dt import step_eqns, step_bnds
 
 def swe(cnfg):
 
@@ -96,10 +96,10 @@ def swe(cnfg):
     flow = sort_flow(flow, mesh, lean=True)
 
     u0_edge = flow.uu_edge[-1, :, 0]
-    uu_edge = u0_edge
+    uu_edge = u0_edge.copy()
     
     h0_cell = flow.hh_cell[-1, :, 0]
-    hh_cell = h0_cell
+    hh_cell = h0_cell.copy()
     
     hh_cell = np.maximum(HH_TINY, hh_cell)
     
@@ -139,8 +139,13 @@ def swe(cnfg):
     
     hh_cell = np.ascontiguousarray(
              hh_cell, dtype=reals_t)
+    hh_min_ = h0_cell.copy()
+    hh_max_ = h0_cell.copy()
+             
     uu_edge = np.ascontiguousarray(
              uu_edge, dtype=reals_t)
+    uu_min_ = u0_edge.copy()
+    uu_max_ = u0_edge.copy()
     
     kp_sums = np.zeros((cnfg.iteration 
             // cnfg.stat_freq + 1), dtype=reals_t)
@@ -200,11 +205,17 @@ def swe(cnfg):
 
         if (step > 0):
         #-- 0-th step is just to write ICs to output...
-             hh_cell, uu_edge, \
-             ch_cell, cu_edge = step_eqns(
-                 mesh, trsk, flow, cnfg, hh_cell, uu_edge,
-                                         ch_cell, cu_edge)
-
+            hh_cell, uu_edge, \
+            ch_cell, cu_edge = step_eqns(
+                mesh, trsk, flow, cnfg, hh_cell, uu_edge,
+                                        ch_cell, cu_edge)
+                      
+            hh_min_, hh_max_, \
+            uu_min_, uu_max_ = step_bnds(
+                mesh, trsk, flow, cnfg, hh_cell, uu_edge,
+                                        hh_min_, hh_max_,
+                                        uu_min_, uu_max_)
+            
         if (step % cnfg.stat_freq == 0):
         #-- eval. statistics on stat steps
             kp_sums[next], \
@@ -255,6 +266,16 @@ def swe(cnfg):
 
     data.variables["kp_sums"][:] = kp_sums
     data.variables["en_sums"][:] = en_sums
+    
+    data.variables["hh_min_"][:] = \
+               hh_min_[mesh.cell.irev - 1]
+    data.variables["hh_max_"][:] = \
+               hh_max_[mesh.cell.irev - 1]
+               
+    data.variables["uu_min_"][:] = \
+               uu_min_[mesh.edge.irev - 1]
+    data.variables["uu_max_"][:] = \
+               uu_max_[mesh.edge.irev - 1]
     
     # xt variables are tmp scratch
     

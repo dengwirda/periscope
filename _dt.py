@@ -43,6 +43,22 @@ def step_eqns(mesh, trsk, flow, cnfg,
     return hh_cell, uu_edge, ch_cell, cu_edge
     
     
+def step_bnds(mesh, trsk, flow, cnfg, 
+              hh_cell, uu_edge,     # state
+              hh_min_, hh_max_,     # up/lo bounds
+              uu_min_, uu_max_):
+              
+#-- Expand the min./max. status for each degree of freedom
+              
+    hh_min_, hh_max_ = \
+        bnd_x_vec(cnfg, hh_cell, hh_min_, hh_max_)
+
+    uu_min_, uu_max_ = \
+        bnd_x_vec(cnfg, uu_edge, uu_min_, uu_max_)
+    
+    return hh_min_, hh_max_, uu_min_, uu_max_
+    
+    
 def step_RK22(mesh, trsk, flow, cnfg, 
               hh_cell, uu_edge,     # state
               ch_cell, cu_edge):    # compensators
@@ -372,6 +388,7 @@ def step_RK32(mesh, trsk, flow, cnfg,
 
 try:
     # load cython kernels, if compiled
+    from _kt import _bnd_x_vec as bnd_x_vec
     from _kt import _set_x_vec as set_x_vec
     from _kt import _cpy_x_vec as cpy_x_vec
     from _kt import _adv_x_fst as adv_x_fst

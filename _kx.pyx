@@ -363,8 +363,7 @@ def _upwinding(mesh, trsk, cnfg,
     return ss_edge, up_bias
     
 
-def _computeHH(mesh, trsk, cnfg, 
-        const REALS_t hh_thin,
+def _computeHH(mesh, trsk, cnfg,
     np.ndarray[REALS_t, ndim=1] hh_cell,
     np.ndarray[REALS_t, ndim=1] uu_edge
               ):
@@ -528,15 +527,18 @@ def _computeHH(mesh, trsk, cnfg,
                 HH_WIND = HH_CELL[cel1]
             else:
                 HH_WIND = HH_CELL[cel2]
-                
-            HH_BIAS = HH_EDGE[edge] / hh_thin - HALF
+                   
+            HH_BIAS = HALF * fabs_r(
+                HH_CELL[cel2] - HH_CELL[cel1]) \
+                    / min(HH_CELL[cel1], 
+                          HH_CELL[cel2])
             
             HH_BIAS = min(ONE_, HH_BIAS)
             HH_BIAS = max(ZERO, HH_BIAS)
             
             HH_EDGE[edge] = \
-                HH_BIAS * HH_EDGE[edge] \
-                    + (ONE_ - HH_BIAS) * HH_WIND
+                HH_BIAS * HH_WIND \
+                    + (ONE_ - HH_BIAS)* HH_EDGE[edge]
              
         #-- compute for PV; simpson's rule       
             H2_EDGE[edge] = HH_EDGE[edge] * FOUR
@@ -1439,9 +1441,12 @@ def _computeVH(mesh, trsk, cnfg,
               ):
     
     cdef INDEX_t edge, cell, iptr, xidx
+    cdef INDEX_t cel1, cel2
     cdef REALS_t xval
+    cdef REALS_t HH_EDGE, ZB_EDGE
     
     cdef REALS_t ZERO = 0.0
+    cdef REALS_t HALF = 0.5
     
     cdef INDEX_t cnfg_numthread = cnfg.numthread
     cdef INDEX_t cnfg_chunksize = cnfg.chunksize
@@ -1495,13 +1500,25 @@ def _computeVH(mesh, trsk, cnfg,
     cdef REALS_t *V4_CELL = &v4_cell[0]
     
     cdef np.ndarray[REALS_t] hz_edge = get_vec_e()
+    cdef np.ndarray[REALS_t] hz_mask = get_vec_e()
         
     cdef REALS_t *HZ_EDGE = &hz_edge[0]
+    cdef REALS_t *HZ_MASK = &hz_mask[0]
+    
+    cdef np.ndarray[INDEX_t, ndim=2] \
+        mesh_edge_cell = mesh.edge.cell
     
     for edge in prange(0, NEDG, nogil=True, 
             schedule="static", 
             num_threads=cnfg_numthread, 
             chunksize=cnfg_chunksize):
+            
+        cel1 = mesh_edge_cell[edge, 0] - 1
+        cel2 = mesh_edge_cell[edge, 1] - 1
+        
+        if (cel1 < 0): cel1 = cel2
+        if (cel2 < 0): cel2 = cel1
+            
     #-- pressure gradient tend.: g * G * (hh + zb)
         HZ_EDGE[edge] = ZERO
         for iptr in range(GRAD_NORM_XPTR[edge +0], 
@@ -1513,8 +1530,21 @@ def _computeVH(mesh, trsk, cnfg,
             HZ_EDGE[edge]+= \
                 xval * gg_cell * (
                     HH_CELL[xidx] + ZB_CELL[xidx])
+     
+    #-- flux-limiter: don't diffuse to topography!
+        HH_EDGE = \
+            HALF * (HH_CELL[cel1] + HH_CELL[cel2])
+        ZB_EDGE = \
+            HALF * (ZB_CELL[cel1] + ZB_CELL[cel2])
+            
+        HZ_MASK[edge] = MESH_EDGE_MASK[edge]
+        
+        HZ_MASK[edge]*= (
+            (ZB_EDGE + HH_EDGE) >= 
+                max (ZB_CELL[cel1], ZB_CELL[cel2])
+                )
                     
-        HZ_EDGE[edge]*= MESH_EDGE_MASK[edge]
+        HZ_EDGE[edge]*= HZ_MASK[edge]
         
     for cell in prange(0, NCEL, nogil=True, 
             schedule="static", 
@@ -1548,7 +1578,7 @@ def _computeVH(mesh, trsk, cnfg,
                 xval * gg_cell * (
                     V2_CELL[xidx] * V4_DIFF[xidx])
                     
-        HZ_EDGE[edge]*= MESH_EDGE_MASK[edge]
+        HZ_EDGE[edge]*= HZ_MASK[edge]
         
     for cell in prange(0, NCEL, nogil=True, 
             schedule="static", 
@@ -1574,6 +1604,7 @@ def _computeVH(mesh, trsk, cnfg,
     put_vec_c  (v4_cell)       
     put_vec_c  (v2_cell)
     put_vec_e  (hz_edge)
+    put_vec_e  (hz_mask)
     
     return hh_tend
     

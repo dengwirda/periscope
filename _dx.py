@@ -15,7 +15,6 @@ from log import tcpu
 from mem import variables
 
 HH_TINY        = 1.0E-04
-HH_THIN        = 1.0E+02
 UU_TINY        = 1.0E-12
 PV_TINY        = 1.0E-16
 KE_TINY        = 1.0E-08
@@ -183,8 +182,7 @@ def compute_H(mesh, trsk, cnfg, hh_cell, uu_edge):
     
     hh_dual, hh_edge, h2_edge = \
         _computeHH(
-            mesh, trsk, cnfg, 
-                HH_THIN, hh_cell, uu_edge)
+            mesh, trsk, cnfg, hh_cell, uu_edge)
     
     ttoc = time.time()
     tcpu.compute_H = tcpu.compute_H + (ttoc - ttic)

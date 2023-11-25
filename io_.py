@@ -278,6 +278,20 @@ def init_file(name, cnfg, save, mesh, flow):
     data["h0_cell"].long_name = "Layer thickness initial conditions"
     data["h0_cell"][:] = flow.hh_cell[-1, :, :]
 
+    data.createVariable(
+        "uu_min_", "f4", ("nEdges", "nVertLevels"))
+    data["uu_min_"].long_name = "Min. normal velocity for all steps"
+    data.createVariable(
+        "uu_max_", "f4", ("nEdges", "nVertLevels"))
+    data["uu_max_"].long_name = "Max. normal velocity for all steps"
+    
+    data.createVariable(
+        "hh_min_", "f4", ("nCells", "nVertLevels"))    
+    data["hh_min_"].long_name = "Min. layer thickness for all steps"
+    data.createVariable(
+        "hh_max_", "f4", ("nCells", "nVertLevels"))    
+    data["hh_max_"].long_name = "Max. layer thickness for all steps"
+
     data.createVariable("kp_sums", "f4", ("Step"))
     data["kp_sums"].long_name = \
         "Energetics invariant: total KE+PE over time"

@@ -25,6 +25,40 @@ ctypedef double  FLT64_t
 ctypedef int32_t INDEX_t
 ctypedef float   REALS_t  # or double
 
+def _bnd_x_vec(cnfg,
+    np.ndarray[REALS_t, ndim=1] xx_data,
+    np.ndarray[REALS_t, ndim=1] xx_min_,
+    np.ndarray[REALS_t, ndim=1] xx_max_
+              ):
+
+#-- update minmax bnds given data in xx
+
+    cdef INDEX_t ipos
+    cdef INDEX_t NDAT = xx_data.size
+
+    cdef INDEX_t \
+        cnfg_numthread = cnfg.numthread
+    cdef INDEX_t \
+        cnfg_chunksize = cnfg.chunksize
+
+    cdef REALS_t *XX_DATA = &xx_data[+0]
+    cdef REALS_t *XX_MIN_ = &xx_min_[+0]
+    cdef REALS_t *XX_MAX_ = &xx_max_[+0]
+
+    for ipos in prange(0, NDAT, nogil=True,
+                schedule="static",
+                num_threads=cnfg_numthread,
+                chunksize=cnfg_chunksize):
+                
+        XX_MIN_[ipos] = min(
+            XX_MIN_[ipos], XX_DATA[ipos])
+            
+        XX_MAX_[ipos] = max(
+            XX_MAX_[ipos], XX_DATA[ipos])
+
+    return xx_min_, xx_max_
+
+
 def _set_x_vec(cnfg,
         const REALS_t xx_fill,
     np.ndarray[REALS_t, ndim=1] xx_data,
