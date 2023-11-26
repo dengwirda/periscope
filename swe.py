@@ -240,7 +240,7 @@ def swe(cnfg):
     ttoc = time.time()
 
     print("")
-    print("Timing data:")
+    print("Run done; timing stats:")
     print("*wall-time (sec):", round(ttoc - ttic, 2))
     print("*file-i/o. (sec):", round(tcpu.filewrite, 2))
     print("*thickness (sec):", round(tcpu.thickness, 2))

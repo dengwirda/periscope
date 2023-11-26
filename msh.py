@@ -582,6 +582,10 @@ def sort_mesh(mesh, sort=None):
 
     mesh.cell.ifwd = reverse_cuthill_mckee(
         cell_adj_(mesh), symmetric_mode=True) + 1
+        
+    if np.all(np.diff(mesh.cell.ifwd) == 1): 
+        print("already sorted")
+        return
     
     mesh.cell.irev = \
         np.zeros(mesh.cell.size, dtype=index_t)

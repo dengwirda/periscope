@@ -77,7 +77,7 @@ def wav1(name, save, rsph, mesh, trsk, xmid, ymid, hmag):
     hh_cell = hmag * np.exp(
             - 100. * (mesh.cell.xlon - xmid) ** 2 + \
             - 100. * (mesh.cell.ylat - ymid) ** 2 ) \
-            + 500.0
+            + 500.0  # + 0.1
 
     zb_cell = np.zeros(mesh.cell.size, dtype=np.float64)
 
