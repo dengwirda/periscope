@@ -151,8 +151,7 @@ def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
 
 
 def upwinding(mesh, trsk, cnfg, 
-        sw_dual, ss_dual, ss_cell, lo_edge, hi_edge,
-        uu_edge, vv_edge, 
+        sw_dual, ss_dual, ss_cell, uu_edge, vv_edge, 
         ss_edge, up_bias,
         delta_t, sv_tiny, uu_tiny,
         up_kind, up_min_, up_max_):
@@ -163,8 +162,7 @@ def upwinding(mesh, trsk, cnfg,
 
     ss_edge, up_bias = _upwinding(
         mesh, trsk, cnfg, 
-        sw_dual, ss_dual, ss_cell, 
-        lo_edge, hi_edge, uu_edge, vv_edge,
+        sw_dual, ss_dual, ss_cell, uu_edge, vv_edge, 
         ss_edge, up_bias, 
         delta_t, sv_tiny, uu_tiny, 
         up_kind, up_min_, up_max_)
@@ -219,9 +217,9 @@ def _build_PV(mesh, trsk, cnfg,
               
     ttic = time.time()
               
-    rv_dual, pv_dual, \
+    rv_dual, pv_dual, p2_dual, \
     rv_cell, pv_cell, \
-    lo_dual, lo_edge, hi_edge = _computePV(
+    rv_edge, pv_edge = _computePV(
         mesh, trsk, cnfg, 
         hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, 
         ff_dual, ff_edge, ff_cell)
@@ -229,8 +227,9 @@ def _build_PV(mesh, trsk, cnfg,
     ttoc = time.time()
     tcpu.computePV = tcpu.computePV + (ttoc - ttic)
 
-    return rv_dual, pv_dual, rv_cell, pv_cell, \
-           lo_dual, lo_edge, hi_edge
+    return rv_dual, pv_dual, p2_dual, \
+           rv_cell, pv_cell, \
+           rv_edge, pv_edge
               
               
 def computePV(mesh, trsk, cnfg, 
@@ -240,21 +239,19 @@ def computePV(mesh, trsk, cnfg,
   
 #-- compute discrete vorticity
   
-    rv_dual, pv_dual, \
-    rv_cell, pv_cell, lo_dual, \
-    lo_edge, hi_edge = _build_PV(
+    rv_dual, pv_dual, p2_dual, \
+    rv_cell, pv_cell, \
+    rv_edge, pv_edge = _build_PV(
         mesh, trsk, cnfg, 
         hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, 
         ff_dual, ff_edge, ff_cell, 
         delta_t)
             
-    pv_edge = variables.pv_edge
     up_edge = variables.pv_bias
             
     pv_edge, up_edge = upwinding(
         mesh, trsk, cnfg, 
-        lo_dual, pv_dual, pv_cell, lo_edge, hi_edge,
-        uu_edge, vv_edge, 
+        p2_dual, pv_dual, pv_cell, uu_edge, vv_edge, 
         pv_edge, up_edge,
         delta_t, PV_TINY, UU_TINY, 
         cnfg.pv_upwind, 

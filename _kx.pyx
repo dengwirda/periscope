@@ -37,8 +37,6 @@ def _upwinding(mesh, trsk, cnfg,
     np.ndarray[REALS_t, ndim=1] sw_dual,
     np.ndarray[REALS_t, ndim=1] ss_dual, 
     np.ndarray[REALS_t, ndim=1] ss_cell,
-    np.ndarray[REALS_t, ndim=1] lo_edge,
-    np.ndarray[REALS_t, ndim=1] hi_edge,
     np.ndarray[REALS_t, ndim=1] uu_edge, 
     np.ndarray[REALS_t, ndim=1] vv_edge,
     np.ndarray[REALS_t, ndim=1] ss_edge,
@@ -52,8 +50,6 @@ def _upwinding(mesh, trsk, cnfg,
     cdef INDEX_t vert, edge, iptr, xidx
     cdef REALS_t xval
     cdef REALS_t UM_EDGE, SS_WIND
-    
-    cdef REALS_t LH_BIAS = 5. / 8.
     
     cdef REALS_t ZERO = 0.0
     cdef REALS_t HALF = 0.5
@@ -69,8 +65,6 @@ def _upwinding(mesh, trsk, cnfg,
     cdef REALS_t *SW_DUAL = &sw_dual[0]
     cdef REALS_t *SS_DUAL = &ss_dual[0]
     cdef REALS_t *SS_CELL = &ss_cell[0]
-    cdef REALS_t *LO_EDGE = &lo_edge[0]
-    cdef REALS_t *HI_EDGE = &hi_edge[0]
     cdef REALS_t *UU_EDGE = &uu_edge[0]
     cdef REALS_t *VV_EDGE = &vv_edge[0]
     cdef REALS_t *SS_EDGE = &ss_edge[0]
@@ -178,11 +172,7 @@ def _upwinding(mesh, trsk, cnfg,
                     )
                     
                 UP_BIAS[edge] = ZERO          
-                SS_EDGE[edge] = (
-                    (ZERO + LH_BIAS)* LO_EDGE[edge]
-                  + (ONE_ - LH_BIAS)* HI_EDGE[edge]
-                    )
-                  
+                
                 SS_EDGE[edge]-=delta_t * SS_WIND
             
     elif (up_kind == "AUST-CONST"):
@@ -229,15 +219,9 @@ def _upwinding(mesh, trsk, cnfg,
                     )
                     
                 UP_BIAS[edge] = up_min_
-                    
-                SS_EDGE[edge] = (
-                    (ZERO + LH_BIAS)* LO_EDGE[edge]
-                  + (ONE_ - LH_BIAS)* HI_EDGE[edge]
-                    )
                   
-                SS_EDGE[edge]-=UP_BIAS[edge] \
-                             * SS_WIND \
-                             * MESH_EDGE_SLEN[edge]
+                SS_EDGE[edge]-= UP_BIAS[edge] \
+                    * SS_WIND * MESH_EDGE_SLEN[edge]
 
     elif (up_kind == "AUST-ADAPT"):
         
@@ -327,29 +311,10 @@ def _upwinding(mesh, trsk, cnfg,
                     )
                     
                 UP_BIAS[edge] = up_min_ + min(
-                    up_max_- up_min_, UP_BIAS[edge])
-                    
-                SS_EDGE[edge] = (
-                    (ZERO + LH_BIAS)* LO_EDGE[edge]
-                  + (ONE_ - LH_BIAS)* HI_EDGE[edge]
-                    )
+                    up_max_ - up_min_, UP_BIAS[edge])
                   
-                SS_EDGE[edge]-=UP_BIAS[edge] \
-                             * SS_WIND \
-                             * MESH_EDGE_SLEN[edge]
-                         
-    else:  # centred - null upwinding
-
-        with nogil, parallel(num_threads=cnfg_numthread):
-
-            for edge in prange(0, NEDG, schedule="static", 
-                    chunksize=cnfg_chunksize):
-            
-                UP_BIAS[edge] = ZERO          
-                SS_EDGE[edge] = (
-                    (ZERO + LH_BIAS)* LO_EDGE[edge]
-                  + (ONE_ - LH_BIAS)* HI_EDGE[edge]
-                    )
+                SS_EDGE[edge]-= UP_BIAS[edge] \
+                    * SS_WIND * MESH_EDGE_SLEN[edge]
               
     put_vec_e  (gn_edge)
     put_vec_e  (gp_edge)   
@@ -723,15 +688,15 @@ def _computePV(mesh, trsk, cnfg,
     cdef REALS_t *RV_CELL = &rv_cell[0]
     cdef REALS_t *PV_CELL = &pv_cell[0]
     
-    cdef np.ndarray[REALS_t] lo_dual = variables.lo_dual
+    cdef np.ndarray[REALS_t] p2_dual = variables.p2_dual
     
-    cdef REALS_t *LO_DUAL = &lo_dual[0]
+    cdef REALS_t *P2_DUAL = &p2_dual[0]
     
-    cdef np.ndarray[REALS_t] lo_edge = variables.lo_edge
-    cdef np.ndarray[REALS_t] hi_edge = variables.hi_edge
+    cdef np.ndarray[REALS_t] rv_edge = variables.rv_edge
+    cdef np.ndarray[REALS_t] pv_edge = variables.pv_edge
         
-    cdef REALS_t *LO_EDGE = &lo_edge[0]
-    cdef REALS_t *HI_EDGE = &hi_edge[0]
+    cdef REALS_t *RV_EDGE = &rv_edge[0]
+    cdef REALS_t *PV_EDGE = &pv_edge[0]
    
     with nogil, parallel(num_threads=cnfg_numthread):
     
@@ -757,36 +722,39 @@ def _computePV(mesh, trsk, cnfg,
         for edge in prange(0, NEDG, schedule="static", 
                 chunksize=cnfg_chunksize):
         #-- compute edge-centred vorticity
-            LO_EDGE[edge] = ZERO
+            RV_EDGE[edge] = ZERO
             for iptr in range(EDGE_VERT_XPTR[edge +0], 
                               EDGE_VERT_XPTR[edge +1]):
                     
                 xidx = EDGE_VERT_XIDX[iptr]
                     
-                LO_EDGE[edge]+= (ONE_ * RV_DUAL[xidx])
+                RV_EDGE[edge]+= (ONE_ * RV_DUAL[xidx])
         
-            LO_EDGE[edge]/= MESH_QUAD_AREA[edge]
+            RV_EDGE[edge]/= MESH_QUAD_AREA[edge]
             
-            LO_EDGE[edge] = \
+            PV_EDGE[edge] = \
                 (ONE_ / HH_EDGE[edge]) * \
-                    (LO_EDGE[edge] + FF_EDGE[edge])
-                    
-            HI_EDGE[edge] = LO_EDGE[edge]
+                    (RV_EDGE[edge] + FF_EDGE[edge])
             
         for vert in prange(0, NVRT, schedule="static", 
                 chunksize=cnfg_chunksize):
         #-- average rhombi to dual -- a'la Gassmann
-            LO_DUAL[vert] = ZERO
+            P2_DUAL[vert] = ZERO
             for iptr in range(VERT_TAIL_XPTR[vert +0], 
                               VERT_TAIL_XPTR[vert +1]):
                 
                 xval = VERT_TAIL_XVAL[iptr]    
                 xidx = VERT_TAIL_XIDX[iptr]
                     
-                LO_DUAL[vert]+= (xval * LO_EDGE[xidx])
+                P2_DUAL[vert]+= (xval * RV_EDGE[xidx])
              
-            LO_DUAL[vert]/= MESH_DUAL_AREA[vert]
+            P2_DUAL[vert]/= MESH_DUAL_AREA[vert]
             
+            P2_DUAL[vert] = \
+                (ONE_ / HH_DUAL[vert]) * \
+                    (P2_DUAL[vert] + FF_DUAL[vert])
+            
+            # circulation to curl(u) final
             RV_DUAL[vert]/= MESH_DUAL_AREA[vert]
         
             PV_DUAL[vert] = \
@@ -811,9 +779,9 @@ def _computePV(mesh, trsk, cnfg,
                 (ONE_ / HH_CELL[cell]) * \
                     (RV_CELL[cell] + FF_CELL[cell])
                   
-    return rv_dual, pv_dual, \
+    return rv_dual, pv_dual, p2_dual, \
            rv_cell, pv_cell, \
-           lo_dual, lo_edge, hi_edge
+           rv_edge, pv_edge
     
     
 def _advect_UH(mesh, trsk, cnfg, 
