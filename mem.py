@@ -103,19 +103,3 @@ def get_vec_c():
         
 def put_vec_c(vec): cell_pool.append(vec)
 
-def aligned(a, alignment=16):
-#-- https://stackoverflow.com/questions/9895787/
-#-- memory-alignment-for-fast-fft-in-python-using-shared-arrays
-    if (a.ctypes.data % alignment) == 0:
-        print("aligned")
-        return a
-    print("not aligned")
-    assert alignment % a.itemsize == 0
-    extra = alignment // a.itemsize
-    buf = np.empty(a.size + extra, dtype=a.dtype)
-    ofs = (-buf.ctypes.data % alignment) // a.itemsize
-    aa = buf[ofs:ofs+a.size].reshape(a.shape)
-    np.copyto(aa, a)
-    assert aa.ctypes.data % alignment == 0
-    return aa
-

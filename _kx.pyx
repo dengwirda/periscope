@@ -389,8 +389,7 @@ def _computeHH(mesh, trsk, cnfg,
     cdef REALS_t *MESH_DUAL_AREA = &mesh_dual_area[0]
     cdef REALS_t *MESH_EDGE_AREA = &mesh_edge_area[0]
 
-    cdef np.ndarray[INDEX_t, ndim=2] \
-        mesh_edge_cell = mesh.edge.cell
+    cdef INDEX_t[:, ::1] mesh_edge_cell = mesh.edge.cell
     
     cdef np.ndarray[REALS_t] hh_dual = variables.hh_dual
     cdef np.ndarray[REALS_t] hh_edge = variables.hh_edge
@@ -497,8 +496,7 @@ def _computeHH(mesh, trsk, cnfg,
                        
                 UP_BIAS[edge] = HALF * fabs_r(
                     HH_CELL[cel2] - HH_CELL[cel1]) \
-                        / min(HH_CELL[cel1], 
-                              HH_CELL[cel2])
+                       / min(HH_CELL[cel1], HH_CELL[cel2])
                 
                 UP_BIAS[edge] = \
                     min(up_max_, UP_BIAS[edge])
@@ -1130,6 +1128,10 @@ def _computeDU(mesh, trsk, cnfg,
                     
                 D2_EDGE[edge]+= (xval * DU_CELL[xidx])
                 
+            D4_EDGE[edge] = (
+                   D2_EDGE[edge] * D4_VISC[edge]
+                   )
+                
         for cell in prange(0, NCEL, schedule="static", 
                 chunksize=cnfg_chunksize):
         #-- compute div(D^2)
@@ -1140,8 +1142,7 @@ def _computeDU(mesh, trsk, cnfg,
                 xval = CELL_FLUX_XVAL[iptr]
                 xidx = CELL_FLUX_XIDX[iptr]
                     
-                DU_CELL[cell]+= (xval * D2_EDGE[xidx]
-                                      * D4_VISC[xidx])
+                DU_CELL[cell]+= (xval * D4_EDGE[xidx])
          
             DU_CELL[cell]/= MESH_CELL_AREA[cell]
 
@@ -1322,6 +1323,10 @@ def _computeVU(mesh, trsk, cnfg,
                 V2_EDGE[edge]-= (xval * RV_DUAL[xidx])
                 
             V2_EDGE[edge]*= MESH_EDGE_MASK[edge]
+            
+            V4_EDGE[edge] = (
+                   V2_EDGE[edge] * V4_VISC[edge]
+                   )
                 
         for cell in prange(0, NCEL, schedule="static", 
                 chunksize=cnfg_chunksize):
@@ -1333,8 +1338,7 @@ def _computeVU(mesh, trsk, cnfg,
                 xval = CELL_FLUX_XVAL[iptr]
                 xidx = CELL_FLUX_XIDX[iptr]
                     
-                DU_CELL[cell]+= (xval * V2_EDGE[xidx]
-                                      * V4_VISC[xidx])
+                DU_CELL[cell]+= (xval * V4_EDGE[xidx])
          
             DU_CELL[cell]/= MESH_CELL_AREA[cell]
 
@@ -1348,8 +1352,7 @@ def _computeVU(mesh, trsk, cnfg,
                 xval = DUAL_CURL_XVAL[iptr]
                 xidx = DUAL_CURL_XIDX[iptr]
                     
-                RV_DUAL[vert]+= (xval * V2_EDGE[xidx]
-                                      * V4_VISC[xidx])
+                RV_DUAL[vert]+= (xval * V4_EDGE[xidx])
          
             RV_DUAL[vert]/= MESH_DUAL_AREA[vert]
             
@@ -1719,8 +1722,7 @@ def _computeCd(mesh, trsk, cnfg,
     
     cdef REALS_t *CD_EDGE = &cd_edge[0]
     
-    cdef np.ndarray[INDEX_t, ndim=2] \
-        mesh_edge_cell = mesh.edge.cell
+    cdef INDEX_t[:, ::1] mesh_edge_cell = mesh.edge.cell
     
     with nogil, parallel(num_threads=cnfg_numthread):
     
