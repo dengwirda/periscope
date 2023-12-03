@@ -15,9 +15,8 @@ from log import tcpu
 from mem import variables
 
 HH_TINY        = 1.0E-04
-UU_TINY        = 1.0E-12
+UU_TINY        = 1.0E-16
 PV_TINY        = 1.0E-16
-KE_TINY        = 1.0E-08
 
 def hrmn_mean(xone, xtwo):
 
@@ -81,17 +80,29 @@ def diag_vars(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
     ff_dual = flow.ff_vert
     ff_edge = flow.ff_edge
     ff_cell = flow.ff_cell
-
-    vv_edge = computeVV(mesh, trsk, cnfg, uu_edge)
+    
+    hE_edge = flow.hE_edge
+    uE_edge = flow.uE_edge
+    
+    zb_cell = flow.zb_cell 
+    gg_cell = flow.gravity
 
     hh_dual, hh_edge, h2_edge, hh_bias = compute_H(
         mesh, trsk, cnfg, hh_cell, uu_edge)
+
+    hh_edge, uu_edge = computeBC(
+        mesh, trsk, cnfg, 
+        hh_edge, uu_edge, 
+        gg_cell, hE_edge, uE_edge)
+        
+    vv_edge = computeVV(
+        mesh, trsk, cnfg, uu_edge)
 
     ke_cell, ke_bias = computeKE(
         mesh, trsk, cnfg, 
         hh_cell, h2_edge, hh_dual, 
         uu_edge, vv_edge,
-        +0.5 * cnfg.time_step)
+        +1. / 2. * cnfg.time_step)
 
     rv_dual, pv_dual, \
     rv_cell, pv_cell, \
@@ -99,7 +110,7 @@ def diag_vars(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
         mesh, trsk, cnfg, 
         hh_cell, h2_edge, hh_dual, uu_edge, vv_edge,
         ff_dual, ff_edge, ff_cell, 
-        +0.5 * cnfg.time_step)
+        +1. / 2. * cnfg.time_step)
 
     return hh_edge, hh_dual, hh_bias, \
            ke_cell, ke_bias, \
@@ -116,17 +127,27 @@ def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
     ff_edge = flow.ff_edge
     ff_cell = flow.ff_cell
 
-    zb_cell = flow.zb_cell
+    hE_edge = flow.hE_edge
+    uE_edge = flow.uE_edge
 
-    vv_edge = computeVV(mesh, trsk, cnfg, uu_edge)
+    zb_cell = flow.zb_cell
+    gg_cell = flow.gravity
 
     hh_dual, hh_edge, h2_edge, hh_bias = compute_H(
         mesh, trsk, cnfg, hh_cell, uu_edge)
 
+    hh_edge, uu_edge = computeBC(
+        mesh, trsk, cnfg, 
+        hh_edge, uu_edge, 
+        gg_cell, hE_edge, uE_edge)
+        
+    vv_edge = computeVV(
+        mesh, trsk, cnfg, uu_edge)
+
     ke_edge = uu_edge ** 2
     ke_edge*= hh_edge * mesh.edge.area
     
-    pe_cell = flow.grav * (
+    pe_cell = flow.gravity * (
         hh_cell * 0.5 + zb_cell - np.min(zb_cell))
 
     pe_cell*= hh_cell * mesh.cell.area
@@ -139,7 +160,7 @@ def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
         mesh, trsk, cnfg, 
         hh_cell, h2_edge, hh_dual, uu_edge, vv_edge,
         ff_dual, ff_edge, ff_cell, 
-        +0.5 * cnfg.time_step)
+        +1. / 2. * cnfg.time_step)
 
    #pv_sums = 0.5 * math.fsum(
    #    mesh.edge.area * hh_edge * pv_edge ** 2)
@@ -148,6 +169,26 @@ def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
         mesh.vert.area * hh_dual * pv_dual ** 2)
 
     return kk_sums, pv_sums
+
+
+def computeBC(mesh, trsk, cnfg,
+        hh_edge, uu_edge, gg_cell, hE_edge, uE_edge):
+        
+#-- setup open bnd. conditions
+   
+    if (hE_edge is None): return hh_edge, uu_edge
+    if (uE_edge is None): return hh_edge, uu_edge
+   
+    ttic = time.time()
+        
+    hh_edge, uu_edge = _computeBC(
+        mesh, trsk, cnfg, 
+        hh_edge, uu_edge, gg_cell, hE_edge, uE_edge)
+        
+    ttoc = time.time()
+    tcpu.computeBC = tcpu.computeBC + (ttoc - ttic)
+        
+    return hh_edge, uu_edge
 
 
 def upwinding(mesh, trsk, cnfg, 
@@ -380,48 +421,6 @@ def addtendVH(mesh, trsk, cnfg, hh_cell, zb_cell,
     return hh_tend
     
     
-def addtendHr(mesh, trsk, cnfg, hh_cell, zb_cell,
-                                hs_cell, hr_cell, 
-                                hh_tend):
-
-#-- forcing from sponge-layer
-
-    if (hs_cell is None): return hh_tend
-    if (hr_cell is None): return hh_tend
-
-    ttic = time.time()
-
-    hh_tend = _computeHr(
-        mesh, trsk, cnfg, hh_cell, 
-            zb_cell, hs_cell, hr_cell, hh_tend)
-    
-    ttoc = time.time()
-    tcpu.computeHr = tcpu.computeHr + (ttoc - ttic)
-
-    return hh_tend
-    
-    
-def addtendUr(mesh, trsk, cnfg, uu_edge, 
-                                us_edge, ur_edge, 
-                                uu_tend):
-
-#-- forcing from sponge-layer
-
-    if (us_edge is None): return uu_tend
-    if (ur_edge is None): return uu_tend
-
-    ttic = time.time()
-
-    uu_tend = _computeUr(
-        mesh, trsk, cnfg, 
-            uu_edge, us_edge, ur_edge, uu_tend)
-    
-    ttoc = time.time()
-    tcpu.computeUr = tcpu.computeUr + (ttoc - ttic)
-
-    return uu_tend
-    
-    
 def addtendTU(mesh, trsk, cnfg, Tu_edge, hh_edge, 
                                 uu_tend):
 
@@ -462,6 +461,7 @@ def computeCd(mesh, trsk, cnfg, hh_cell, uu_edge):
 
 try:
     # load cython kernels, if compiled
+    from _kx import _computeBC
     from _kx import _upwinding
     from _kx import _computeHH
     from _kx import _computeKE
@@ -473,8 +473,6 @@ try:
     from _kx import _computeDU
     from _kx import _computeVU
     from _kx import _computeVH
-    from _kx import _computeHr
-    from _kx import _computeUr
     from _kx import _computeTU
     from _kx import _computeCd
 

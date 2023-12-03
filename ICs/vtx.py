@@ -89,6 +89,9 @@ def vtx1(name, save, rsph, mesh, trsk):
     print("Computing velocity field...")
 
     uu_edge = -(grav / f) * trsk.edge_grad_perp * hh_vert
+    
+    bc_slip = np.zeros(uu_edge.shape, dtype=np.float64)
+    bc_slip[mesh.edge.mask] = 1.  # free slip
 
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
@@ -127,6 +130,8 @@ def vtx1(name, save, rsph, mesh, trsk):
     init["rv_dual"] = (
         ("nVertices"),
         (trsk.dual_curl_sums * uu_edge) / mesh.vert.area)
+
+    init["bc_slip"] = (("nEdges"), bc_slip)
 
     init["ff_cell"] = (("nCells"),
         f * np.ones(mesh.cell.size, dtype=np.float64))
@@ -178,6 +183,9 @@ def vtx2(name, save, rsph, mesh, trsk):
 
     uu_edge = -(grav / f) * trsk.edge_grad_perp * hh_vert
 
+    bc_slip = np.zeros(uu_edge.shape, dtype=np.float64)
+    bc_slip[mesh.edge.mask] = 0.  # no slip
+
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
     print("Output written to:", save)
@@ -215,6 +223,8 @@ def vtx2(name, save, rsph, mesh, trsk):
     init["rv_dual"] = (
         ("nVertices"),
         (trsk.dual_curl_sums * uu_edge) / mesh.vert.area)
+
+    init["bc_slip"] = (("nEdges"), bc_slip)
 
     init["ff_cell"] = (("nCells"),
         f * np.ones(mesh.cell.size, dtype=np.float64))

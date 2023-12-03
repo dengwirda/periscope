@@ -16,14 +16,16 @@ from _fp import reals_t, index_t
 
 from log import tcpu
 
-from msh import load_mesh, load_flow, \
-                sort_mesh, sort_flow
+from msh import load_mesh, sort_mesh, \
+                load_flow, sort_flow, \
+                load_forc, sort_forc
 from ops import trsk_mats
 from mem import init_pool
 
 from io_ import init_file, save_step
 
 from _dx import invariant, scalingVk, HH_TINY
+
 from _dt import step_eqns, step_bnds
 
 def swe(cnfg):
@@ -63,6 +65,7 @@ def swe(cnfg):
         cnfg.pv_upwind = "NONE"
     
     name = cnfg.mesh_file
+    forc = cnfg.forc_file
     path, file = os.path.split(name)
     save = os.path.join(path, "out_" + file)
 
@@ -73,6 +76,7 @@ def swe(cnfg):
     # load mesh + init. conditions
     mesh = load_mesh(name)
     flow = load_flow(name, mesh, lean=True)
+    flow = load_forc(forc, flow, lean=True)
 
     ttoc = time.time()
     print("*READ done (sec):", round(ttoc - ttic, 2))
@@ -94,11 +98,12 @@ def swe(cnfg):
 
     mesh = sort_mesh(mesh, True)
     flow = sort_flow(flow, mesh, lean=True)
+    flow = sort_forc(flow, mesh, lean=True)
 
-    u0_edge = flow.uu_edge[-1, :, 0]
+    u0_edge = flow.uu_edge
     uu_edge = u0_edge.copy()
     
-    h0_cell = flow.hh_cell[-1, :, 0]
+    h0_cell = flow.hh_cell
     hh_cell = h0_cell.copy()
     
     hh_cell = np.maximum(HH_TINY, hh_cell)
@@ -115,58 +120,74 @@ def swe(cnfg):
     mesh.edge.mask[flow.uu_mask]= True
     mesh.vert.mask[flow.rv_mask]= True
     
+    mesh.edge.open = np.asarray(
+        np.argwhere(
+    flow.is_open).ravel(), dtype=index_t)
+    
     # set sparse spatial operators
     trsk = trsk_mats(mesh)
 
     # remap fe,fc is more accurate?
     flow.ff_edge = trsk.edge_tail_sums*flow.ff_vert
-    flow.ff_edge = \
-        (flow.ff_edge / mesh.edge.area)
-
+    flow.ff_edge/= mesh.edge.area
+    flow.ff_edge = np.asarray(
+           flow.ff_edge, dtype=flt32_t)
+    
     flow.ff_cell = trsk.cell_kite_sums*flow.ff_vert
-    flow.ff_cell = \
-        (flow.ff_cell / mesh.cell.area)
+    flow.ff_cell/= mesh.cell.area
+    flow.ff_cell = np.asarray(
+           flow.ff_cell, dtype=flt32_t)
     
     flow.ff_cell*= (not cnfg.no_rotate)
     flow.ff_edge*= (not cnfg.no_rotate)
     flow.ff_vert*= (not cnfg.no_rotate)
     
-    # always round IC's to flt32_t
-    hh_cell = np.ascontiguousarray(
-             hh_cell, dtype=flt32_t)
-    uu_edge = np.ascontiguousarray(
-             uu_edge, dtype=flt32_t)
-    
-    hh_cell = np.ascontiguousarray(
-             hh_cell, dtype=reals_t)
-    hh_min_ = h0_cell.copy()
-    hh_max_ = h0_cell.copy()
-             
-    uu_edge = np.ascontiguousarray(
-             uu_edge, dtype=reals_t)
-    uu_min_ = u0_edge.copy()
-    uu_max_ = u0_edge.copy()
-    
-    kp_sums = np.zeros((cnfg.iteration 
-            // cnfg.stat_freq + 1), dtype=reals_t)
-    en_sums = np.zeros((cnfg.iteration 
-            // cnfg.stat_freq + 1), dtype=reals_t)
-
     ttoc = time.time()
     print("*FORM done (sec):", round(ttoc - ttic, 2))
    
     print("")
     print("Integrating the flow...")
 
-    ttic = time.time(); next = 0; freq = 0
+    ttic = time.time(); next = 0; freq = 0; tsec = 0.
+    
+    kp_sums = np.zeros((cnfg.iteration 
+            // cnfg.stat_freq + 1), dtype=reals_t)
+    en_sums = np.zeros((cnfg.iteration 
+            // cnfg.stat_freq + 1), dtype=reals_t)
+    
+    # always round IC's to flt32_t
+    hh_cell = np.ascontiguousarray(
+                hh_cell, dtype=flt32_t)
+    hh_cell = np.ascontiguousarray(
+                hh_cell, dtype=reals_t)
+    hh_min_ = hh_cell.copy()
+    hh_max_ = hh_cell.copy()
+    
+    uu_edge = np.ascontiguousarray(
+                uu_edge, dtype=flt32_t)         
+    uu_edge = np.ascontiguousarray(
+                uu_edge, dtype=reals_t)
+    uu_min_ = uu_edge.copy()
+    uu_max_ = uu_edge.copy()
     
     init_pool(mesh)  # alloc. internal arrays
+    
+    uu_edge[mesh.edge.mask] = 0.  # ensure BC
+    uu_edge[mesh.edge.open] = \
+            u0_edge [mesh.edge.open]
+    
+    mesh.edge.slip = flow.bc_slip
+    mesh.edge.slip[mesh.edge.open] = reals_t(1.0)
+    
+    mesh.vert.slip = trsk.dual_edge_sums * \
+                     mesh.edge.slip
+    mesh.vert.slip/= np.maximum(+1, 
+                     trsk.dual_edge_sums * \
+                     mesh.edge.mask)
     
     mesh.cell.fmsk = reals_t(1.0 - mesh.cell.mask)
     mesh.edge.fmsk = reals_t(1.0 - mesh.edge.mask)
     mesh.vert.fmsk = reals_t(1.0 - mesh.vert.mask)
-    
-    uu_edge[mesh.edge.mask] = 0.  # ensure BC
     
     cnfg.anylaw_cd = \
         max([cnfg.linlaw_cd, cnfg.sqrlaw_cd, 
@@ -194,7 +215,7 @@ def swe(cnfg):
         (cnfg.hh_diff_2 * s2_cell), dtype=reals_t)
     cnfg.hh_diff_4 = np.asarray(
         (cnfg.hh_diff_4 * s4_cell), dtype=reals_t)
-    
+   
     cnfg.du_visc_4 = np.sqrt(cnfg.du_visc_4)
     cnfg.uu_visc_4 = np.sqrt(cnfg.uu_visc_4)
     cnfg.hh_diff_4 = np.sqrt(cnfg.hh_diff_4)
@@ -205,27 +226,43 @@ def swe(cnfg):
 
         if (step > 0):
         #-- 0-th step is just to write ICs to output...
+            if (flow.xx_time is not None):
+                # find needed forcing step to interp.
+                need = np.searchsorted(
+                    flow.xx_time, tsec + 0.5 * cnfg.time_step)
+                    
+                if (need > flow.step): 
+                # a piecewise const. interp. for now...          
+                    flow = load_forc(forc, flow, need)
+                    flow = sort_forc(flow, mesh)
+        
             hh_cell, uu_edge, \
             ch_cell, cu_edge = step_eqns(
                 mesh, trsk, flow, cnfg, hh_cell, uu_edge,
-                                        ch_cell, cu_edge)
+                                        ch_cell, cu_edge
+            )
                       
             hh_min_, hh_max_, \
             uu_min_, uu_max_ = step_bnds(
                 mesh, trsk, flow, cnfg, hh_cell, uu_edge,
                                         hh_min_, hh_max_,
-                                        uu_min_, uu_max_)
+                                        uu_min_, uu_max_
+            )
+                                        
+            tsec = tsec + cnfg.time_step
             
         if (step % cnfg.stat_freq == 0):
         #-- eval. statistics on stat steps
             kp_sums[next], \
             en_sums[next] = invariant(
-                mesh, trsk, flow, cnfg, hh_cell, uu_edge)
+                mesh, trsk, flow, cnfg, hh_cell, uu_edge
+            )
 
-            print("*STEP, d(K+P), d(Q^2):",
-                 f"{step:>12}",
-                 f"{rdf(kp_sums[next], kp_sums[+0]):>24}",
-                 f"{rdf(en_sums[next], en_sums[+0]):>24}"
+            print ( 
+                 "*STEP, d(K+P), d(Q^2):",
+                f"{step:>12}",
+                f"{rdf(kp_sums[next], kp_sums[+0]):>24}",
+                f"{rdf(en_sums[next], en_sums[+0]):>24}"
             )
 
             next = next + 1
@@ -233,18 +270,20 @@ def swe(cnfg):
         if (step % cnfg.save_freq == 0):
         #-- & save all state on save steps
             save_step(save, mesh, trsk,
-                      flow, cnfg, freq, hh_cell, uu_edge)
+                      flow, cnfg, freq, hh_cell, uu_edge
+            )
 
             freq = freq + 1
 
     ttoc = time.time()
 
     print("")
-    print("Run done; timing stats:")
+    print("Run complete; timers:")
     print("*wall-time (sec):", round(ttoc - ttic, 2))
     print("*file-i/o. (sec):", round(tcpu.filewrite, 2))
     print("*thickness (sec):", round(tcpu.thickness, 2))
     print("*momentum_ (sec):", round(tcpu.momentum_, 2))
+    print("*computeBC (sec):", round(tcpu.computeBC, 2))
     print("*upwinding (sec):", round(tcpu.upwinding, 2)) 
     print("*compute_H (sec):", round(tcpu.compute_H, 2))
     print("*advect_UH (sec):", round(tcpu.advect_UH, 2))
@@ -256,10 +295,6 @@ def swe(cnfg):
     print("*computeDU (sec):", round(tcpu.computeDU, 2))
     print("*computeVU (sec):", round(tcpu.computeVU, 2))
     print("*computeVH (sec):", round(tcpu.computeVH, 2))
-    print("*computeHr (sec):", round(tcpu.computeHr, 2))
-    print("*computeUr (sec):", round(tcpu.computeUr, 2))
-    print("*computeTU (sec):", round(tcpu.computeTU, 2))
-    print("*computePi (sec):", round(tcpu.computePi, 2))
     print("*computeCd (sec):", round(tcpu.computeCd, 2))
 
     data = nc.Dataset(save, "a", format="NETCDF4")
@@ -331,6 +366,7 @@ if (__name__ == "__main__"):
         
     parser.add_argument(
         "--forc-file", dest="forc_file", type=str,
+        default="",
         required=False, 
         help="Path to user FORCING tendencies file.")
 
@@ -370,9 +406,9 @@ if (__name__ == "__main__"):
     parser.add_argument(
         "--save-vars", dest="save_vars", type=str,
         default=
-        "uu_edge,hh_cell,ke_cell,du_cell,rv_dual,pv_dual",
+        "uu_edge,hh_cell,ke_cell,du_cell,rv_dual",
         required=False,
-        help="Variables to save to file.")
+        help="Selected ouput variables to save to file.")
 
     parser.add_argument(
         "--equations", dest="equations", type=str,
@@ -391,12 +427,6 @@ if (__name__ == "__main__"):
         default=4096,
         required=False,
         help="Stride of parallel decomp. = {4096}.")
-        
-    parser.add_argument(
-        "--wall-slip", dest="wall_slip", type=float,
-        default=0.0,
-        required=False,
-        help="Not-slip/free-slip factor = {+0.}, +1.")
         
     parser.add_argument(
         "--hh-min-up", dest="hh_min_up", type=float,
@@ -467,22 +497,10 @@ if (__name__ == "__main__"):
         help="KE.-grad formulation = {CENTRE}, SKINNY.")
 
     parser.add_argument(
-        "--hh-expect", dest="hh_expect", type=float,
-        default=1.E+03,
-        required=False,
-        help="Ref. HH. magnitude {|HH| = +1.E+03}.")
-        
-    parser.add_argument(
-        "--uu-expect", dest="uu_expect", type=float,
-        default=1.E+00,
-        required=False,
-        help="Ref. UU. magnitude {|UU| = +1.E+00}.")
-
-    parser.add_argument(
         "--ref-scale", dest="ref_scale", type=float,
         default=30.E+3,
         required=False,
-        help="Ref-len. for viscosity scaling {DX = 30E+3}.")
+        help="Ref-len. for visc. scales {DX = 30.E+03}.")
         
     parser.add_argument(
         "--hh-diff-2", dest="hh_diff_2", type=float,

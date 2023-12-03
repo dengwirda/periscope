@@ -4,7 +4,7 @@ A number of test cases are available to run out-of-the-box:
 
 ### `Geostrophic balance`
 
-    python3 wtc.py \
+    python3 ICs/wtc.py \
     --mesh-file="mesh_w_elev_cvt_7.nc" \
     --init-file="wtc2_cvt_7.nc" \
     --radius=6371220. \
@@ -30,7 +30,7 @@ A number of test cases are available to run out-of-the-box:
 
 ### `Flow along mountain`
 
-    python3 wtc.py \
+    python3 ICs/wtc.py \
     --mesh-file="mesh_w_elev_cvt_7.nc" \
     --init-file="wtc5_cvt_7.nc" \
     --radius=6371220. \
@@ -56,7 +56,7 @@ A number of test cases are available to run out-of-the-box:
 
 ### `RossbyHaurwitz wave`
 
-    python3 wtc.py \
+    python3 ICs/wtc.py \
     --mesh-file="mesh_w_elev_cvt_7.nc" \
     --init-file="wtc6_cvt_7.nc" \
     --radius=6371220. \
@@ -73,7 +73,7 @@ A number of test cases are available to run out-of-the-box:
 
 ### `Barotropic jet roll-up`
 
-    python3 jet.py \
+    python3 ICs/jet.py \
     --mesh-file="mesh_w_elev_cvt_7.nc" \
     --init-file="bjet_cvt_7.nc" \
     --radius=6371220. \
@@ -99,7 +99,7 @@ A number of test cases are available to run out-of-the-box:
 
 ### `Linear gravity wave`
 
-    python3 wav.py \
+    python3 ICs/wav.py \
     --mesh-file="mesh_w_elev_cvt_7.nc" \
     --init-file="lgw1_cvt_7.nc" \
     --radius=6371220. \
@@ -118,14 +118,14 @@ A number of test cases are available to run out-of-the-box:
     
 ### `Tohoku tsunami wave`
 
-    python3 wav.py \
-    --mesh-file="mesh_pac_10_1p875km.nc" \
-    --init-file="tok_10_1p875km.nc" \
+    python3 ICs/wav.py \
+    --mesh-file="mesh_w_elev_cvt_8.nc" \
+    --init-file="tsu_cvt_8.nc" \
     --test-case=4 \
     --xydz-file="fujii.txydz"
     
     python3 swe.py \ 
-    --mesh-file="tok_10_1p875km.nc" \
+    --mesh-file="tsu_cvt_8.nc" \
     --num-steps=1920 \
     --time-step=15. \
     --save-freq=40 \
@@ -134,14 +134,12 @@ A number of test cases are available to run out-of-the-box:
     --hh-scheme="UPWIND" \
     --uu-visc-4=1.E+11 \
     --hh-diff-4=1.E+11 \
-    --loglaw-z0=0.001 \
-    --loglaw-lo=0.0025 \
-    --loglaw-hi=10. \
+    --loglaw-z0=0.001 --loglaw-lo=0.0025 --loglaw-hi=1. \
     --numthread=cores
 
 ### `Merging vortex pair`
 
-    python3 vtx.py \
+    python3 ICs/vtx.py \
     --mesh-file="mesh_disk_3.nc" \
     --init-file="merger_3.nc" \
     --test-case=1
@@ -152,13 +150,11 @@ A number of test cases are available to run out-of-the-box:
     --time-step=0.001 \
     --save-freq=250 \
     --stat-freq=125 \
-    --integrate="RK32-FB" \
-    --wall-slip=1.0 \
     --numthread=cores
 
 ### `Dipole-wall interaction`
 
-    python3 vtx.py \
+    python3 ICs/vtx.py \
     --mesh-file="mesh_disk_3.nc" \
     --init-file="dipole_3.nc" \
     --test-case=2
@@ -169,7 +165,25 @@ A number of test cases are available to run out-of-the-box:
     --time-step=0.001 \
     --save-freq=250 \
     --stat-freq=125 \
-    --integrate="RK32-FB" \
-    --wall-slip=0.0 \
+    --numthread=cores
+        
+### `Vortex-shedding wake`
+
+    python3 ICs/obc.py \
+    --mesh-file="mesh_disk_3.nc" 
+    --init-file="wake_3.nc" \
+    --radius=50000.
+
+    python3 swe.py \
+    --mesh-file="wake_3.nc" \
+    --forc-file="frc_wake_3.nc" \
+    --time-step=0.0625 \
+    --num-steps=1440 \
+    --save-freq=144 \
+    --stat-freq=288 \
+    --hh-scheme="UPWIND" \
+    --loglaw-z0=0.001 --loglaw-lo=0.0025 --loglaw-hi=1. \
+    --uu-visc-2=1.E+03 --uu-visc-4=1.E+12 \
+    --hh-diff-4=1.E+11 \
     --numthread=cores
 

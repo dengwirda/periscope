@@ -10,11 +10,10 @@ from _fp import reals_t, index_t
 
 from log import tcpu
 
-from _dx import compute_H, addtendUH, \
+from _dx import computeBC, compute_H, addtendUH, \
                 computeKE, computePV, addtendUV, \
                 computeVV, addtendGZ, \
                 addtendDU, addtendVU, addtendVH, \
-                addtendHr, addtendUr, \
                 addtendTU
 
 def rhs_slw_h(mesh, trsk, flow, cnfg, hh_cell, uu_edge, hh_tend):
@@ -30,26 +29,24 @@ def rhs_fst_h(mesh, trsk, flow, cnfg, hh_cell, uu_edge, hh_tend):
 
     if cnfg.no_h_tend: return hh_tend
 
-    zb_cell = flow.zb_cell; gg_cell = flow.grav
+    zb_cell = flow.zb_cell; gg_cell = flow.gravity
     
-    zs_cell = flow.zs_cell 
-    if zs_cell is not None: zs_cell = zs_cell[0, :, 0]
-    
-    hr_cell = flow.hr_cell
-    if hr_cell is not None: hr_cell = hr_cell[0, :, 0]
+    hE_edge = flow.hE_edge
+    uE_edge = flow.uE_edge
 
     hh_dual, hh_edge, h2_edge, hh_bias = \
               compute_H(mesh, trsk, cnfg, hh_cell, uu_edge)
 
+    hh_edge, uu_edge = computeBC(
+        mesh, trsk, cnfg, 
+        hh_edge, uu_edge, 
+        gg_cell, hE_edge, uE_edge)
+  
     hh_tend = addtendUH(mesh, trsk, cnfg, hh_edge, uu_edge, 
                                           hh_tend)
     
     hh_tend = addtendVH(mesh, trsk, cnfg, hh_cell, zb_cell, 
                                           gg_cell, hh_tend)
-                                          
-    hh_tend = addtendHr(mesh, trsk, cnfg, hh_cell, zb_cell, 
-                                          zs_cell, hr_cell,
-                                          hh_tend)
 
     hh_tend[mesh.cell.mask] = reals_t(0.0)
 
@@ -77,23 +74,26 @@ def rhs_slw_u(mesh, trsk, flow, cnfg, hh_cell, uu_edge, uu_tend):
     
     if cnfg.no_u_tend: return uu_tend
     
+    gg_cell = flow.gravity
+    
     ff_cell = flow.ff_cell
     ff_edge = flow.ff_edge
     ff_dual = flow.ff_vert
     
     Tu_edge = flow.Tu_edge
-    if Tu_edge is not None: Tu_edge = Tu_edge[0, :, 0]
-    
-    us_edge = flow.us_edge
-    if us_edge is not None: us_edge = us_edge[0, :, 0]
-    
-    ur_edge = flow.ur_edge
-    if ur_edge is not None: ur_edge = ur_edge[0, :, 0]
-
-    vv_edge = computeVV(mesh, trsk, cnfg, uu_edge)
+    hE_edge = flow.hE_edge
+    uE_edge = flow.uE_edge
 
     hh_dual, hh_edge, h2_edge, hh_bias = \
               compute_H(mesh, trsk, cnfg, hh_cell, uu_edge)
+              
+    hh_edge, uu_edge = computeBC(
+        mesh, trsk, cnfg, 
+        hh_edge, uu_edge, 
+        gg_cell, hE_edge, uE_edge)
+
+    vv_edge = computeVV(
+        mesh, trsk, cnfg, uu_edge)
 
     ke_cell, ke_bias = computeKE(
         mesh, trsk, cnfg, 
@@ -119,10 +119,6 @@ def rhs_slw_u(mesh, trsk, flow, cnfg, hh_cell, uu_edge, uu_tend):
     
     uu_tend = addtendTU(mesh, trsk, cnfg, Tu_edge, h2_edge,
                                           uu_tend)
-                                          
-    uu_tend = addtendUr(mesh, trsk, cnfg, uu_edge, 
-                                          us_edge, ur_edge,
-                                          uu_tend)
     
     uu_tend[mesh.edge.mask] = reals_t(0.0)
     
@@ -135,7 +131,7 @@ def rhs_fst_u(mesh, trsk, flow, cnfg, hh_cell, uu_edge, uu_tend):
 
     if cnfg.no_u_tend: return uu_tend
 
-    zb_cell = flow.zb_cell; gg_cell = flow.grav
+    zb_cell = flow.zb_cell; gg_cell = flow.gravity
 
     uu_tend = addtendGZ(mesh, trsk, cnfg, hh_cell, zb_cell, 
                                           gg_cell, uu_tend)

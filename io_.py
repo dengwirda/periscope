@@ -22,6 +22,7 @@ out_.hh_bias = False
 out_.hh_cell = False
 out_.hh_edge = False
 out_.hh_dual = False
+out_.zt_cell = False
 out_.du_cell = False
 out_.uh_cell = False
 out_.ke_bias = False
@@ -31,6 +32,9 @@ out_.pv_dual = False
 out_.rv_dual = False
 out_.pv_cell = False
 out_.rv_cell = False
+out_.ux_cell = False
+out_.uy_cell = False
+out_.uz_cell = False
 
 def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
 
@@ -79,6 +83,13 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
         data.variables["hh_dual"][step, :, :] = \
             np.reshape(hh_dual[
                 mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                
+    if (out_.zt_cell):
+        xt_cell = flow.zb_cell + hh_cell
+    
+        data.variables["zt_cell"][step, :, :] = \
+            np.reshape(xt_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
 
     if (out_.du_cell):
         xt_cell = trsk.cell_flux_sums * uu_edge
@@ -129,6 +140,27 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
         data.variables["rv_cell"][step, :, :] = \
             np.reshape(rv_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+                
+    if (out_.ux_cell):
+        xt_cell = trsk.cell_lsqr_xnrm * uu_edge
+
+        data.variables["ux_cell"][step, :, :] = \
+            np.reshape(xt_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+                
+    if (out_.uy_cell):
+        xt_cell = trsk.cell_lsqr_ynrm * uu_edge
+
+        data.variables["uy_cell"][step, :, :] = \
+            np.reshape(xt_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+                
+    if (out_.uz_cell):
+        xt_cell = trsk.cell_lsqr_znrm * uu_edge
+
+        data.variables["uz_cell"][step, :, :] = \
+            np.reshape(xt_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))   
 
     data.close()
     
@@ -143,7 +175,7 @@ def init_file(name, cnfg, save, mesh, flow):
     data = nc.Dataset(save, "w", format="NETCDF4")
     data.on_a_sphere = "YES"
     data.sphere_radius = mesh.rsph
-    data.config_gravity = flow.grav
+    data.config_gravity = flow.gravity
     data.is_periodic = "NO"
     data.source = "PERISCOPE"
     
@@ -245,9 +277,17 @@ def init_file(name, cnfg, save, mesh, flow):
     data.createVariable("is_mask", "i1", ("nCells"))
     data["is_mask"].long_name = "TRUE for cells masked out of flow"
     data["is_mask"][:] = flow.is_mask
+    
+    data.createVariable("is_open", "i1", ("nEdges"))
+    data["is_open"].long_name = "TRUE for edges on open boundaries"
+    data["is_open"][:] = flow.is_open
+    
+    data.createVariable("bc_slip", "f4", ("nEdges"))
+    data["bc_slip"].long_name = "Wall slip coefficient on edges"
+    data["bc_slip"][:] = flow.bc_slip
    
     data.createVariable("zb_cell", "f4", ("nCells"))
-    data["zb_cell"].long_name = "Elevation of bottom surface"
+    data["zb_cell"].long_name = "Elevation of lower surface"
     data["zb_cell"][:] = flow.zb_cell
 
     data.createVariable("ff_cell", "f4", ("nCells"))
@@ -282,11 +322,11 @@ def init_file(name, cnfg, save, mesh, flow):
     data.createVariable(
         "u0_edge", "f4", ("nEdges", "nVertLevels"))
     data["u0_edge"].long_name = "Normal velocity initial conditions" 
-    data["u0_edge"][:] = flow.uu_edge[-1, :, :]
+    data["u0_edge"][:] = flow.uu_edge
     data.createVariable(
         "h0_cell", "f4", ("nCells", "nVertLevels"))    
     data["h0_cell"].long_name = "Layer thickness initial conditions"
-    data["h0_cell"][:] = flow.hh_cell[-1, :, :]
+    data["h0_cell"][:] = flow.hh_cell
 
     data.createVariable(
         "uu_min_", "f4", ("nEdges", "nVertLevels"))
@@ -332,6 +372,12 @@ def init_file(name, cnfg, save, mesh, flow):
             "hh_dual", "f4", ("Time", "nVertices", "nVertLevels"))    
         data["hh_dual"].long_name = "Layer thickness on vertices"
         out_.hh_dual = True
+        
+    if ("zt_cell" in cnfg.save_vars):
+        data.createVariable(
+            "zt_cell", "f4", ("Time", "nCells", "nVertLevels"))
+        data["zt_cell"].long_name = "Elevation of upper surface"
+        out_.zt_cell = True
 
     if ("du_cell" in cnfg.save_vars):
         data.createVariable(
@@ -397,6 +443,27 @@ def init_file(name, cnfg, save, mesh, flow):
             "rv_cell", "f4", ("Time", "nCells", "nVertLevels"))
         data["rv_cell"].long_name = "Relative vorticity on cells"
         out_.rv_cell = True
+        
+    if ("ux_cell" in cnfg.save_vars):
+        data.createVariable(
+            "ux_cell", "f4", ("Time", "nCells", "nVertLevels"))
+        data["ux_cell"].long_name = \
+            "Reconstructed velocity on cells in x-axis direction"
+        out_.ux_cell = True
+        
+    if ("uy_cell" in cnfg.save_vars):
+        data.createVariable(
+            "uy_cell", "f4", ("Time", "nCells", "nVertLevels"))
+        data["uy_cell"].long_name = \
+            "Reconstructed velocity on cells in y-axis direction"
+        out_.uy_cell = True
+        
+    if ("uz_cell" in cnfg.save_vars):
+        data.createVariable(
+            "uz_cell", "f4", ("Time", "nCells", "nVertLevels"))
+        data["uz_cell"].long_name = \
+            "Reconstructed velocity on cells in z-axis direction"
+        out_.uz_cell = True
 
     data.close()
     

@@ -30,8 +30,8 @@ def one_step_error(m1st, f1st, m2nd, f2nd):
 
 #-- compute error wrt. one time step
 
-    h1_cell = f1st.hh_cell[-1, :, 0]
-    h2_cell = f2nd.hh_cell[-1, :, 0]
+    h1_cell = f1st.hh_cell
+    h2_cell = f2nd.hh_cell
 
     eps_ = np.finfo(h1_cell.dtype).eps * 2
 
@@ -44,8 +44,8 @@ def one_step_error(m1st, f1st, m2nd, f2nd):
     print("l_two(hh):", l_two)
     print("l_inf(hh):", l_inf)
 
-    u1_edge = f1st.uu_edge[-1, :, 0]
-    u2_edge = f2nd.uu_edge[-1, :, 0]
+    u1_edge = f1st.uu_edge
+    u2_edge = f2nd.uu_edge
 
     eps_ = np.finfo(u1_edge.dtype).eps * 2
 
@@ -58,8 +58,8 @@ def one_step_error(m1st, f1st, m2nd, f2nd):
     print("l_two(uu):", l_two)
     print("l_inf(uu):", l_inf)
 
-    r1_dual = f1st.rv_dual[-1, :, 0]
-    r2_dual = f2nd.rv_dual[-1, :, 0]
+    r1_dual = f1st.rv_dual
+    r2_dual = f2nd.rv_dual
 
     eps_ = np.finfo(r1_dual.dtype).eps * 2
 
@@ -72,8 +72,8 @@ def one_step_error(m1st, f1st, m2nd, f2nd):
     print("l_two(rv):", l_two)
     print("l_inf(rv):", l_inf)
 
-    p1_dual = f1st.pv_dual[-1, :, 0]
-    p2_dual = f2nd.pv_dual[-1, :, 0]
+    p1_dual = f1st.pv_dual
+    p2_dual = f2nd.pv_dual
 
     eps_ = np.finfo(p1_dual.dtype).eps * 2
 
@@ -91,8 +91,8 @@ def all_step_error(m1st, f1st, m2nd, f2nd):
 
 #-- compute error wrt. all time step
 
-    h1_cell = f1st.hh_cell[:, :, 0]
-    h2_cell = f2nd.hh_cell[:, :, 0]
+    h1_cell = f1st.hh_cell
+    h2_cell = f2nd.hh_cell
 
     eps_ = np.finfo(h1_cell.dtype).eps * 2
 
@@ -112,8 +112,8 @@ def all_step_error(m1st, f1st, m2nd, f2nd):
     print("l_two(hh):", l_two)
     print("l_inf(hh):", l_inf)
 
-    u1_edge = f1st.uu_edge[:, :, 0]
-    u2_edge = f2nd.uu_edge[:, :, 0]
+    u1_edge = f1st.uu_edge
+    u2_edge = f2nd.uu_edge
     
     eps_ = np.finfo(u1_edge.dtype).eps * 2
 
@@ -152,13 +152,12 @@ if (__name__ == "__main__"):
     m1st = load_mesh(args.test_file)
     m2nd = load_mesh(args.base_file)
 
-    print("delta(m):", np.mean(m1st.edge.clen))
+    print("ref-length:", 
+        np.mean(np.sqrt(2.0 * m1st.edge.area)))
 
     f1st = load_flow(args.test_file, m1st)
     f2nd = load_flow(args.base_file, m2nd)
     
-    if (f2nd.hh_cell.shape[0] == 1):
-        one_step_error(m1st, f1st, m2nd, f2nd)    
-    else:
-        all_step_error(m1st, f1st, m2nd, f2nd)
+    one_step_error(m1st, f1st, m2nd, f2nd)        
+   #all_step_error(m1st, f1st, m2nd, f2nd)
 
