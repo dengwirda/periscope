@@ -1,4 +1,6 @@
 
+### `Formulation`
+
 `PERISCOPE` provides a nonlinear rotating shallow water model, solved in 
 so-called vector-invariant form using an unstructured C-grid discretisation. Thickness, 
 velocity and vorticity DoF are staggered at the cells, edges and vertices (duals) of a 
@@ -10,7 +12,7 @@ $$
 
 $$
 \frac{\partial u}{\partial t} + q (u h)^{\perp} = 
-  -\nabla \Big(g(h + z_{b}) + \phi_{u}\Big) - \nabla \frac{1}{2} |u|^{2} - c_{d} u + \nu_{k}^{u} \nabla^{k} u + \frac{1}{h} \tau_{u} + S_{u}\ ,
+  -\nabla \Big(g(h + z_{b}) + \xi_{u}\Big) - \nabla \frac{1}{2} |u|^{2} - c_{d} u + \nu_{k}^{u} \nabla^{k} u + \frac{1}{h} \tau_{u} + S_{u}\ ,
 $$
 
 $$
@@ -44,4 +46,20 @@ $$
   - Dissipation coefficients are scaled with the mesh, such that $\nu_{2} = \Big(\frac{\Delta x}{\overline{\Delta x}}\Big)^{1} \nu_{2}$ and
     $\nu_{4} = \Big(\frac{\Delta x}{\overline{\Delta x}}\Big)^{3} \nu_{4}$.
   - $\overline{\Delta x} =$ `--ref-scale` is the reference length-scale. $\overline{\Delta x} \leq 0$ disables the scaling.
-- $S_{h}, S_{u}$ are source terms, $\tau_{u}$ is an external stress, and $\phi_{u}$ is an applied geopotential.
+- $S_{h}, S_{u}$ are source terms, $\tau_{u}$ is an external stress, and $\xi_{u}$ is an applied geopotential.
+- Radiative inflow / outflow boundary conditions are defined by the external velocity and thickness forcing `uE_edge`, `hE_edge`.
+
+### `Model Output`
+
+`PERISCOPE` outputs a number of default dynamical variables, saved in the `out_<your-case-name>.nc` file. Output can be customised using the `--save-vars` cmd-line argument, which should be a comma-delimited list that can include:
+
+- `uu_edge`, `vv_edge`: edge-aligned normal and tangential velocities.
+- `ux_cell`, `uy_cell`, `uz_cell`: cell-centred cartesian velocity components.
+- `hh_cell`, `hh_edge`, `hh_dual`: fluid thickness, integrated on various staggered control volumes.
+- `zt_cell`: cell-centred fluid upper surface.
+- `du_cell`: cell-centred divergence $\nabla \cdot u$.
+- `uh_cell`: cell-centred flux divergence $\nabla \cdot (u h)$.
+- `ke_cell`: cell-centred kinetic energy $\frac{1}{2} |u|^{2}$.
+- `rv_dual`, `pv_dual`: dual-centred vorticity $\nabla \times u$ and $h^{-1}(\zeta + f)$.
+- `rv_cell`, `pv_cell`: cell-remapped vorticity $\nabla \times u$ and $h^{-1}(\zeta + f)$.
+- `pv_bias`, `ke_bias`, `hh_bias`: upwind bias in advection scheme, if appropriate upwind scheme is selected.
