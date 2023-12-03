@@ -15,14 +15,11 @@ $$
 
 $$
 \frac{\partial u}{\partial t} + (u \cdot \nabla) u + f u^{\perp} = 
-    -\nabla \Big(g(h + z_{b}) + \phi_{u}\Big) - c_{d} u + D_{u} + \frac{1}{h} \tau_{u} + S_{u}\ ,
+    -\nabla \Big(g(h + z_{b}) + \xi_{u}\Big) - c_{d} u + D_{u} + \frac{1}{h} \tau_{u} + S_{u}\ .
 $$
 
-$$
-c_{d} = c_{1} + (c_{2} + c_{l}) \frac{1}{h} \|u\|\ .
-$$
-
-See `MODELS.md` for additional detail regarding the formulation.
+See `MODELS.md` for additional detail regarding the formulation, numerics and model 
+output.
 
 A staggered, unstructured mesh mimetic finite-volume / difference discretisation 
 is employed that maintains the energy (and to a lesser extent enstrophy) balances 
