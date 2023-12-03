@@ -51,7 +51,9 @@ $$
 
 ### `Model Output`
 
-`PERISCOPE` outputs a number of default dynamical variables, saved in the `out_<your-case-name>.nc` file. Output can be customised using the `--save-vars` cmd-line argument, which should be a comma-delimited list that can include:
+`PERISCOPE` outputs a number of default dynamical variables, saved in the `out_<your-case-name>.nc` 
+file. Output can be customised using the `--save-vars` cmd-line argument, which should be a 
+comma-delimited list that can include:
 
 - `uu_edge`, `vv_edge`: edge-aligned normal and tangential velocities.
 - `ux_cell`, `uy_cell`, `uz_cell`: cell-centred cartesian velocity components.
