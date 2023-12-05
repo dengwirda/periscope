@@ -38,21 +38,21 @@ $$
   - $c_{2} =$ `--sqrlaw-cd` is a quadratic drag coefficient.
   - $c_{l}$ is a log law-of-the-wall formulation with roughness $z_{0} =$ `--loglaw-z0`.
   - $c_{l}$ is bracketed by `--loglaw-lo` and `--loglaw-hi`.
-- $\nu_{k}^{u} \nabla^{k} u$, $\nu_{k}^{t} \nabla^{k} u$ and $\nu_{k}^{h} \nabla g(h + z_{b})$ are dissipative operators:
+- $\nu_{k}^{u} \nabla^{k} u$ and $\nu_{k}^{h} \nabla g(h + z_{b})$ are dissipative operators:
   - $\nu_{2}^{u} \nabla^{2} u$ (with $\nu_{2}^{u} =$ `--uu-visc-2`) is a Laplacian viscosity.
   - $\nu_{4}^{u} \nabla^{4} u$ (with $\nu_{4}^{u} =$ `--uu-visc-4`) is a biharmonic viscosity.
   - $\nu_{k}^{\delta} (\nabla \nabla \cdot)^{\frac{k}{2}} u$ (with $\nu_{k}^{\delta} =$ `--du-visc-2` or `--du-visc-4`) 
     are equivalent divergence damping terms.
   - $\nu_{2}^{h} \nabla^{2} g(h + z_{b})$ (with $\nu_{2}^{u} =$ `--hh-diff-2`) is a Laplacian diffusivity.
   - $\nu_{4}^{h} \nabla^{4} g(h + z_{b})$ (with $\nu_{4}^{u} =$ `--hh-diff-4`) is a biharmonic diffusivity.
-  - $\nu_{2}^{t} \nabla^{2} u$ is an eddy viscosity closure, with $\nu_{2}^{t} determined by a sub-grid model. Presently 
-    the Leith closure is supported, where $\nu_{2}^{t} = \Big(\chi_{l} \delta_{l}\Big)^{3} |\nabla \nabla \times u| 
+  - $\nu_{2}^{t} \nabla^{2} u$ is an eddy viscosity closure, with $\nu_{2}^{t}$ determined by a sub-grid model. Presently 
+    the Leith closure is supported, where $\nu_{2}^{t} = \big(\chi_{l} \delta_{l}\big)^{3} |\nabla \nabla \times u|$
     with $\chi_{l} =$ `--leith-chi` and $\nu_{2}^{t}$ bounded below `--leith-max`. $\delta_{l}$ is a measure of the 
     local mesh spacing.
   - Dissipation coefficients are scaled with the mesh, such that 
-    $\nu_{2} = \Big(\frac{\Delta x}{\overline{\Delta x}}\Big)^{1} \nu_{2}$ and
-    $\nu_{4} = \Big(\frac{\Delta x}{\overline{\Delta x}}\Big)^{3} \nu_{4}$.
-  - $\overline{\Delta x} =$ `--ref-scale` is the reference length-scale. $\overline{\Delta x} \leq 0$ disables the scaling.
+    $\nu_{2} = \big(\frac{\delta}{\Delta}\big)^{1} \nu_{2}$ and
+    $\nu_{4} = \big(\frac{\delta}{\Delta}\big)^{3} \nu_{4}$.
+  - $\Delta =$ `--ref-scale` is the reference length-scale. $\Delta \leq 0$ disables the scaling.
 - $S_{h}, S_{u}$ are source terms, $\tau_{u}$ is an external stress, and $\xi_{u}$ is an applied geopotential.
 - Radiative inflow / outflow boundary conditions are defined by the external velocity and thickness forcing `uE_edge`, `hE_edge`.
 
