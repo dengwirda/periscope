@@ -104,19 +104,22 @@ def diag_vars(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
         uu_edge, vv_edge,
         +1. / 2. * cnfg.time_step)
 
-    rv_dual, pv_dual, \
+    rv_dual, pv_dual, r2_dual, p2_dual, \
     rv_cell, pv_cell, \
     pv_edge, pv_bias = computePV(
         mesh, trsk, cnfg, 
         hh_cell, h2_edge, hh_dual, uu_edge, vv_edge,
         ff_dual, ff_edge, ff_cell, 
         +1. / 2. * cnfg.time_step)
+        
+    nu_edge = computeNu(
+        mesh, trsk, cnfg, r2_dual, rv_cell)
 
     return hh_edge, hh_dual, hh_bias, \
            ke_cell, ke_bias, \
            rv_cell, pv_cell, \
            rv_dual, pv_dual, pv_edge, pv_bias, \
-           vv_edge
+           vv_edge, nu_edge
 
 
 def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
@@ -155,7 +158,8 @@ def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
     kk_sums = math.fsum(ke_edge) \
             + math.fsum(pe_cell)
 
-    rv_dual, pv_dual, rv_cell, pv_cell, \
+    rv_dual, pv_dual, r2_dual, p2_dual, \
+    rv_cell, pv_cell, \
     pv_edge, pv_bias = computePV(
         mesh, trsk, cnfg, 
         hh_cell, h2_edge, hh_dual, uu_edge, vv_edge,
@@ -258,7 +262,7 @@ def _build_PV(mesh, trsk, cnfg,
               
     ttic = time.time()
               
-    rv_dual, pv_dual, p2_dual, \
+    rv_dual, pv_dual, r2_dual, p2_dual, \
     rv_cell, pv_cell, \
     rv_edge, pv_edge = _computePV(
         mesh, trsk, cnfg, 
@@ -268,7 +272,7 @@ def _build_PV(mesh, trsk, cnfg,
     ttoc = time.time()
     tcpu.computePV = tcpu.computePV + (ttoc - ttic)
 
-    return rv_dual, pv_dual, p2_dual, \
+    return rv_dual, pv_dual, r2_dual, p2_dual, \
            rv_cell, pv_cell, \
            rv_edge, pv_edge
               
@@ -280,7 +284,7 @@ def computePV(mesh, trsk, cnfg,
   
 #-- compute discrete vorticity
   
-    rv_dual, pv_dual, p2_dual, \
+    rv_dual, pv_dual, r2_dual, p2_dual, \
     rv_cell, pv_cell, \
     rv_edge, pv_edge = _build_PV(
         mesh, trsk, cnfg, 
@@ -298,7 +302,8 @@ def computePV(mesh, trsk, cnfg,
         cnfg.pv_upwind, 
         cnfg.pv_min_up, cnfg.pv_max_up)
           
-    return rv_dual, pv_dual, rv_cell, pv_cell, \
+    return rv_dual, pv_dual, r2_dual, p2_dual, \
+           rv_cell, pv_cell, \
            pv_edge, up_edge
               
               
@@ -367,6 +372,25 @@ def addtendGZ(mesh, trsk, cnfg, hh_cell, zb_cell,
 
     return uu_tend
     
+    
+def computeNu(mesh, trsk, cnfg, rv_dual, rv_cell):
+
+#-- compute leith viscosities
+
+    nu_edge = variables.nu_edge
+
+    if (cnfg.leith_chi == 0): return nu_edge
+
+    ttic = time.time()
+
+    nu_edge = _computeNu(
+        mesh, trsk, cnfg, rv_dual, rv_cell)
+    
+    ttoc = time.time()
+    tcpu.computeNu = tcpu.computeNu + (ttoc - ttic)
+
+    return nu_edge
+    
 
 def addtendDU(mesh, trsk, cnfg, uu_edge, uu_tend):
 
@@ -385,7 +409,8 @@ def addtendDU(mesh, trsk, cnfg, uu_edge, uu_tend):
     return uu_tend
 
 
-def addtendVU(mesh, trsk, cnfg, uu_edge, uu_tend):
+def addtendVU(mesh, trsk, cnfg, uu_edge, nu_edge,
+                                uu_tend):
 
 #-- viscous del^k operators
 
@@ -394,7 +419,8 @@ def addtendVU(mesh, trsk, cnfg, uu_edge, uu_tend):
     ttic = time.time()
             
     uu_tend = _computeVU(
-        mesh, trsk, cnfg, uu_edge, uu_tend)
+        mesh, trsk, cnfg, 
+                 uu_edge, nu_edge, uu_tend)
 
     ttoc = time.time()
     tcpu.computeVU = tcpu.computeVU + (ttoc - ttic)
@@ -470,6 +496,7 @@ try:
     from _kx import _advect_UH
     from _kx import _advect_UV
     from _kx import _computeGZ
+    from _kx import _computeNu
     from _kx import _computeDU
     from _kx import _computeVU
     from _kx import _computeVH

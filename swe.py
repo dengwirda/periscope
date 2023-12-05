@@ -197,11 +197,16 @@ def swe(cnfg):
         max (cnfg.du_visc_2, cnfg.du_visc_4)
     cnfg.uu_visc_k = \
         max (cnfg.uu_visc_2, cnfg.uu_visc_4)
+    cnfg.uu_visc_k = \
+        max (cnfg.uu_visc_k, cnfg.leith_chi)
     cnfg.hh_diff_k = \
         max (cnfg.hh_diff_2, cnfg.hh_diff_4)
     
     s2_edge, s4_edge,\
     s2_cell, s4_cell = scalingVk(mesh, trsk, cnfg)
+    
+    cnfg.leith_max = np.asarray(
+        (cnfg.leith_max * s2_edge), dtype=reals_t)
     
     cnfg.du_visc_2 = np.asarray(
         (cnfg.du_visc_2 * s2_edge), dtype=reals_t)
@@ -292,6 +297,7 @@ def swe(cnfg):
     print("*advect_UV (sec):", round(tcpu.advect_UV, 2))
     print("*computeGZ (sec):", round(tcpu.computeGZ, 2))
     print("*computeVV (sec):", round(tcpu.computeVV, 2))
+    print("*computeNu (sec):", round(tcpu.computeNu, 2))
     print("*computeDU (sec):", round(tcpu.computeDU, 2))
     print("*computeVU (sec):", round(tcpu.computeVU, 2))
     print("*computeVH (sec):", round(tcpu.computeVH, 2))
@@ -537,6 +543,18 @@ if (__name__ == "__main__"):
         default=0.E+00,
         required=False,
         help="DEL^4(U) damping coeff. {VISC = +0.E+00}.")
+
+    parser.add_argument(
+        "--leith-chi", dest="leith_chi", type=float,
+        default=0.E+00,
+        required=False,
+        help="Leith model coefficient {SCAL = +0.E+00}.")
+        
+    parser.add_argument(
+        "--leith-max", dest="leith_max", type=float,
+        default=0.E+00,
+        required=False,
+        help="Leith model max damping {VISC = +0.E+00}.")
 
     parser.add_argument(
         "--linlaw-cd", dest="linlaw_cd", type=float,

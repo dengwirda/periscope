@@ -10,10 +10,11 @@ from _fp import reals_t, index_t
 
 from log import tcpu
 
-from _dx import computeBC, compute_H, addtendUH, \
+from _dx import computeBC, \
+                compute_H, addtendUH, addtendVH, \
                 computeKE, computePV, addtendUV, \
                 computeVV, addtendGZ, \
-                addtendDU, addtendVU, addtendVH, \
+                computeNu, addtendDU, addtendVU, \
                 addtendTU
 
 def rhs_slw_h(mesh, trsk, flow, cnfg, hh_cell, uu_edge, hh_tend):
@@ -42,9 +43,11 @@ def rhs_fst_h(mesh, trsk, flow, cnfg, hh_cell, uu_edge, hh_tend):
         hh_edge, uu_edge, 
         gg_cell, hE_edge, uE_edge)
   
+    # thickness advection
     hh_tend = addtendUH(mesh, trsk, cnfg, hh_edge, uu_edge, 
                                           hh_tend)
     
+    # del^k dissipation
     hh_tend = addtendVH(mesh, trsk, cnfg, hh_cell, zb_cell, 
                                           gg_cell, hh_tend)
 
@@ -101,7 +104,8 @@ def rhs_slw_u(mesh, trsk, flow, cnfg, hh_cell, uu_edge, uu_tend):
         uu_edge, vv_edge,
         +1. / 2. * cnfg.time_step)
 
-    rv_dual, pv_dual, rv_cell, pv_cell, \
+    rv_dual, pv_dual, r2_dual, p2_dual, \
+    rv_cell, pv_cell, \
     pv_edge, pv_bias = computePV(
         mesh, trsk, cnfg, 
         hh_cell, h2_edge, hh_dual, 
@@ -109,14 +113,22 @@ def rhs_slw_u(mesh, trsk, flow, cnfg, hh_cell, uu_edge, uu_tend):
         ff_dual, ff_edge, ff_cell, 
         +1. / 2. * cnfg.time_step)
 
+    # nonlinear advection
     uu_tend = addtendUV(mesh, trsk, cnfg, hh_edge, uu_edge,
                                           pv_edge, ke_cell, 
                                           uu_tend)
 
+    # leith sub-grid
+    nu_edge = computeNu(mesh, trsk, cnfg, r2_dual, rv_cell)
+
+    # div^k dissipation
     uu_tend = addtendDU(mesh, trsk, cnfg, uu_edge, uu_tend)
     
-    uu_tend = addtendVU(mesh, trsk, cnfg, uu_edge, uu_tend)
+    # del^k dissipation
+    uu_tend = addtendVU(mesh, trsk, cnfg, uu_edge, nu_edge,
+                                          uu_tend)
     
+    # external stresses
     uu_tend = addtendTU(mesh, trsk, cnfg, Tu_edge, h2_edge,
                                           uu_tend)
     
@@ -133,6 +145,7 @@ def rhs_fst_u(mesh, trsk, flow, cnfg, hh_cell, uu_edge, uu_tend):
 
     zb_cell = flow.zb_cell; gg_cell = flow.gravity
 
+    # pressure gradient
     uu_tend = addtendGZ(mesh, trsk, cnfg, hh_cell, zb_cell, 
                                           gg_cell, uu_tend)
     

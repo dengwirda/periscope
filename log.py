@@ -17,6 +17,7 @@ tcpu.computePV = 0.0E+00
 tcpu.advect_UV = 0.0E+00
 tcpu.computeGZ = 0.0E+00
 tcpu.computeVV = 0.0E+00
+tcpu.computeNu = 0.0E+00
 tcpu.computeDU = 0.0E+00
 tcpu.computeVU = 0.0E+00
 tcpu.computeVH = 0.0E+00

@@ -46,6 +46,8 @@ def init_pool(mesh):
             np.empty(mesh.vert.size, dtype=reals_t)
     variables.pv_dual = \
             np.empty(mesh.vert.size, dtype=reals_t)
+    variables.r2_dual = \
+            np.empty(mesh.vert.size, dtype=reals_t)
     variables.p2_dual = \
             np.empty(mesh.vert.size, dtype=reals_t)
             
@@ -68,6 +70,11 @@ def init_pool(mesh):
             
     variables.ke_bias = \
             np.empty(mesh.edge.size, dtype=reals_t)
+    
+    variables.nu_edge = \
+            np.empty(mesh.edge.size, dtype=reals_t)
+        
+    variables.nu_edge[:] = 0.0
         
     variables.cd_edge = \
             np.empty(mesh.edge.size, dtype=reals_t)

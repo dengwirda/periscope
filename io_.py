@@ -35,13 +35,16 @@ out_.rv_cell = False
 out_.ux_cell = False
 out_.uy_cell = False
 out_.uz_cell = False
+out_.nu_turb = False
 
 def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
 
     hh_edge, hh_dual, hh_bias, \
     ke_cell, ke_bias, \
-    rv_cell, pv_cell, rv_dual, pv_dual, \
-    pv_edge, pv_bias, vv_edge = diag_vars (
+    rv_cell, pv_cell, \
+    rv_dual, pv_dual, \
+    pv_edge, pv_bias, \
+    vv_edge, nu_edge = diag_vars (
         mesh, trsk, flow, cnfg, hh_cell, uu_edge
         )
 
@@ -161,6 +164,14 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
         data.variables["uz_cell"][step, :, :] = \
             np.reshape(xt_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))   
+                
+    if (out_.nu_turb):
+        xt_dual = trsk.dual_tail_sums * nu_edge
+        xt_dual/= mesh.vert.area
+    
+        data.variables["nu_turb"][step, :, :] = \
+            np.reshape(xt_dual[
+                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
 
     data.close()
     
@@ -464,6 +475,13 @@ def init_file(name, cnfg, save, mesh, flow):
         data["uz_cell"].long_name = \
             "Reconstructed velocity on cells in z-axis direction"
         out_.uz_cell = True
+        
+    if ("nu_turb" in cnfg.save_vars):
+        data.createVariable(
+            "nu_turb", "f4", ("Time", "nVertices", "nVertLevels"))
+        data["nu_turb"].long_name = \
+            "Turbulent eddy viscosity, remapped to duals"
+        out_.nu_turb = True
 
     data.close()
     
