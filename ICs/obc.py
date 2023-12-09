@@ -41,7 +41,7 @@ def init(name, save, rsph=0.E+0):
 
     grav = 9.81                 # gravity
     f = 1.0E-04                 # coriolis
-    u0 = 3.0                    # velocity
+    u0 = 1.0 #3.0                    # velocity
     h0 = 15.                    # depth
     z0 = 0.0                    # hill position
     y0 =-250.

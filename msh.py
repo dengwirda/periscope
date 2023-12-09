@@ -899,11 +899,11 @@ def load_forc(name, flow=None, lean=False, step=+0):
 
     if (flow is None): flow = base()
     
-    flow.xx_time = None
-    flow.uE_edge = None
-    flow.hE_edge = None
-    flow.Tu_edge = None
-    flow.Xi_cell = None
+    if (step == 0): flow.xx_time = None  
+    if (step >= 0): flow.uE_edge = None
+    if (step >= 0): flow.hE_edge = None
+    if (step >= 0): flow.Tu_edge = None
+    if (step >= 0): flow.Xi_cell = None
     
     flow.step = step
 

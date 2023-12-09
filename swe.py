@@ -176,8 +176,9 @@ def swe(cnfg):
     uu_edge[mesh.edge.open] = \
             u0_edge [mesh.edge.open]
     
-    mesh.edge.slip = flow.bc_slip
-    mesh.edge.slip[mesh.edge.open] = reals_t(1.0)
+    mesh.edge.slip = mesh.edge.mask * \
+                     flow.bc_slip
+    mesh.edge.slip  [mesh.edge.open] = reals_t(1.)
     
     mesh.vert.slip = trsk.dual_edge_sums * \
                      mesh.edge.slip
@@ -234,11 +235,12 @@ def swe(cnfg):
             if (flow.xx_time is not None):
                 # find needed forcing step to interp.
                 need = np.searchsorted(
-                    flow.xx_time, tsec + 0.5 * cnfg.time_step)
+                    flow.xx_time, 
+                        tsec + 0.5 * cnfg.time_step) - 1
                     
                 if (need > flow.step): 
-                # a piecewise const. interp. for now...          
-                    flow = load_forc(forc, flow, need)
+                # a piecewise const. interp. for now...       
+                    flow = load_forc(forc, flow, step=need)
                     flow = sort_forc(flow, mesh)
         
             hh_cell, uu_edge, \
@@ -283,7 +285,7 @@ def swe(cnfg):
     ttoc = time.time()
 
     print("")
-    print("Run complete; timers:")
+    print("Run complete; runtime:")
     print("*wall-time (sec):", round(ttoc - ttic, 2))
     print("*file-i/o. (sec):", round(tcpu.filewrite, 2))
     print("*thickness (sec):", round(tcpu.thickness, 2))

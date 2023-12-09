@@ -130,11 +130,11 @@ A number of test cases are available to run out-of-the-box:
     --time-step=15. \
     --save-freq=40 \
     --stat-freq=40 \
-    --wall-slip=1. \
     --hh-scheme="UPWIND" \
-    --uu-visc-4=1.E+11 \
-    --hh-diff-4=1.E+11 \
-    --loglaw-z0=0.001 --loglaw-lo=0.0025 --loglaw-hi=1. \
+    --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
+    --uu-visc-2=1.E+01 --uu-visc-4=2.E+11 \
+    --hh-diff-2=1.E+01 --hh-diff-4=2.E+11 \
+    --leith-chi=0.3875 --leith-max=1.E+04 \
     --numthread=cores
 
 ### `Merging vortex pair`
@@ -166,11 +166,22 @@ A number of test cases are available to run out-of-the-box:
     --save-freq=250 \
     --stat-freq=125 \
     --numthread=cores
+    
+    python3 swe.py \
+    --mesh-file="dipole_3.nc" \
+    --num-steps=10000 \
+    --time-step=0.001 \
+    --save-freq=250 \
+    --stat-freq=125 \
+    --uu-visc-2=1.E-01 --uu-visc-4=2.E+09 \
+    --hh-diff-2=1.E-01 --hh-diff-4=2.E+09 \
+    --leith-chi=0.3875 --leith-max=1.E+02 \
+    --numthread=cores
         
 ### `Vortex-shedding wake`
 
     python3 ICs/obc.py \
-    --mesh-file="mesh_disk_3.nc" 
+    --mesh-file="mesh_disk_3.nc" \
     --init-file="wake_3.nc" \
     --radius=50000.
 
@@ -182,8 +193,9 @@ A number of test cases are available to run out-of-the-box:
     --save-freq=144 \
     --stat-freq=288 \
     --hh-scheme="UPWIND" \
-    --loglaw-z0=0.001 --loglaw-lo=0.0025 --loglaw-hi=1. \
-    --uu-visc-2=1.E+03 --uu-visc-4=1.E+12 \
-    --hh-diff-4=1.E+11 \
+    --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
+    --uu-visc-2=1.E+01 --uu-visc-4=2.E+11 \
+    --hh-diff-2=1.E+01 --hh-diff-4=2.E+11 \
+    --leith-chi=0.3875 --leith-max=1.E+04 \
     --numthread=cores
 

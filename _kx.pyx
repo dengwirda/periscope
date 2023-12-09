@@ -44,12 +44,15 @@ def _computeBC(mesh, trsk, cnfg,
 #-- update u, h variables to set open BCs
             
     cdef INDEX_t edge, eidx
-    cdef REALS_t UU_PRED
+    cdef REALS_t RADIATE, UU_PRED
     
     cdef REALS_t ZERO = 0.0
+    cdef REALS_t TWO_ = 2.0
     
     cdef INDEX_t cnfg_numthread = cnfg.numthread
     cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    
+    cdef REALS_t cnfg_time_step = cnfg.time_step
         
     cdef INDEX_t NBCS = mesh.edge.open.size
     
@@ -62,6 +65,10 @@ def _computeBC(mesh, trsk, cnfg,
     
     cdef INDEX_t *MESH_EDGE_OPEN = &mesh_edge_open[0]
     
+    cdef REALS_t[::1] mesh_edge_slen = mesh.edge.slen
+    
+    cdef REALS_t *MESH_EDGE_SLEN = &mesh_edge_slen[0]
+    
     if (NBCS > 0):
 
         with nogil, parallel(num_threads=cnfg_numthread):
@@ -72,24 +79,29 @@ def _computeBC(mesh, trsk, cnfg,
                 eidx = MESH_EDGE_OPEN[edge]
                     
                 #-- Flather-type bnd. condition
-                UU_PRED = UE_EDGE[eidx] + \
-                    sqrt_r(gg_cell / HH_EDGE[eidx]) * (
-                        HH_EDGE[eidx] - HE_EDGE[eidx]
-                    )
+                RADIATE = sqrt_r(
+                    gg_cell / HH_EDGE[eidx])
                     
+                #-- CFL-like limiter
+                RADIATE = min(RADIATE, TWO_ * 
+                    MESH_EDGE_SLEN[eidx] / cnfg_time_step)
+                
+                UU_PRED = UE_EDGE[eidx] + RADIATE * (
+                    HH_EDGE[eidx] - HE_EDGE[eidx]
+                    )
+                
                 if (UU_PRED <=  ZERO):
                 
                 #-- inflow: prescribe mass flux
+                    UU_EDGE[eidx] = UU_PRED
                     HH_EDGE[eidx] = HE_EDGE[eidx]
-                    UU_EDGE[eidx] = UE_EDGE[eidx]
-                
+                    
                 else:
                 
                 #-- outflow: radiate deviations
                     UU_EDGE[eidx] = UU_PRED
                    #HH_EDGE[eidx] = upwind, from scheme
-                    
-         
+                          
     return hh_edge, uu_edge
             
 
@@ -1656,8 +1668,8 @@ def _computeVH(mesh, trsk, cnfg,
          
         #-- flux-limiter: don't diffuse to topography!
             OK_EDGE[edge] = MESH_EDGE_MASK[edge]
-            OK_EDGE[edge]*=(HALF *
-                   (ZB_CELL[cel1]+ HH_CELL[cel1] +
+            OK_EDGE[edge]*=(
+                min(ZB_CELL[cel1]+ HH_CELL[cel1],
                     ZB_CELL[cel2]+ HH_CELL[cel2])
               > max(ZB_CELL[cel1], ZB_CELL[cel2])
                    )
