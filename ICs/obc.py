@@ -15,7 +15,7 @@ sys.path.insert(
 from stb import strtobool
 
 from msh import load_mesh, cell_quad, dual_quad
-from ops import trsk_mats
+from ops import operators
 
 #-- Open BCs and wakes around obstructions
 #-- Authors: Darren Engwirda
@@ -35,13 +35,13 @@ def init(name, save, rsph=0.E+0):
 
     print("Building coefficients...")
 
-    trsk = trsk_mats(mesh)
+    mats = operators(mesh)
 
 #-- requires rsph = 50000. to scale disk to 1000m
 
     grav = 9.81                 # gravity
     f = 1.0E-04                 # coriolis
-    u0 = 1.0 #3.0                    # velocity
+    u0 = 3.0                    # velocity
     h0 = 15.                    # depth
     z0 = 0.0                    # hill position
     y0 =-250.

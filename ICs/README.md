@@ -28,7 +28,7 @@ A number of test cases are available to run out-of-the-box:
     --integrate="RK22-FB" \
     --numthread=cores
 
-### `Flow along mountain`
+### `Flow over a mountain`
 
     python3 ICs/wtc.py \
     --mesh-file="mesh_w_elev_cvt_7.nc" \
@@ -54,7 +54,7 @@ A number of test cases are available to run out-of-the-box:
     --integrate="RK32-FB" \
     --numthread=cores
 
-### `RossbyHaurwitz wave`
+### `Rossby-Haurwitz wave`
 
     python3 ICs/wtc.py \
     --mesh-file="mesh_w_elev_cvt_7.nc" \

@@ -8,7 +8,10 @@
 
 """ SWE spatial discretisation using TRSK-like operators
 """
+#-- Part of the PERISCOPE solver
 #-- Darren Engwirda
+#-- d.engwirda@gmail.com
+#-- https://github.com/dengwirda/
 
 import numpy as np
 cimport numpy as np
@@ -33,7 +36,7 @@ ctypedef double  FLT64_t
 ctypedef int32_t INDEX_t
 ctypedef float   REALS_t  # or double
 
-def _computeBC(mesh, trsk, cnfg,
+def _computeBC(mesh, mats, cnfg,
     np.ndarray[REALS_t, ndim=1] hh_edge,
     np.ndarray[REALS_t, ndim=1] uu_edge,
     const REALS_t gg_cell,
@@ -105,7 +108,7 @@ def _computeBC(mesh, trsk, cnfg,
     return hh_edge, uu_edge
             
 
-def _upwinding(mesh, trsk, cnfg, 
+def _upwinding(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] sw_dual,
     np.ndarray[REALS_t, ndim=1] ss_dual, 
     np.ndarray[REALS_t, ndim=1] ss_cell,
@@ -146,42 +149,42 @@ def _upwinding(mesh, trsk, cnfg,
     cdef REALS_t *UP_BIAS = &up_bias[0]
     
     cdef INDEX_t[::1] grad_norm_xptr = \
-        trsk.edge_grad_norm.indptr
+        mats.edge_grad_norm.indptr
     cdef INDEX_t[::1] grad_norm_xidx = \
-        trsk.edge_grad_norm.indices
+        mats.edge_grad_norm.indices
     cdef REALS_t[::1] grad_norm_xval = \
-        trsk.edge_grad_norm.data
+        mats.edge_grad_norm.data
     
     cdef INDEX_t *GRAD_NORM_XPTR = &grad_norm_xptr[0]
     cdef INDEX_t *GRAD_NORM_XIDX = &grad_norm_xidx[0]
     cdef REALS_t *GRAD_NORM_XVAL = &grad_norm_xval[0]
     
     cdef INDEX_t[::1] grad_perp_xptr = \
-        trsk.edge_grad_perp.indptr
+        mats.edge_grad_perp.indptr
     cdef INDEX_t[::1] grad_perp_xidx = \
-        trsk.edge_grad_perp.indices
+        mats.edge_grad_perp.indices
     cdef REALS_t[::1] grad_perp_xval = \
-        trsk.edge_grad_perp.data
+        mats.edge_grad_perp.data
     
     cdef INDEX_t *GRAD_PERP_XPTR = &grad_perp_xptr[0]
     cdef INDEX_t *GRAD_PERP_XIDX = &grad_perp_xidx[0]
     cdef REALS_t *GRAD_PERP_XVAL = &grad_perp_xval[0]
        
     cdef INDEX_t[::1] vert_tail_xptr = \
-        trsk.dual_tail_sums.indptr
+        mats.dual_tail_sums.indptr
     cdef INDEX_t[::1] vert_tail_xidx = \
-        trsk.dual_tail_sums.indices
+        mats.dual_tail_sums.indices
     cdef REALS_t[::1] vert_tail_xval = \
-        trsk.dual_tail_sums.data
+        mats.dual_tail_sums.data
     
     cdef INDEX_t *VERT_EDGE_XPTR = &vert_tail_xptr[0]
     cdef INDEX_t *VERT_EDGE_XIDX = &vert_tail_xidx[0]
     cdef REALS_t *VERT_EDGE_XVAL = &vert_tail_xval[0]
     
     cdef INDEX_t[::1] edge_vert_xptr = \
-        trsk.edge_vert_sums.indptr
+        mats.edge_vert_sums.indptr
     cdef INDEX_t[::1] edge_vert_xidx = \
-        trsk.edge_vert_sums.indices
+        mats.edge_vert_sums.indices
     
     cdef INDEX_t *EDGE_VERT_XPTR = &edge_vert_xptr[0]
     cdef INDEX_t *EDGE_VERT_XIDX = &edge_vert_xidx[0]
@@ -379,7 +382,7 @@ def _upwinding(mesh, trsk, cnfg,
     return ss_edge, up_bias
     
 
-def _computeHH(mesh, trsk, cnfg,
+def _computeHH(mesh, mats, cnfg,
     np.ndarray[REALS_t, ndim=1] hh_cell,
     np.ndarray[REALS_t, ndim=1] uu_edge
               ):
@@ -411,31 +414,31 @@ def _computeHH(mesh, trsk, cnfg,
     cdef REALS_t *UU_EDGE = &uu_edge[0]
     
     cdef INDEX_t[::1] edge_wing_xptr = \
-        trsk.edge_wing_sums.indptr
+        mats.edge_wing_sums.indptr
     cdef INDEX_t[::1] edge_wing_xidx = \
-        trsk.edge_wing_sums.indices
+        mats.edge_wing_sums.indices
     cdef REALS_t[::1] edge_wing_xval = \
-        trsk.edge_wing_sums.data
+        mats.edge_wing_sums.data
     
     cdef INDEX_t *EDGE_WING_XPTR = &edge_wing_xptr[0]
     cdef INDEX_t *EDGE_WING_XIDX = &edge_wing_xidx[0]
     cdef REALS_t *EDGE_WING_XVAL = &edge_wing_xval[0]
        
     cdef INDEX_t[::1] dual_kite_xptr = \
-        trsk.dual_kite_sums.indptr
+        mats.dual_kite_sums.indptr
     cdef INDEX_t[::1] dual_kite_xidx = \
-        trsk.dual_kite_sums.indices
+        mats.dual_kite_sums.indices
     cdef REALS_t[::1] dual_kite_xval = \
-        trsk.dual_kite_sums.data
+        mats.dual_kite_sums.data
     
     cdef INDEX_t *DUAL_KITE_XPTR = &dual_kite_xptr[0]
     cdef INDEX_t *DUAL_KITE_XIDX = &dual_kite_xidx[0]
     cdef REALS_t *DUAL_KITE_XVAL = &dual_kite_xval[0]
     
     cdef INDEX_t[::1] edge_vert_xptr = \
-        trsk.edge_vert_sums.indptr
+        mats.edge_vert_sums.indptr
     cdef INDEX_t[::1] edge_vert_xidx = \
-        trsk.edge_vert_sums.indices
+        mats.edge_vert_sums.indices
     
     cdef INDEX_t *EDGE_VERT_XPTR = &edge_vert_xptr[0]
     cdef INDEX_t *EDGE_VERT_XIDX = &edge_vert_xidx[0]
@@ -580,7 +583,7 @@ def _computeHH(mesh, trsk, cnfg,
     return hh_dual, hh_edge, h2_edge, up_bias
 
     
-def _computeKE(mesh, trsk, cnfg, 
+def _computeKE(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] uu_edge,
     np.ndarray[REALS_t, ndim=1] vv_edge
               ):
@@ -604,11 +607,11 @@ def _computeKE(mesh, trsk, cnfg,
     cdef REALS_t *VV_EDGE = &vv_edge[0]
     
     cdef INDEX_t[::1] cell_wing_xptr = \
-        trsk.cell_wing_sums.indptr
+        mats.cell_wing_sums.indptr
     cdef INDEX_t[::1] cell_wing_xidx = \
-        trsk.cell_wing_sums.indices
+        mats.cell_wing_sums.indices
     cdef REALS_t[::1] cell_wing_xval = \
-        trsk.cell_wing_sums.data
+        mats.cell_wing_sums.data
     
     cdef INDEX_t *CELL_WING_XPTR = &cell_wing_xptr[0]
     cdef INDEX_t *CELL_WING_XIDX = &cell_wing_xidx[0]
@@ -644,7 +647,7 @@ def _computeKE(mesh, trsk, cnfg,
     return ke_cell
     
     
-def _computePV(mesh, trsk, cnfg, 
+def _computePV(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] hh_cell, 
     np.ndarray[REALS_t, ndim=1] hh_edge, 
     np.ndarray[REALS_t, ndim=1] hh_dual,
@@ -681,41 +684,41 @@ def _computePV(mesh, trsk, cnfg,
     cdef FLT32_t *FF_CELL = &ff_cell[0]
     
     cdef INDEX_t[::1] dual_curl_xptr = \
-        trsk.dual_curl_sums.indptr
+        mats.dual_curl_sums.indptr
     cdef INDEX_t[::1] dual_curl_xidx = \
-        trsk.dual_curl_sums.indices
+        mats.dual_curl_sums.indices
     cdef REALS_t[::1] dual_curl_xval = \
-        trsk.dual_curl_sums.data
+        mats.dual_curl_sums.data
     
     cdef INDEX_t *DUAL_CURL_XPTR = &dual_curl_xptr[0]
     cdef INDEX_t *DUAL_CURL_XIDX = &dual_curl_xidx[0]
     cdef REALS_t *DUAL_CURL_XVAL = &dual_curl_xval[0]
     
     cdef INDEX_t[::1] edge_vert_xptr = \
-        trsk.edge_vert_sums.indptr
+        mats.edge_vert_sums.indptr
     cdef INDEX_t[::1] edge_vert_xidx = \
-        trsk.edge_vert_sums.indices
+        mats.edge_vert_sums.indices
     
     cdef INDEX_t *EDGE_VERT_XPTR = &edge_vert_xptr[0]
     cdef INDEX_t *EDGE_VERT_XIDX = &edge_vert_xidx[0]
        
     cdef INDEX_t[::1] cell_kite_xptr = \
-        trsk.cell_kite_sums.indptr
+        mats.cell_kite_sums.indptr
     cdef INDEX_t[::1] cell_kite_xidx = \
-        trsk.cell_kite_sums.indices
+        mats.cell_kite_sums.indices
     cdef REALS_t[::1] cell_kite_xval = \
-        trsk.cell_kite_sums.data
+        mats.cell_kite_sums.data
     
     cdef INDEX_t *CELL_KITE_XPTR = &cell_kite_xptr[0]
     cdef INDEX_t *CELL_KITE_XIDX = &cell_kite_xidx[0]
     cdef REALS_t *CELL_KITE_XVAL = &cell_kite_xval[0]
        
     cdef INDEX_t[::1] vert_tail_xptr = \
-        trsk.dual_tail_sums.indptr
+        mats.dual_tail_sums.indptr
     cdef INDEX_t[::1] vert_tail_xidx = \
-        trsk.dual_tail_sums.indices
+        mats.dual_tail_sums.indices
     cdef REALS_t[::1] vert_tail_xval = \
-        trsk.dual_tail_sums.data
+        mats.dual_tail_sums.data
     
     cdef INDEX_t *VERT_TAIL_XPTR = &vert_tail_xptr[0]
     cdef INDEX_t *VERT_TAIL_XIDX = &vert_tail_xidx[0]
@@ -843,7 +846,7 @@ def _computePV(mesh, trsk, cnfg,
            rv_edge, pv_edge
     
     
-def _advect_UH(mesh, trsk, cnfg, 
+def _advect_UH(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] hh_edge,
     np.ndarray[REALS_t, ndim=1] uu_edge,
     np.ndarray[REALS_t, ndim=1] hh_tend
@@ -870,11 +873,11 @@ def _advect_UH(mesh, trsk, cnfg,
     cdef REALS_t *HH_TEND = &hh_tend[0]
     
     cdef INDEX_t[::1] cell_flux_xptr = \
-        trsk.cell_flux_sums.indptr
+        mats.cell_flux_sums.indptr
     cdef INDEX_t[::1] cell_flux_xidx = \
-        trsk.cell_flux_sums.indices
+        mats.cell_flux_sums.indices
     cdef REALS_t[::1] cell_flux_xval = \
-        trsk.cell_flux_sums.data
+        mats.cell_flux_sums.data
     
     cdef INDEX_t *CELL_FLUX_XPTR = &cell_flux_xptr[0]
     cdef INDEX_t *CELL_FLUX_XIDX = &cell_flux_xidx[0]
@@ -907,7 +910,7 @@ def _advect_UH(mesh, trsk, cnfg,
     return hh_tend
     
     
-def _advect_UV(mesh, trsk, cnfg, 
+def _advect_UV(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] hh_edge,
     np.ndarray[REALS_t, ndim=1] uu_edge,
     np.ndarray[REALS_t, ndim=1] pv_edge,
@@ -940,22 +943,22 @@ def _advect_UV(mesh, trsk, cnfg,
     cdef REALS_t *UU_TEND = &uu_tend[0]
 
     cdef INDEX_t[::1] edge_flux_xptr = \
-        trsk.edge_flux_perp.indptr
+        mats.edge_flux_perp.indptr
     cdef INDEX_t[::1] edge_flux_xidx = \
-        trsk.edge_flux_perp.indices
+        mats.edge_flux_perp.indices
     cdef REALS_t[::1] edge_flux_xval = \
-        trsk.edge_flux_perp.data
+        mats.edge_flux_perp.data
     
     cdef INDEX_t *EDGE_FLUX_XPTR = &edge_flux_xptr[0]
     cdef INDEX_t *EDGE_FLUX_XIDX = &edge_flux_xidx[0]
     cdef REALS_t *EDGE_FLUX_XVAL = &edge_flux_xval[0]
        
     cdef INDEX_t[::1] grad_norm_xptr = \
-        trsk.edge_grad_norm.indptr
+        mats.edge_grad_norm.indptr
     cdef INDEX_t[::1] grad_norm_xidx = \
-        trsk.edge_grad_norm.indices
+        mats.edge_grad_norm.indices
     cdef REALS_t[::1] grad_norm_xval = \
-        trsk.edge_grad_norm.data
+        mats.edge_grad_norm.data
     
     cdef INDEX_t *GRAD_NORM_XPTR = &grad_norm_xptr[0]
     cdef INDEX_t *GRAD_NORM_XIDX = &grad_norm_xidx[0]
@@ -996,7 +999,7 @@ def _advect_UV(mesh, trsk, cnfg,
     return uu_tend
     
 
-def _computeGZ(mesh, trsk, cnfg, 
+def _computeGZ(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] hh_cell,
     np.ndarray[FLT32_t, ndim=1] zb_cell,
         const REALS_t gg_cell,
@@ -1024,11 +1027,11 @@ def _computeGZ(mesh, trsk, cnfg,
     cdef REALS_t *UU_TEND = &uu_tend[0]
     
     cdef INDEX_t[::1] grad_norm_xptr = \
-        trsk.edge_grad_norm.indptr
+        mats.edge_grad_norm.indptr
     cdef INDEX_t[::1] grad_norm_xidx = \
-        trsk.edge_grad_norm.indices
+        mats.edge_grad_norm.indices
     cdef REALS_t[::1] grad_norm_xval = \
-        trsk.edge_grad_norm.data
+        mats.edge_grad_norm.data
     
     cdef INDEX_t *GRAD_NORM_XPTR = &grad_norm_xptr[0]
     cdef INDEX_t *GRAD_NORM_XIDX = &grad_norm_xidx[0]
@@ -1055,7 +1058,7 @@ def _computeGZ(mesh, trsk, cnfg,
     return uu_tend
 
     
-def _computeVV(mesh, trsk, cnfg, 
+def _computeVV(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] uu_edge
               ):
     
@@ -1076,11 +1079,11 @@ def _computeVV(mesh, trsk, cnfg,
     cdef REALS_t *UU_EDGE = &uu_edge[0]
 
     cdef INDEX_t[::1] edge_lsqr_xptr = \
-        trsk.edge_lsqr_perp.indptr
+        mats.edge_lsqr_perp.indptr
     cdef INDEX_t[::1] edge_lsqr_xidx = \
-        trsk.edge_lsqr_perp.indices
+        mats.edge_lsqr_perp.indices
     cdef REALS_t[::1] edge_lsqr_xval = \
-        trsk.edge_lsqr_perp.data
+        mats.edge_lsqr_perp.data
     
     cdef INDEX_t *EDGE_LSQR_XPTR = &edge_lsqr_xptr[0]
     cdef INDEX_t *EDGE_LSQR_XIDX = &edge_lsqr_xidx[0]
@@ -1107,7 +1110,7 @@ def _computeVV(mesh, trsk, cnfg,
     return vv_edge
 
 
-def _computeNu(mesh, trsk, cnfg, 
+def _computeNu(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] rv_dual,
     np.ndarray[REALS_t, ndim=1] rv_cell
               ):
@@ -1136,22 +1139,22 @@ def _computeNu(mesh, trsk, cnfg,
     cdef REALS_t *NU_MAX_ = &nu_max_[0]
     
     cdef INDEX_t[::1] grad_norm_xptr = \
-        trsk.edge_grad_norm.indptr
+        mats.edge_grad_norm.indptr
     cdef INDEX_t[::1] grad_norm_xidx = \
-        trsk.edge_grad_norm.indices
+        mats.edge_grad_norm.indices
     cdef REALS_t[::1] grad_norm_xval = \
-        trsk.edge_grad_norm.data
+        mats.edge_grad_norm.data
     
     cdef INDEX_t *GRAD_NORM_XPTR = &grad_norm_xptr[0]
     cdef INDEX_t *GRAD_NORM_XIDX = &grad_norm_xidx[0]
     cdef REALS_t *GRAD_NORM_XVAL = &grad_norm_xval[0]
     
     cdef INDEX_t[::1] grad_perp_xptr = \
-        trsk.edge_grad_perp.indptr
+        mats.edge_grad_perp.indptr
     cdef INDEX_t[::1] grad_perp_xidx = \
-        trsk.edge_grad_perp.indices
+        mats.edge_grad_perp.indices
     cdef REALS_t[::1] grad_perp_xval = \
-        trsk.edge_grad_perp.data
+        mats.edge_grad_perp.data
     
     cdef INDEX_t *GRAD_PERP_XPTR = &grad_perp_xptr[0]
     cdef INDEX_t *GRAD_PERP_XIDX = &grad_perp_xidx[0]
@@ -1206,7 +1209,7 @@ def _computeNu(mesh, trsk, cnfg,
     return nu_edge
 
 
-def _computeDU(mesh, trsk, cnfg, 
+def _computeDU(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] uu_edge,
     np.ndarray[REALS_t, ndim=1] uu_tend
               ):
@@ -1235,22 +1238,22 @@ def _computeDU(mesh, trsk, cnfg,
     cdef REALS_t *D4_VISC = &d4_visc[0]
     
     cdef INDEX_t[::1] cell_flux_xptr = \
-        trsk.cell_flux_sums.indptr
+        mats.cell_flux_sums.indptr
     cdef INDEX_t[::1] cell_flux_xidx = \
-        trsk.cell_flux_sums.indices
+        mats.cell_flux_sums.indices
     cdef REALS_t[::1] cell_flux_xval = \
-        trsk.cell_flux_sums.data
+        mats.cell_flux_sums.data
     
     cdef INDEX_t *CELL_FLUX_XPTR = &cell_flux_xptr[0]
     cdef INDEX_t *CELL_FLUX_XIDX = &cell_flux_xidx[0]
     cdef REALS_t *CELL_FLUX_XVAL = &cell_flux_xval[0]
        
     cdef INDEX_t[::1] grad_norm_xptr = \
-        trsk.edge_grad_norm.indptr
+        mats.edge_grad_norm.indptr
     cdef INDEX_t[::1] grad_norm_xidx = \
-        trsk.edge_grad_norm.indices
+        mats.edge_grad_norm.indices
     cdef REALS_t[::1] grad_norm_xval = \
-        trsk.edge_grad_norm.data
+        mats.edge_grad_norm.data
     
     cdef INDEX_t *GRAD_NORM_XPTR = &grad_norm_xptr[0]
     cdef INDEX_t *GRAD_NORM_XIDX = &grad_norm_xidx[0]
@@ -1340,7 +1343,7 @@ def _computeDU(mesh, trsk, cnfg,
     return uu_tend
     
 
-def _computeVU(mesh, trsk, cnfg,
+def _computeVU(mesh, mats, cnfg,
     np.ndarray[REALS_t, ndim=1] uu_edge,
     np.ndarray[REALS_t, ndim=1] nu_edge,
     np.ndarray[REALS_t, ndim=1] uu_tend
@@ -1372,44 +1375,44 @@ def _computeVU(mesh, trsk, cnfg,
     cdef REALS_t *V4_VISC = &v4_visc[0]
     
     cdef INDEX_t[::1] cell_flux_xptr = \
-        trsk.cell_flux_sums.indptr
+        mats.cell_flux_sums.indptr
     cdef INDEX_t[::1] cell_flux_xidx = \
-        trsk.cell_flux_sums.indices
+        mats.cell_flux_sums.indices
     cdef REALS_t[::1] cell_flux_xval = \
-        trsk.cell_flux_sums.data
+        mats.cell_flux_sums.data
     
     cdef INDEX_t *CELL_FLUX_XPTR = &cell_flux_xptr[0]
     cdef INDEX_t *CELL_FLUX_XIDX = &cell_flux_xidx[0]
     cdef REALS_t *CELL_FLUX_XVAL = &cell_flux_xval[0]
        
     cdef INDEX_t[::1] dual_curl_xptr = \
-        trsk.dual_curl_sums.indptr
+        mats.dual_curl_sums.indptr
     cdef INDEX_t[::1] dual_curl_xidx = \
-        trsk.dual_curl_sums.indices
+        mats.dual_curl_sums.indices
     cdef REALS_t[::1] dual_curl_xval = \
-        trsk.dual_curl_sums.data
+        mats.dual_curl_sums.data
     
     cdef INDEX_t *DUAL_CURL_XPTR = &dual_curl_xptr[0]
     cdef INDEX_t *DUAL_CURL_XIDX = &dual_curl_xidx[0]
     cdef REALS_t *DUAL_CURL_XVAL = &dual_curl_xval[0]
        
     cdef INDEX_t[::1] grad_norm_xptr = \
-        trsk.edge_grad_norm.indptr
+        mats.edge_grad_norm.indptr
     cdef INDEX_t[::1] grad_norm_xidx = \
-        trsk.edge_grad_norm.indices
+        mats.edge_grad_norm.indices
     cdef REALS_t[::1] grad_norm_xval = \
-        trsk.edge_grad_norm.data
+        mats.edge_grad_norm.data
     
     cdef INDEX_t *GRAD_NORM_XPTR = &grad_norm_xptr[0]
     cdef INDEX_t *GRAD_NORM_XIDX = &grad_norm_xidx[0]
     cdef REALS_t *GRAD_NORM_XVAL = &grad_norm_xval[0]
     
     cdef INDEX_t[::1] grad_perp_xptr = \
-        trsk.edge_grad_perp.indptr
+        mats.edge_grad_perp.indptr
     cdef INDEX_t[::1] grad_perp_xidx = \
-        trsk.edge_grad_perp.indices
+        mats.edge_grad_perp.indices
     cdef REALS_t[::1] grad_perp_xval = \
-        trsk.edge_grad_perp.data
+        mats.edge_grad_perp.data
     
     cdef INDEX_t *GRAD_PERP_XPTR = &grad_perp_xptr[0]
     cdef INDEX_t *GRAD_PERP_XIDX = &grad_perp_xidx[0]
@@ -1564,7 +1567,7 @@ def _computeVU(mesh, trsk, cnfg,
     return uu_tend
     
     
-def _computeVH(mesh, trsk, cnfg, 
+def _computeVH(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] hh_cell,
     np.ndarray[FLT32_t, ndim=1] zb_cell,
         const REALS_t gg_cell,
@@ -1599,22 +1602,22 @@ def _computeVH(mesh, trsk, cnfg,
     cdef REALS_t *V4_DIFF = &v4_diff[0]
     
     cdef INDEX_t[::1] cell_flux_xptr = \
-        trsk.cell_flux_sums.indptr
+        mats.cell_flux_sums.indptr
     cdef INDEX_t[::1] cell_flux_xidx = \
-        trsk.cell_flux_sums.indices
+        mats.cell_flux_sums.indices
     cdef REALS_t[::1] cell_flux_xval = \
-        trsk.cell_flux_sums.data
+        mats.cell_flux_sums.data
     
     cdef INDEX_t *CELL_FLUX_XPTR = &cell_flux_xptr[0]
     cdef INDEX_t *CELL_FLUX_XIDX = &cell_flux_xidx[0]
     cdef REALS_t *CELL_FLUX_XVAL = &cell_flux_xval[0]
     
     cdef INDEX_t[::1] grad_norm_xptr = \
-        trsk.edge_grad_norm.indptr
+        mats.edge_grad_norm.indptr
     cdef INDEX_t[::1] grad_norm_xidx = \
-        trsk.edge_grad_norm.indices
+        mats.edge_grad_norm.indices
     cdef REALS_t[::1] grad_norm_xval = \
-        trsk.edge_grad_norm.data
+        mats.edge_grad_norm.data
     
     cdef INDEX_t *GRAD_NORM_XPTR = &grad_norm_xptr[0]
     cdef INDEX_t *GRAD_NORM_XIDX = &grad_norm_xidx[0]
@@ -1747,7 +1750,7 @@ def _computeVH(mesh, trsk, cnfg,
     return hh_tend
     
     
-def _computeTU(mesh, trsk, cnfg, 
+def _computeTU(mesh, mats, cnfg, 
     np.ndarray[FLT32_t, ndim=1] Tu_edge,
     np.ndarray[REALS_t, ndim=1] hh_edge,
     np.ndarray[REALS_t, ndim=1] uu_tend
@@ -1781,7 +1784,7 @@ def _computeTU(mesh, trsk, cnfg,
     return uu_tend
     
     
-def _computeCd(mesh, trsk, cnfg, 
+def _computeCd(mesh, mats, cnfg, 
         const REALS_t hh_tiny,
     np.ndarray[REALS_t, ndim=1] hh_cell,
     np.ndarray[REALS_t, ndim=1] uu_edge,

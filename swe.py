@@ -7,7 +7,10 @@ import argparse
 
 """ SWE: solve the nonlinear SWE on generalised MPAS meshes.
 """
-#-- Authors: Darren Engwirda
+#-- Part of the PERISCOPE solver
+#-- Darren Engwirda
+#-- d.engwirda@gmail.com
+#-- https://github.com/dengwirda/
 
 from stb import strtobool
 
@@ -19,7 +22,7 @@ from log import tcpu
 from msh import load_mesh, sort_mesh, \
                 load_flow, sort_flow, \
                 load_forc, sort_forc
-from ops import trsk_mats
+from ops import operators
 from mem import init_pool
 
 from io_ import init_file, save_step
@@ -125,15 +128,15 @@ def swe(cnfg):
     flow.is_open).ravel(), dtype=index_t)
     
     # set sparse spatial operators
-    trsk = trsk_mats(mesh)
+    mats = operators(mesh)
 
     # remap fe,fc is more accurate?
-    flow.ff_edge = trsk.edge_tail_sums*flow.ff_vert
+    flow.ff_edge = mats.edge_tail_sums*flow.ff_vert
     flow.ff_edge/= mesh.edge.area
     flow.ff_edge = np.asarray(
            flow.ff_edge, dtype=flt32_t)
     
-    flow.ff_cell = trsk.cell_kite_sums*flow.ff_vert
+    flow.ff_cell = mats.cell_kite_sums*flow.ff_vert
     flow.ff_cell/= mesh.cell.area
     flow.ff_cell = np.asarray(
            flow.ff_cell, dtype=flt32_t)
@@ -180,10 +183,10 @@ def swe(cnfg):
                      flow.bc_slip
     mesh.edge.slip  [mesh.edge.open] = reals_t(1.)
     
-    mesh.vert.slip = trsk.dual_edge_sums * \
+    mesh.vert.slip = mats.dual_edge_sums * \
                      mesh.edge.slip
     mesh.vert.slip/= np.maximum(+1, 
-                     trsk.dual_edge_sums * \
+                     mats.dual_edge_sums * \
                      mesh.edge.mask)
     
     mesh.cell.fmsk = reals_t(1.0 - mesh.cell.mask)
@@ -204,7 +207,7 @@ def swe(cnfg):
         max (cnfg.hh_diff_2, cnfg.hh_diff_4)
     
     s2_edge, s4_edge,\
-    s2_cell, s4_cell = scalingVk(mesh, trsk, cnfg)
+    s2_cell, s4_cell = scalingVk(mesh, mats, cnfg)
     
     cnfg.leith_max = np.asarray(
         (cnfg.leith_max * s2_edge), dtype=reals_t)
@@ -245,13 +248,13 @@ def swe(cnfg):
         
             hh_cell, uu_edge, \
             ch_cell, cu_edge = step_eqns(
-                mesh, trsk, flow, cnfg, hh_cell, uu_edge,
+                mesh, mats, flow, cnfg, hh_cell, uu_edge,
                                         ch_cell, cu_edge
             )
                       
             hh_min_, hh_max_, \
             uu_min_, uu_max_ = step_bnds(
-                mesh, trsk, flow, cnfg, hh_cell, uu_edge,
+                mesh, mats, flow, cnfg, hh_cell, uu_edge,
                                         hh_min_, hh_max_,
                                         uu_min_, uu_max_
             )
@@ -262,7 +265,7 @@ def swe(cnfg):
         #-- eval. statistics on stat steps
             kp_sums[next], \
             en_sums[next] = invariant(
-                mesh, trsk, flow, cnfg, hh_cell, uu_edge
+                mesh, mats, flow, cnfg, hh_cell, uu_edge
             )
 
             print ( 
@@ -276,7 +279,7 @@ def swe(cnfg):
 
         if (step % cnfg.save_freq == 0):
         #-- & save all state on save steps
-            save_step(save, mesh, trsk,
+            save_step(save, mesh, mats,
                       flow, cnfg, freq, hh_cell, uu_edge
             )
 
@@ -322,25 +325,25 @@ def swe(cnfg):
     
     # xt variables are tmp scratch
     
-    xt_dual = trsk.dual_tail_sums * cnfg.du_visc_2
+    xt_dual = mats.dual_tail_sums * cnfg.du_visc_2
     xt_dual/= mesh.vert.area
     
     data.variables["d2_visc"][:] = \
                xt_dual[mesh.vert.irev - 1]
     
-    xt_dual = trsk.dual_tail_sums * cnfg.du_visc_4
+    xt_dual = mats.dual_tail_sums * cnfg.du_visc_4
     xt_dual/= mesh.vert.area
     
     data.variables["d4_visc"][:] = \
                xt_dual[mesh.vert.irev - 1] ** 2
     
-    xt_dual = trsk.dual_tail_sums * cnfg.uu_visc_2
+    xt_dual = mats.dual_tail_sums * cnfg.uu_visc_2
     xt_dual/= mesh.vert.area
     
     data.variables["u2_visc"][:] = \
                xt_dual[mesh.vert.irev - 1]
     
-    xt_dual = trsk.dual_tail_sums * cnfg.uu_visc_4
+    xt_dual = mats.dual_tail_sums * cnfg.uu_visc_4
     xt_dual/= mesh.vert.area
     
     data.variables["u4_visc"][:] = \
@@ -619,5 +622,4 @@ if (__name__ == "__main__"):
         help="Forward-backward weights for integrators.")
 
     swe(parser.parse_args())
-    
     

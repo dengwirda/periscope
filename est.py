@@ -6,7 +6,10 @@ import argparse
 
 """ Util. to set time-step estimates via CFL approximations.
 """
-#-- Authors: Darren Engwirda
+#-- Part of the PERISCOPE solver
+#-- Darren Engwirda
+#-- d.engwirda@gmail.com
+#-- https://github.com/dengwirda/
 
 def est(opts, mesh):
 

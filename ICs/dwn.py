@@ -15,7 +15,7 @@ sys.path.insert(
 from stb import strtobool
 
 from msh import load_mesh, cell_quad, dual_quad
-from ops import trsk_mats
+from ops import operators
 
 #-- Spin-down from random initial vorticity 
 #-- Authors: Darren Engwirda
@@ -28,14 +28,14 @@ def init(name, save, rsph=0.E+0):
 
     if (rsph <= 0.): rsph= None
 
-    mesh = load_mesh(name, rsph)   
+    mesh = load_mesh(name, rsph)
     rsph = mesh.rsph
     
 #------------------------------------ build TRSK matrix op's
 
     print("Building coefficients...")
 
-    trsk = trsk_mats(mesh)
+    mats = operators(mesh)
 
 #-- build a stream-function, velocity field + thickness IC's
 
@@ -51,33 +51,33 @@ def init(name, save, rsph=0.E+0):
     rv_dual = np.random.rand(mesh.vert.size)
     
     # smooth at grid-scale a little
-    rv_cell = trsk.cell_kite_sums * rv_dual
+    rv_cell = mats.cell_kite_sums * rv_dual
     rv_cell/= mesh.cell.area
     
-    rv_dual = trsk.dual_kite_sums * rv_cell
+    rv_dual = mats.dual_kite_sums * rv_cell
     rv_dual/= mesh.vert.area
     
-    rv_cell = trsk.cell_kite_sums * rv_dual
+    rv_cell = mats.cell_kite_sums * rv_dual
     rv_cell/= mesh.cell.area
     
-    rv_dual = trsk.dual_kite_sums * rv_cell
+    rv_dual = mats.dual_kite_sums * rv_cell
     rv_dual/= mesh.vert.area
     
     """
     actually... doing it this way induces a grid-scale mode!
     
-    rv_cell = trsk.cell_kite_sums * rv_dual
+    rv_cell = mats.cell_kite_sums * rv_dual
     rv_cell/= mesh.cell.area
     
     rv_cell*= 2.5E+06 * (1. / 2.) ** 2
     rv_cell-= np.mean(rv_cell)
     
     sf_cell, info = gcrotmk(
-        trsk.cell_flux_sums * 
-        trsk.edge_grad_norm, rv_cell, 
+        mats.cell_flux_sums * 
+        mats.edge_grad_norm, rv_cell, 
             tol=1.E-08, atol=1.E-08, m=50, k=25)
             
-    sf_vert = trsk.dual_kite_sums * sf_cell
+    sf_vert = mats.dual_kite_sums * sf_cell
     sf_vert/= mesh.vert.area
     """
 
@@ -87,17 +87,17 @@ def init(name, save, rsph=0.E+0):
     rv_dual-= np.mean(rv_dual)
 
     sf_vert, info = gcrotmk(
-        trsk.dual_flux_sums * 
-        trsk.edge_grad_perp, rv_dual, 
+        mats.dual_flux_sums * 
+        mats.edge_grad_perp, rv_dual, 
             tol=1.E-04, atol=1.E-04, m=50, k=25)
             
-    sf_cell = trsk.cell_kite_sums * sf_vert
+    sf_cell = mats.cell_kite_sums * sf_vert
     sf_cell/= mesh.cell.area
 
     print("Computing velocity field...")
 
-    uu_edge = trsk.edge_grad_perp * sf_vert * -1.
-    vv_edge = trsk.edge_grad_norm * sf_cell * -1.
+    uu_edge = mats.edge_grad_perp * sf_vert * -1.
+    vv_edge = mats.edge_grad_norm * sf_cell * -1.
 
     hh_cell = 1. * np.ones(  # 5000.
         (mesh.cell.size), dtype=np.float64)
@@ -140,8 +140,8 @@ def init(name, save, rsph=0.E+0):
 
     init["streamfunction"] = (("nVertices"), sf_vert)
     init["rv_dual"] = (
-        ("nVertices"),
-        (trsk.dual_curl_sums * uu_edge) / mesh.vert.area)
+        ("Time", "nVertices", "nVertLevels"),
+        np.reshape(rv_dual, (1, mesh.vert.size, 1)))
 
     """
     init["ff_cell"] = (("nCells"),
@@ -151,7 +151,6 @@ def init(name, save, rsph=0.E+0):
     init["ff_vert"] = (("nVertices"),
         2.00E+00 * erot * np.sin(mesh.vert.ylat))
     """
-
 
     f = 5.
     init["ff_cell"] = (("nCells"),

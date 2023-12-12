@@ -15,7 +15,7 @@ sys.path.insert(
 from stb import strtobool
 
 from msh import load_mesh, cell_quad, dual_quad
-from ops import trsk_mats
+from ops import operators
 
 from map import maptocell
 
@@ -37,7 +37,7 @@ def init(name, save, rsph, _ics, case, xmid, ymid, hmag):
 
     print("Forming coefficients...")
 
-    trsk = trsk_mats(mesh)
+    mats = operators(mesh)
 
 #------------------------------------ compute test-case IC's
 
@@ -48,16 +48,16 @@ def init(name, save, rsph, _ics, case, xmid, ymid, hmag):
         ValueError("Unsupported test-case.")
 
     if (case == 1):
-        wav1(name, save, rsph, mesh, trsk, xmid, ymid, hmag)
+        wav1(name, save, rsph, mesh, mats, xmid, ymid, hmag)
         
     if (case == 2):
-        wav2(name, save, rsph, mesh, trsk, xmid, ymid, hmag)
+        wav2(name, save, rsph, mesh, mats, xmid, ymid, hmag)
 
     if (case == 3):
-        tsu1(name, save, rsph, mesh, trsk, xmid, ymid, hmag)
+        tsu1(name, save, rsph, mesh, mats, xmid, ymid, hmag)
         
     if (case == 4):
-        tsu2(name, save, rsph, mesh, trsk, _ics)
+        tsu2(name, save, rsph, mesh, mats, _ics)
 
     if (case >= 5):
         ValueError("Unsupported test-case.")
@@ -65,7 +65,7 @@ def init(name, save, rsph, _ics, case, xmid, ymid, hmag):
     return
 
 
-def wav1(name, save, rsph, mesh, trsk, xmid, ymid, hmag):
+def wav1(name, save, rsph, mesh, mats, xmid, ymid, hmag):
 
 #-- simple isolated gravity-wave test-case
 
@@ -111,7 +111,7 @@ def wav1(name, save, rsph, mesh, trsk, xmid, ymid, hmag):
         np.reshape(hh_cell, (1, mesh.cell.size, 1)))
     init["zb_cell"] = (("nCells"), zb_cell)
 
-    hh_dual = trsk.dual_kite_sums * hh_cell
+    hh_dual = mats.dual_kite_sums * hh_cell
     hh_dual/= mesh.vert.area
 
     init["hh_dual"] = (
@@ -136,7 +136,7 @@ def wav1(name, save, rsph, mesh, trsk, xmid, ymid, hmag):
     return
     
     
-def wav2(name, save, rsph, mesh, trsk, xmid, ymid, hmag):
+def wav2(name, save, rsph, mesh, mats, xmid, ymid, hmag):
 
 #-- simple isolated gravity-wave test-case
 
@@ -186,7 +186,7 @@ def wav2(name, save, rsph, mesh, trsk, xmid, ymid, hmag):
         np.reshape(hh_cell, (1, mesh.cell.size, 1)))
     init["zb_cell"] = (("nCells"), zb_cell)
 
-    hh_dual = trsk.dual_kite_sums * hh_cell
+    hh_dual = mats.dual_kite_sums * hh_cell
     hh_dual/= mesh.vert.area
 
     init["hh_dual"] = (
@@ -211,7 +211,7 @@ def wav2(name, save, rsph, mesh, trsk, xmid, ymid, hmag):
     return
 
 
-def tsu1(name, save, rsph, mesh, trsk, xmid, ymid, hmag):
+def tsu1(name, save, rsph, mesh, mats, xmid, ymid, hmag):
 
 #-- earth-topography tsunami-wave test-case
 
@@ -318,7 +318,7 @@ def tsu1(name, save, rsph, mesh, trsk, xmid, ymid, hmag):
     return
     
     
-def tsu2(name, save, rsph, mesh, trsk, _ics):
+def tsu2(name, save, rsph, mesh, mats, _ics):
 
 #-- earth-topography tsunami-wave test-case w obs 
 

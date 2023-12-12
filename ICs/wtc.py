@@ -15,7 +15,7 @@ sys.path.insert(
 from stb import strtobool
 
 from msh import load_mesh, cell_quad, dual_quad
-from ops import trsk_mats
+from ops import operators
 
 # SWE test cases due to Williamson et al
 # Authors: Darren Engwirda
@@ -39,7 +39,7 @@ def init(name, save, rsph, case):
 
     print("Building coefficients...")
 
-    trsk = trsk_mats(mesh)
+    mats = operators(mesh)
 
 #------------------------------------ compute test-case IC's
 
@@ -47,10 +47,10 @@ def init(name, save, rsph, case):
         ValueError("Unsupported test-case.")
 
     if (case == 2): 
-        wtc2(name, save, rsph, mesh, trsk)
+        wtc2(name, save, rsph, mesh, mats)
 
     if (case == 22): 
-        wtcb(name, save, rsph, mesh, trsk)
+        wtcb(name, save, rsph, mesh, mats)
         
     if (case == 3):
         ValueError("Unsupported test-case.")
@@ -59,13 +59,13 @@ def init(name, save, rsph, case):
         ValueError("Unsupported test-case.")
 
     if (case == 5): 
-        wtc5(name, save, rsph, mesh, trsk)
+        wtc5(name, save, rsph, mesh, mats)
         
     if (case == 55): 
-        wtcd(name, save, rsph, mesh, trsk)
+        wtcd(name, save, rsph, mesh, mats)
         
     if (case == 6): 
-        wtc6(name, save, rsph, mesh, trsk)
+        wtc6(name, save, rsph, mesh, mats)
         
     if (case >= 7): 
         ValueError("Unsupported test-case.")
@@ -73,7 +73,7 @@ def init(name, save, rsph, case):
     return
 
 
-def wtc2(name, save, rsph, mesh, trsk):
+def wtc2(name, save, rsph, mesh, mats):
 
 #-- build a stream-function, velocity field + thickness IC's
 
@@ -85,12 +85,12 @@ def wtc2(name, save, rsph, mesh, trsk):
 
     sf_vert = rsph * umag * np.sin(mesh.vert.ylat) * -1.
 
-    uu_edge = trsk.edge_grad_perp * sf_vert * -1.
-    vv_edge = trsk.edge_lsqr_perp * uu_edge
+    uu_edge = mats.edge_grad_perp * sf_vert * -1.
+    vv_edge = mats.edge_lsqr_perp * uu_edge
     
     ke_edge = 0.5 * (uu_edge ** 2 + vv_edge ** 2)
    #ke_edge = uu_edge ** 2
-    ke_cell = trsk.cell_wing_sums * ke_edge
+    ke_cell = mats.cell_wing_sums * ke_edge
     ke_cell/= mesh.cell.area
 
     fh_vert = (g_h0 - (
@@ -104,6 +104,9 @@ def wtc2(name, save, rsph, mesh, trsk):
     hh_cell = cell_quad(mesh, fh_cell, fh_vert)
 
     zb_cell = np.zeros(hh_cell.shape, dtype=np.float64)
+    
+    rv_dual = mats.dual_curl_sums * uu_edge
+    rv_dual/= mesh.vert.area
 
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
@@ -145,8 +148,8 @@ def wtc2(name, save, rsph, mesh, trsk):
 
     init["streamfunction"] = (("nVertices"), sf_vert)
     init["rv_dual"] = (
-        ("nVertices"),
-        (trsk.dual_curl_sums * uu_edge) / mesh.vert.area)
+        ("Time", "nVertices", "nVertLevels"),
+        np.reshape(rv_dual, (1, mesh.vert.size, 1)))
 
     init["ff_cell"] = (("nCells"),
         2.00E+00 * erot * np.sin(mesh.cell.ylat))
@@ -162,7 +165,7 @@ def wtc2(name, save, rsph, mesh, trsk):
     return
 
 
-def wtcb(name, save, rsph, mesh, trsk):
+def wtcb(name, save, rsph, mesh, mats):
 
 #-- build a stream-function, velocity field + thickness IC's
 #-- TC2 "thin", as per Peixoto
@@ -175,7 +178,7 @@ def wtcb(name, save, rsph, mesh, trsk):
 
     sf_vert = rsph * umag * np.sin(mesh.vert.ylat) * -1.
 
-    uu_edge = trsk.edge_grad_perp * (sf_vert) * -1.
+    uu_edge = mats.edge_grad_perp * (sf_vert) * -1.
 
     fh_vert = (g_h0 - (
         rsph * erot * umag + 0.5 * umag ** 2) * \
@@ -188,6 +191,9 @@ def wtcb(name, save, rsph, mesh, trsk):
     zb_cell = cell_quad(mesh, fh_cell, fh_vert)
 
     hh_cell = np.ones(zb_cell.shape, dtype=np.float64)
+    
+    rv_dual = mats.dual_curl_sums * uu_edge
+    rv_dual/= mesh.vert.area
 
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
@@ -225,8 +231,8 @@ def wtcb(name, save, rsph, mesh, trsk):
 
     init["streamfunction"] = (("nVertices"), sf_vert)
     init["rv_dual"] = (
-        ("nVertices"),
-        (trsk.dual_curl_sums * uu_edge) / mesh.vert.area)
+        ("Time", "nVertices", "nVertLevels"),
+        np.reshape(rv_dual, (1, mesh.vert.size, 1)))
 
     init["ff_cell"] = (("nCells"),
         2.00E+00 * erot * np.sin(mesh.cell.ylat))
@@ -242,7 +248,7 @@ def wtcb(name, save, rsph, mesh, trsk):
     return
 
 
-def wtc5(name, save, rsph, mesh, trsk):
+def wtc5(name, save, rsph, mesh, mats):
 
 #-- build a stream-function, velocity field + thickness IC's
 
@@ -259,7 +265,7 @@ def wtc5(name, save, rsph, mesh, trsk):
 
     sf_vert = rsph * umag * np.sin(mesh.vert.ylat) * -1.
 
-    uu_edge = trsk.edge_grad_perp * (sf_vert) * -1.
+    uu_edge = mats.edge_grad_perp * (sf_vert) * -1.
 
     fh_vert = (g_h0 - (
         rsph * erot * umag + 0.5 * umag ** 2) * \
@@ -284,6 +290,9 @@ def wtc5(name, save, rsph, mesh, trsk):
     zb_cell = cell_quad(mesh, fz_cell, fz_vert)
     
     hh_cell = hh_cell - zb_cell
+    
+    rv_dual = mats.dual_curl_sums * uu_edge
+    rv_dual/= mesh.vert.area
 
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
@@ -321,8 +330,8 @@ def wtc5(name, save, rsph, mesh, trsk):
 
     init["streamfunction"] = (("nVertices"), sf_vert)
     init["rv_dual"] = (
-        ("nVertices"),
-        (trsk.dual_curl_sums * uu_edge) / mesh.vert.area)
+        ("Time", "nVertices", "nVertLevels"),
+        np.reshape(rv_dual, (1, mesh.vert.size, 1)))
 
     init["ff_cell"] = (("nCells"),
         2.00E+00 * erot * np.sin(mesh.cell.ylat))
@@ -338,7 +347,7 @@ def wtc5(name, save, rsph, mesh, trsk):
     return
     
     
-def wtcd(name, save, rsph, mesh, trsk):
+def wtcd(name, save, rsph, mesh, mats):
 
 #-- build a stream-function, velocity field + thickness IC's
 
@@ -357,7 +366,7 @@ def wtcd(name, save, rsph, mesh, trsk):
 
     sf_vert = rsph * umag * np.sin(mesh.vert.ylat) * -1.
 
-    uu_edge = trsk.edge_grad_perp * (sf_vert) * -1.
+    uu_edge = mats.edge_grad_perp * (sf_vert) * -1.
 
     fh_vert = (g_h0 - (
         rsph * erot * umag + 0.5 * umag ** 2) * \
@@ -382,6 +391,9 @@ def wtcd(name, save, rsph, mesh, trsk):
     zb_cell = cell_quad(mesh, fz_cell, fz_vert)
     
     hh_cell = hh_cell - zb_cell
+    
+    rv_dual = mats.dual_curl_sums * uu_edge
+    rv_dual/= mesh.vert.area
 
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
@@ -419,8 +431,8 @@ def wtcd(name, save, rsph, mesh, trsk):
 
     init["streamfunction"] = (("nVertices"), sf_vert)
     init["rv_dual"] = (
-        ("nVertices"),
-        (trsk.dual_curl_sums * uu_edge) / mesh.vert.area)
+        ("Time", "nVertices", "nVertLevels"),
+        np.reshape(rv_dual, (1, mesh.vert.size, 1)))
 
     init["ff_cell"] = (("nCells"),
         2.00E+00 * erot * np.sin(mesh.cell.ylat))
@@ -436,7 +448,7 @@ def wtcd(name, save, rsph, mesh, trsk):
     return
     
     
-def wtc6(name, save, rsph, mesh, trsk):
+def wtc6(name, save, rsph, mesh, mats):
 
 #-- build a stream-function, velocity field + thickness IC's
 
@@ -471,12 +483,12 @@ def wtc6(name, save, rsph, mesh, trsk):
 
     print("Computing velocity field...")
 
-    uu_edge = trsk.edge_grad_perp * sf_vert * -1.
+    uu_edge = mats.edge_grad_perp * sf_vert * -1.
 
-   #vv_edge = trsk.edge_flux_perp * uu_edge * -1.
-    vv_edge = trsk.edge_grad_norm * sf_cell * -1.
+   #vv_edge = mats.edge_flux_perp * uu_edge * -1.
+    vv_edge = mats.edge_grad_norm * sf_cell * -1.
 
-    du_cell = trsk.cell_flux_sums * uu_edge
+    du_cell = mats.cell_flux_sums * uu_edge
 
     print("--> max(abs(unrm)):", np.max(uu_edge))
     print("--> sum(div(unrm)):", np.sum(du_cell))
@@ -491,23 +503,23 @@ def wtc6(name, save, rsph, mesh, trsk):
     
     ke_edge = 0.5 * (uu_edge ** 2 + 
                      vv_edge ** 2 )
-    ke_cell = trsk.cell_wing_sums * ke_edge
+    ke_cell = mats.cell_wing_sums * ke_edge
     ke_cell/= mesh.cell.area
     
-    rv_edge = trsk.quad_curl_sums * uu_edge
+    rv_edge = mats.quad_curl_sums * uu_edge
     rv_edge/= mesh.quad.area
     av_edge = ff_edge + rv_edge  # curl(u) + f
     
-    rh_edge = trsk.cell_flux_sums * (
-        av_edge * vv_edge + trsk.edge_grad_norm * ke_cell)
+    rh_edge = mats.cell_flux_sums * (
+        av_edge * vv_edge + mats.edge_grad_norm * ke_cell)
     rh_edge = rh_edge * -1.0 / grav
 
     rh_edge = rh_edge - np.mean(rh_edge) # INT rhs must be 0
     
     ttic = time.time()
     hh_cell, info = gcrotmk(
-        trsk.cell_flux_sums * 
-        trsk.edge_grad_norm, rh_edge, 
+        mats.cell_flux_sums * 
+        mats.edge_grad_norm, rh_edge, 
             tol=1.E-08, atol=1.E-08, m=50, k=25)
     ttoc = time.time()
    #print(ttoc - ttic)    
@@ -519,6 +531,9 @@ def wtc6(name, save, rsph, mesh, trsk):
     hh_cell = g_h0 / grav + hh_cell
     
     zb_cell = np.zeros(hh_cell.shape, dtype=np.float64)
+    
+    rv_dual = mats.dual_curl_sums * uu_edge
+    rv_dual/= mesh.vert.area
 
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
@@ -556,8 +571,8 @@ def wtc6(name, save, rsph, mesh, trsk):
 
     init["streamfunction"] = (("nVertices"), sf_vert)
     init["rv_dual"] = (
-        ("nVertices"),
-        (trsk.dual_curl_sums * uu_edge) / mesh.vert.area)
+        ("Time", "nVertices", "nVertLevels"),
+        np.reshape(rv_dual, (1, mesh.vert.size, 1)))
 
     init["ff_cell"] = (("nCells"),
         2.00E+00 * erot * np.sin(mesh.cell.ylat))

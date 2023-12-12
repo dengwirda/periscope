@@ -15,7 +15,7 @@ sys.path.insert(
 from stb import strtobool
 
 from msh import load_mesh, cell_quad, dual_quad
-from ops import trsk_mats
+from ops import operators
 
 
 def ujet(alat, lat0, lat1, uamp, rsph):
@@ -62,7 +62,7 @@ def init(name, save, rsph=0.E+0, pert=True):
 
     print("Building coefficients...")
 
-    trsk = trsk_mats(mesh)
+    mats = operators(mesh)
 
 #------------------------------------ build a streamfunction
 
@@ -130,12 +130,15 @@ def init(name, save, rsph=0.E+0, pert=True):
 
     print("Computing velocity field...")
 
-    unrm = trsk.edge_grad_perp * vpsi * -1.00
+    unrm = mats.edge_grad_perp * vpsi * -1.00
 
-   #uprp = trsk.edge_lsqr_perp * unrm * -1.00
-    uprp = trsk.edge_grad_norm * cpsi * -1.00
+   #uprp = mats.edge_lsqr_perp * unrm * -1.00
+    uprp = mats.edge_grad_norm * cpsi * -1.00
 
-    udiv = trsk.cell_flux_sums * unrm
+    udiv = mats.cell_flux_sums * unrm
+    
+    curl = mats.dual_curl_sums * unrm
+    curl/= mesh.vert.area
 
     print("--> max(abs(unrm)):", np.max(unrm))
     print("--> sum(div(unrm)):", np.sum(udiv))
@@ -147,7 +150,7 @@ def init(name, save, rsph=0.E+0, pert=True):
 
     frot = 2.0 * erot * np.sin(mesh.edge.ylat)
 
-    vrhs = trsk.cell_flux_sums * (frot * uprp)
+    vrhs = mats.cell_flux_sums * (frot * uprp)
     vrhs = vrhs * -1.00 / grav
 
     vrhs = vrhs - np.mean(vrhs)     # INT rhs dA must be 0.0
@@ -155,8 +158,8 @@ def init(name, save, rsph=0.E+0, pert=True):
 
     ttic = time.time()
     hdel, info = gcrotmk(
-        trsk.cell_flux_sums *
-        trsk.edge_grad_norm, vrhs, 
+        mats.cell_flux_sums *
+        mats.edge_grad_norm, vrhs, 
             tol=1.E-8, atol=1.E-8, m=50, k=25)
     ttoc = time.time()
    #print(ttoc - ttic)    
@@ -190,7 +193,7 @@ def init(name, save, rsph=0.E+0, pert=True):
     print("Output written to:", save)
 
     ke_e = 0.5 * (unrm ** 2 + uprp ** 2)
-    ke_c = trsk.cell_wing_sums * ke_e
+    ke_c = mats.cell_wing_sums * ke_e
     ke_c/= mesh.cell.area
     
     init = xarray.open_dataset(name)
@@ -227,8 +230,8 @@ def init(name, save, rsph=0.E+0, pert=True):
 
     init["streamfunction"] = (("nVertices"), vpsi)
     init["rv_dual"] = (
-        ("nVertices"),
-        (trsk.dual_curl_sums * unrm) / mesh.vert.area)
+        ("Time", "nVertices", "nVertLevels"),
+        np.reshape(curl, (1, mesh.vert.size, 1)))
 
     init["ff_cell"] = (("nCells"),
         2.00E+00 * erot * np.sin(mesh.cell.ylat))

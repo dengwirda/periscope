@@ -5,7 +5,10 @@ import numpy as np
 
 """ SWE spatial discretisation using TRSK-like operators
 """
+#-- Part of the PERISCOPE solver
 #-- Darren Engwirda
+#-- d.engwirda@gmail.com
+#-- https://github.com/dengwirda/
 
 from _fp import flt32_t, flt64_t
 from _fp import reals_t, index_t
@@ -14,7 +17,7 @@ from log import tcpu
 
 from mem import variables
 
-HH_TINY        = 1.0E-04
+HH_TINY        = 1.0E-08
 UU_TINY        = 1.0E-16
 PV_TINY        = 1.0E-16
 
@@ -25,7 +28,7 @@ def hrmn_mean(xone, xtwo):
     return +2.0 * xone * xtwo / (xone + xtwo)
 
 
-def scalingVk(mesh, trsk, cnfg):
+def scalingVk(mesh, mats, cnfg):
 
 #-- local gridsize scaling on div^k and del^k operators
 
@@ -33,19 +36,19 @@ def scalingVk(mesh, trsk, cnfg):
     dx_cell = 2. * np.sqrt(mesh.cell.area / np.pi)
 
     # smooth near grid-scale
-    dx_edge = trsk.edge_wing_sums * dx_cell
+    dx_edge = mats.edge_wing_sums * dx_cell
     dx_edge/= mesh.edge.area
-    dx_cell = trsk.cell_wing_sums * dx_edge
+    dx_cell = mats.cell_wing_sums * dx_edge
     dx_cell/= mesh.cell.area
     
-    dx_edge = trsk.edge_wing_sums * dx_cell
+    dx_edge = mats.edge_wing_sums * dx_cell
     dx_edge/= mesh.edge.area
-    dx_cell = trsk.cell_wing_sums * dx_edge
+    dx_cell = mats.cell_wing_sums * dx_edge
     dx_cell/= mesh.cell.area
     
-    dx_edge = trsk.edge_wing_sums * dx_cell
+    dx_edge = mats.edge_wing_sums * dx_cell
     dx_edge/= mesh.edge.area
-    dx_cell = trsk.cell_wing_sums * dx_edge
+    dx_cell = mats.cell_wing_sums * dx_edge
     dx_cell/= mesh.cell.area
     
     if (cnfg.ref_scale > 0.0):
@@ -57,7 +60,7 @@ def scalingVk(mesh, trsk, cnfg):
         s4_cell = np.ones(
             (mesh.cell.size), dtype=reals_t)
     
-    dx_edge = trsk.edge_wing_sums * dx_cell
+    dx_edge = mats.edge_wing_sums * dx_cell
     dx_edge/= mesh.edge.area
 
     if (cnfg.ref_scale > 0.0):
@@ -73,7 +76,7 @@ def scalingVk(mesh, trsk, cnfg):
            s2_cell, s4_cell
 
 
-def diag_vars(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
+def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
 
 #-- compute diagnostic variables from the current state
 
@@ -88,18 +91,18 @@ def diag_vars(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
     gg_cell = flow.gravity
 
     hh_dual, hh_edge, h2_edge, hh_bias = compute_H(
-        mesh, trsk, cnfg, hh_cell, uu_edge)
+        mesh, mats, cnfg, hh_cell, uu_edge)
 
     hh_edge, uu_edge = computeBC(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
         hh_edge, uu_edge, 
         gg_cell, hE_edge, uE_edge)
         
     vv_edge = computeVV(
-        mesh, trsk, cnfg, uu_edge)
+        mesh, mats, cnfg, uu_edge)
 
     ke_cell, ke_bias = computeKE(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
         hh_cell, h2_edge, hh_dual, 
         uu_edge, vv_edge,
         +1. / 2. * cnfg.time_step)
@@ -107,13 +110,13 @@ def diag_vars(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
     rv_dual, pv_dual, r2_dual, p2_dual, \
     rv_cell, pv_cell, \
     pv_edge, pv_bias = computePV(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
         hh_cell, h2_edge, hh_dual, uu_edge, vv_edge,
         ff_dual, ff_edge, ff_cell, 
         +1. / 2. * cnfg.time_step)
         
     nu_edge = computeNu(
-        mesh, trsk, cnfg, r2_dual, rv_cell)
+        mesh, mats, cnfg, r2_dual, rv_cell)
 
     return hh_edge, hh_dual, hh_bias, \
            ke_cell, ke_bias, \
@@ -122,7 +125,7 @@ def diag_vars(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
            vv_edge, nu_edge
 
 
-def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
+def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
 
 #-- compute the discrete energy and enstrophy invariants
 
@@ -137,15 +140,15 @@ def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
     gg_cell = flow.gravity
 
     hh_dual, hh_edge, h2_edge, hh_bias = compute_H(
-        mesh, trsk, cnfg, hh_cell, uu_edge)
+        mesh, mats, cnfg, hh_cell, uu_edge)
 
     hh_edge, uu_edge = computeBC(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
         hh_edge, uu_edge, 
         gg_cell, hE_edge, uE_edge)
         
     vv_edge = computeVV(
-        mesh, trsk, cnfg, uu_edge)
+        mesh, mats, cnfg, uu_edge)
 
     ke_edge = uu_edge ** 2
     ke_edge*= hh_edge * mesh.edge.area
@@ -161,7 +164,7 @@ def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
     rv_dual, pv_dual, r2_dual, p2_dual, \
     rv_cell, pv_cell, \
     pv_edge, pv_bias = computePV(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
         hh_cell, h2_edge, hh_dual, uu_edge, vv_edge,
         ff_dual, ff_edge, ff_cell, 
         +1. / 2. * cnfg.time_step)
@@ -175,7 +178,7 @@ def invariant(mesh, trsk, flow, cnfg, hh_cell, uu_edge):
     return kk_sums, pv_sums
 
 
-def computeBC(mesh, trsk, cnfg,
+def computeBC(mesh, mats, cnfg,
         hh_edge, uu_edge, gg_cell, hE_edge, uE_edge):
         
 #-- setup open bnd. conditions
@@ -186,7 +189,7 @@ def computeBC(mesh, trsk, cnfg,
     ttic = time.time()
         
     hh_edge, uu_edge = _computeBC(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
         hh_edge, uu_edge, gg_cell, hE_edge, uE_edge)
         
     ttoc = time.time()
@@ -195,7 +198,7 @@ def computeBC(mesh, trsk, cnfg,
     return hh_edge, uu_edge
 
 
-def upwinding(mesh, trsk, cnfg, 
+def upwinding(mesh, mats, cnfg, 
         sw_dual, ss_dual, ss_cell, uu_edge, vv_edge, 
         ss_edge, up_bias,
         delta_t, sv_tiny, uu_tiny,
@@ -206,7 +209,7 @@ def upwinding(mesh, trsk, cnfg,
     ttic = time.time()
 
     ss_edge, up_bias = _upwinding(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
         sw_dual, ss_dual, ss_cell, uu_edge, vv_edge, 
         ss_edge, up_bias, 
         delta_t, sv_tiny, uu_tiny, 
@@ -218,7 +221,7 @@ def upwinding(mesh, trsk, cnfg,
     return ss_edge, up_bias
 
 
-def compute_H(mesh, trsk, cnfg, hh_cell, uu_edge):
+def compute_H(mesh, mats, cnfg, hh_cell, uu_edge):
 
 #-- compute discrete thickness
 
@@ -226,7 +229,7 @@ def compute_H(mesh, trsk, cnfg, hh_cell, uu_edge):
     
     hh_dual, hh_edge, h2_edge, hh_bias = \
         _computeHH(
-            mesh, trsk, cnfg, hh_cell, uu_edge)
+            mesh, mats, cnfg, hh_cell, uu_edge)
     
     ttoc = time.time()
     tcpu.compute_H = tcpu.compute_H + (ttoc - ttic)
@@ -234,7 +237,7 @@ def compute_H(mesh, trsk, cnfg, hh_cell, uu_edge):
     return hh_dual, hh_edge, h2_edge, hh_bias
     
 
-def computeKE(mesh, trsk, cnfg, 
+def computeKE(mesh, mats, cnfg, 
         hh_cell, hh_edge, hh_dual, uu_edge, vv_edge,
         delta_t):
 
@@ -245,7 +248,7 @@ def computeKE(mesh, trsk, cnfg,
     up_edge = variables.ke_bias
  
     ke_cell = _computeKE(
-        mesh, trsk, cnfg, uu_edge, vv_edge)
+        mesh, mats, cnfg, uu_edge, vv_edge)
         
     ttoc = time.time()
     tcpu.computeKE = tcpu.computeKE + (ttoc - ttic)
@@ -253,7 +256,7 @@ def computeKE(mesh, trsk, cnfg,
     return ke_cell, up_edge
 
 
-def _build_PV(mesh, trsk, cnfg, 
+def _build_PV(mesh, mats, cnfg, 
         hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, 
         ff_dual, ff_edge, ff_cell,
         delta_t):
@@ -265,7 +268,7 @@ def _build_PV(mesh, trsk, cnfg,
     rv_dual, pv_dual, r2_dual, p2_dual, \
     rv_cell, pv_cell, \
     rv_edge, pv_edge = _computePV(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
         hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, 
         ff_dual, ff_edge, ff_cell)
     
@@ -277,7 +280,7 @@ def _build_PV(mesh, trsk, cnfg,
            rv_edge, pv_edge
               
               
-def computePV(mesh, trsk, cnfg, 
+def computePV(mesh, mats, cnfg, 
         hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, 
         ff_dual, ff_edge, ff_cell,
         delta_t):
@@ -287,7 +290,7 @@ def computePV(mesh, trsk, cnfg,
     rv_dual, pv_dual, r2_dual, p2_dual, \
     rv_cell, pv_cell, \
     rv_edge, pv_edge = _build_PV(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
         hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, 
         ff_dual, ff_edge, ff_cell, 
         delta_t)
@@ -295,7 +298,7 @@ def computePV(mesh, trsk, cnfg,
     up_edge = variables.pv_bias
             
     pv_edge, up_edge = upwinding(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
         p2_dual, pv_dual, pv_cell, uu_edge, vv_edge, 
         pv_edge, up_edge,
         delta_t, PV_TINY, UU_TINY, 
@@ -307,13 +310,13 @@ def computePV(mesh, trsk, cnfg,
            pv_edge, up_edge
               
               
-def computeVV(mesh, trsk, cnfg, uu_edge):
+def computeVV(mesh, mats, cnfg, uu_edge):
 
 #-- get tangential velocity
 
     ttic = time.time()
 
-    vv_edge = _computeVV(mesh, trsk, cnfg, uu_edge)
+    vv_edge = _computeVV(mesh, mats, cnfg, uu_edge)
 
     ttoc = time.time()
     tcpu.computeVV = tcpu.computeVV + (ttoc - ttic)
@@ -321,7 +324,7 @@ def computeVV(mesh, trsk, cnfg, uu_edge):
     return vv_edge
               
               
-def addtendUH(mesh, trsk, cnfg, hh_edge, uu_edge, 
+def addtendUH(mesh, mats, cnfg, hh_edge, uu_edge, 
                                 hh_tend):
 
 #-- div. for thickness flux
@@ -329,7 +332,7 @@ def addtendUH(mesh, trsk, cnfg, hh_edge, uu_edge,
     ttic = time.time()
 
     hh_tend = _advect_UH(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
             hh_edge, uu_edge, hh_tend)
 
     ttoc = time.time()
@@ -338,7 +341,7 @@ def addtendUH(mesh, trsk, cnfg, hh_edge, uu_edge,
     return hh_tend
     
               
-def addtendUV(mesh, trsk, cnfg, hh_edge, uu_edge,
+def addtendUV(mesh, mats, cnfg, hh_edge, uu_edge,
                                 pv_edge, ke_cell,
                                 uu_tend):
 
@@ -347,7 +350,7 @@ def addtendUV(mesh, trsk, cnfg, hh_edge, uu_edge,
     ttic = time.time()
 
     uu_tend = _advect_UV(
-        mesh, trsk, cnfg, hh_edge, 
+        mesh, mats, cnfg, hh_edge, 
             uu_edge, pv_edge, ke_cell, uu_tend)
 
     ttoc = time.time()
@@ -356,7 +359,7 @@ def addtendUV(mesh, trsk, cnfg, hh_edge, uu_edge,
     return uu_tend
     
     
-def addtendGZ(mesh, trsk, cnfg, hh_cell, zb_cell, 
+def addtendGZ(mesh, mats, cnfg, hh_cell, zb_cell, 
                                 gg_cell, uu_tend):
 
 #-- get z pressure gradient
@@ -364,7 +367,7 @@ def addtendGZ(mesh, trsk, cnfg, hh_cell, zb_cell,
     ttic = time.time()
 
     uu_tend = _computeGZ(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
             hh_cell, zb_cell, gg_cell, uu_tend)
         
     ttoc = time.time()
@@ -373,7 +376,7 @@ def addtendGZ(mesh, trsk, cnfg, hh_cell, zb_cell,
     return uu_tend
     
     
-def computeNu(mesh, trsk, cnfg, rv_dual, rv_cell):
+def computeNu(mesh, mats, cnfg, rv_dual, rv_cell):
 
 #-- compute leith viscosities
 
@@ -384,7 +387,7 @@ def computeNu(mesh, trsk, cnfg, rv_dual, rv_cell):
     ttic = time.time()
 
     nu_edge = _computeNu(
-        mesh, trsk, cnfg, rv_dual, rv_cell)
+        mesh, mats, cnfg, rv_dual, rv_cell)
     
     ttoc = time.time()
     tcpu.computeNu = tcpu.computeNu + (ttoc - ttic)
@@ -392,7 +395,7 @@ def computeNu(mesh, trsk, cnfg, rv_dual, rv_cell):
     return nu_edge
     
 
-def addtendDU(mesh, trsk, cnfg, uu_edge, uu_tend):
+def addtendDU(mesh, mats, cnfg, uu_edge, uu_tend):
 
 #-- damping div^k operators
 
@@ -401,7 +404,7 @@ def addtendDU(mesh, trsk, cnfg, uu_edge, uu_tend):
     ttic = time.time()
     
     uu_tend = _computeDU(
-        mesh, trsk, cnfg, uu_edge, uu_tend)
+        mesh, mats, cnfg, uu_edge, uu_tend)
 
     ttoc = time.time()
     tcpu.computeDU = tcpu.computeDU + (ttoc - ttic)
@@ -409,7 +412,7 @@ def addtendDU(mesh, trsk, cnfg, uu_edge, uu_tend):
     return uu_tend
 
 
-def addtendVU(mesh, trsk, cnfg, uu_edge, nu_edge,
+def addtendVU(mesh, mats, cnfg, uu_edge, nu_edge,
                                 uu_tend):
 
 #-- viscous del^k operators
@@ -419,7 +422,7 @@ def addtendVU(mesh, trsk, cnfg, uu_edge, nu_edge,
     ttic = time.time()
             
     uu_tend = _computeVU(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
                  uu_edge, nu_edge, uu_tend)
 
     ttoc = time.time()
@@ -428,7 +431,7 @@ def addtendVU(mesh, trsk, cnfg, uu_edge, nu_edge,
     return uu_tend
     
     
-def addtendVH(mesh, trsk, cnfg, hh_cell, zb_cell, 
+def addtendVH(mesh, mats, cnfg, hh_cell, zb_cell, 
                                 gg_cell, hh_tend):
 
 #-- diffusive del^k operators
@@ -438,7 +441,7 @@ def addtendVH(mesh, trsk, cnfg, hh_cell, zb_cell,
     ttic = time.time()
 
     hh_tend = _computeVH(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
             hh_cell, zb_cell, gg_cell, hh_tend)
     
     ttoc = time.time()
@@ -447,7 +450,7 @@ def addtendVH(mesh, trsk, cnfg, hh_cell, zb_cell,
     return hh_tend
     
     
-def addtendTU(mesh, trsk, cnfg, Tu_edge, hh_edge, 
+def addtendTU(mesh, mats, cnfg, Tu_edge, hh_edge, 
                                 uu_tend):
 
 #-- forcing from external tau
@@ -457,7 +460,7 @@ def addtendTU(mesh, trsk, cnfg, Tu_edge, hh_edge,
     ttic = time.time()
 
     uu_tend = _computeTU(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
             Tu_edge, hh_edge, uu_tend)
     
     ttoc = time.time()
@@ -466,17 +469,17 @@ def addtendTU(mesh, trsk, cnfg, Tu_edge, hh_edge,
     return uu_tend
 
 
-def computeCd(mesh, trsk, cnfg, hh_cell, uu_edge):
+def computeCd(mesh, mats, cnfg, hh_cell, uu_edge):
 
 #-- loglaw bottom drag term
 
     ttic = time.time()
 
     vv_edge = computeVV(
-            mesh, trsk, cnfg, uu_edge)
+            mesh, mats, cnfg, uu_edge)
             
     cd_edge = _computeCd(
-        mesh, trsk, cnfg, 
+        mesh, mats, cnfg, 
             HH_TINY, hh_cell, uu_edge, vv_edge)
             
     ttoc = time.time()

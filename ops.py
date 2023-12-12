@@ -8,9 +8,16 @@ from _fp import reals_t, index_t
 
 from mat import inv_3x3
 
-def trsk_mats(mesh):
+""" Staggered spatial discretisation on unstructured meshes.
+"""
+#-- Part of the PERISCOPE solver
+#-- Darren Engwirda
+#-- d.engwirda@gmail.com
+#-- https://github.com/dengwirda/
+
+def operators(mesh):
     """
-    TRSK-MATS: returns various "TRiSK-style" numerical
+    Implements various "TRiSK-style" numerical
     operators as sparse matrices:
 
     CELL-FLUX-SUMS: div. integration (* area)
@@ -62,47 +69,46 @@ def trsk_mats(mesh):
     EDGE-LSQR-ZNRM: reconstruct Z (cartesian)
 
     """
-    # Authors: Darren Engwirda
 
     class base: pass
     
-    trsk = base()
+    mats = base()
 
     ttic = time.time()
 
     # vector-calc. as sparse matrix operators
-    trsk.cell_flux_sums = cell_flux_sums(mesh)
-    trsk.cell_kite_sums = cell_kite_sums(mesh)
-    trsk.cell_wing_sums = cell_wing_sums(mesh)
-    trsk.cell_edge_sums = cell_edge_sums(mesh)
-    trsk.cell_vert_sums = cell_vert_sums(mesh)
-   #trsk.cell_curl_sums = cell_curl_sums(mesh)
-    trsk.cell_curl_sums = trsk.cell_flux_sums  # equiv.
+    mats.cell_flux_sums = cell_flux_sums(mesh)
+    mats.cell_kite_sums = cell_kite_sums(mesh)
+    mats.cell_wing_sums = cell_wing_sums(mesh)
+    mats.cell_edge_sums = cell_edge_sums(mesh)
+    mats.cell_vert_sums = cell_vert_sums(mesh)
+   #mats.cell_curl_sums = cell_curl_sums(mesh)
+    mats.cell_curl_sums = mats.cell_flux_sums  # equiv.
 
-    trsk.edge_tail_sums = edge_tail_sums(mesh)
-    trsk.edge_wing_sums = edge_wing_sums(mesh)
-    trsk.edge_vert_sums = edge_vert_sums(mesh)
-    trsk.edge_cell_sums = edge_cell_sums(mesh)
-    trsk.edge_grad_norm = edge_grad_norm(mesh)
-    trsk.edge_grad_perp = edge_grad_perp(mesh)
+    mats.edge_tail_sums = edge_tail_sums(mesh)
+    mats.edge_wing_sums = edge_wing_sums(mesh)
+    mats.edge_vert_sums = edge_vert_sums(mesh)
+    mats.edge_cell_sums = edge_cell_sums(mesh)
+    mats.edge_grad_norm = edge_grad_norm(mesh)
+    mats.edge_grad_perp = edge_grad_perp(mesh)
 
-   #trsk.cell_del2_sums = trsk.cell_flux_sums \
-   #                    * trsk.edge_grad_norm
+   #mats.cell_del2_sums = mats.cell_flux_sums \
+   #                    * mats.edge_grad_norm
 
-    trsk.dual_flux_sums = dual_flux_sums(mesh)
-    trsk.dual_kite_sums = dual_kite_sums(mesh)
-    trsk.dual_tail_sums = dual_tail_sums(mesh)
-    trsk.dual_cell_sums = dual_cell_sums(mesh)
-    trsk.dual_edge_sums = dual_edge_sums(mesh)
-   #trsk.dual_curl_sums = dual_curl_sums(mesh)
-    trsk.dual_curl_sums = trsk.dual_flux_sums  # equiv.
+    mats.dual_flux_sums = dual_flux_sums(mesh)
+    mats.dual_kite_sums = dual_kite_sums(mesh)
+    mats.dual_tail_sums = dual_tail_sums(mesh)
+    mats.dual_cell_sums = dual_cell_sums(mesh)
+    mats.dual_edge_sums = dual_edge_sums(mesh)
+   #mats.dual_curl_sums = dual_curl_sums(mesh)
+    mats.dual_curl_sums = mats.dual_flux_sums  # equiv.
 
-   #trsk.dual_del2_sums = trsk.dual_flux_sums \
-   #                    * trsk.edge_grad_perp
+   #mats.dual_del2_sums = mats.dual_flux_sums \
+   #                    * mats.edge_grad_perp
 
     # take curl on rhombi, a'la Gassmann
-    trsk.quad_curl_sums = trsk.edge_vert_sums \
-                        * trsk.dual_curl_sums
+    mats.quad_curl_sums = mats.edge_vert_sums \
+                        * mats.dual_curl_sums
 
     ttoc = time.time()
     print("-MATS done (sec):", round(ttoc - ttic, 2))
@@ -114,7 +120,7 @@ def trsk_mats(mesh):
     # is required to be anti-symmetric to ensure
     # energetically neutral PV fluxes: W_ij = -W_ji.
     # Due to floating-point round-off!
-    trsk.edge_flux_perp = edge_flux_perp(mesh)
+    mats.edge_flux_perp = edge_flux_perp(mesh)
 
     lmat = spdiags(
         1./mesh.edge.vlen, 
@@ -124,7 +130,7 @@ def trsk_mats(mesh):
         1.*mesh.edge.dlen, 
         0, mesh.edge.size, mesh.edge.size)
 
-    wmat = dmat * trsk.edge_flux_perp * lmat
+    wmat = dmat * mats.edge_flux_perp * lmat
     
     wmat = 0.5 * (wmat - wmat.transpose())
 
@@ -136,7 +142,7 @@ def trsk_mats(mesh):
         1./mesh.edge.clen, 
         0, mesh.edge.size, mesh.edge.size)
 
-    trsk.edge_flux_perp = dmat * wmat * lmat
+    mats.edge_flux_perp = dmat * wmat * lmat
     
     ttoc = time.time()
     print("-WSYM done (sec):", round(ttoc - ttic, 2))
@@ -154,28 +160,28 @@ def trsk_mats(mesh):
                    dtype=flt64_t)
 
     mesh.vert.area = (
-        0.5 * trsk.dual_kite_sums * crhs +
-        0.5 * trsk.dual_tail_sums * erhs
+        0.5 * mats.dual_kite_sums * crhs +
+        0.5 * mats.dual_tail_sums * erhs
         )
         
     mesh.vert.area = reals_t(mesh.vert.area)
     
     mesh.edge.area = (
-        0.5 * trsk.edge_wing_sums * crhs +
-        0.5 * trsk.edge_tail_sums * vrhs
+        0.5 * mats.edge_wing_sums * crhs +
+        0.5 * mats.edge_tail_sums * vrhs
         )
 
     mesh.edge.area = reals_t(mesh.edge.area)
     
     mesh.quad = base()
-    mesh.quad.area = trsk.edge_vert_sums \
+    mesh.quad.area = mats.edge_vert_sums \
                    * mesh.vert.area
 
     mesh.quad.area = reals_t(mesh.quad.area)
        
     mesh.cell.area = (
-        0.5 * trsk.cell_wing_sums * erhs +
-        0.5 * trsk.cell_kite_sums * vrhs
+        0.5 * mats.cell_wing_sums * erhs +
+        0.5 * mats.cell_kite_sums * vrhs
         )
 
     mesh.cell.area = reals_t(mesh.cell.area)
@@ -186,20 +192,20 @@ def trsk_mats(mesh):
     ttic = time.time()
     
     # least-squares vector reconst. operators
-    trsk.dual_lsqr_xnrm, \
-    trsk.dual_lsqr_ynrm, \
-    trsk.dual_lsqr_znrm, \
-    trsk.dual_lsqr_xprp, \
-    trsk.dual_lsqr_yprp, \
-    trsk.dual_lsqr_zprp = dual_lsqr_fxyz(mesh)
+    mats.dual_lsqr_xnrm, \
+    mats.dual_lsqr_ynrm, \
+    mats.dual_lsqr_znrm, \
+    mats.dual_lsqr_xprp, \
+    mats.dual_lsqr_yprp, \
+    mats.dual_lsqr_zprp = dual_lsqr_fxyz(mesh)
 
-    trsk.cell_lsqr_xnrm, \
-    trsk.cell_lsqr_ynrm, \
-    trsk.cell_lsqr_znrm = cell_lsqr_fxyz(mesh)
+    mats.cell_lsqr_xnrm, \
+    mats.cell_lsqr_ynrm, \
+    mats.cell_lsqr_znrm = cell_lsqr_fxyz(mesh)
     
-    trsk.edge_lsqr_xnrm, \
-    trsk.edge_lsqr_ynrm, \
-    trsk.edge_lsqr_znrm = edge_lsqr_fxyz(mesh)
+    mats.edge_lsqr_xnrm, \
+    mats.edge_lsqr_ynrm, \
+    mats.edge_lsqr_znrm = edge_lsqr_fxyz(mesh)
 
     ttoc = time.time()
     print("-LSQR done (sec):", round(ttoc - ttic, 2))
@@ -207,17 +213,17 @@ def trsk_mats(mesh):
     ttic = time.time()
     
     # build LSQR-<OP> from edge-wise reconstructions
-    trsk.edge_lsqr_perp = edge_lsqr_perp(mesh, trsk)
+    mats.edge_lsqr_perp = edge_lsqr_perp(mesh, mats)
     
     # operators for piecewise linear reconstructions
     # fe = fi + (xe - xi) * grad(f)
-   #trsk.edge_dual_reco = edge_dual_reco(mesh, trsk)
-   #trsk.edge_cell_reco = edge_cell_reco(mesh, trsk)
+   #mats.edge_dual_reco = edge_dual_reco(mesh, mats)
+   #mats.edge_cell_reco = edge_cell_reco(mesh, mats)
    
     ttoc = time.time()
     print("-RECO done (sec):", round(ttoc - ttic, 2))
    
-    return trsk
+    return mats
 
 
 def cell_flux_sums(mesh):
@@ -719,7 +725,12 @@ def dual_lsqr_mats(mesh):
         mesh.vert.xpos, 
         mesh.vert.ypos, mesh.vert.zpos)).T
     
-    dnrm = dnrm / mesh.rsph
+    if (mesh.rsph is not None):
+        dnrm = dnrm / mesh.rsph
+    else:
+        dnrm = np.zeros(
+        (mesh.vert.size, 3), dtype=flt64_t)
+        dnrm[:, 2] = flt64_t(1)
     
     Amat = np.zeros(
         (4, 3, mesh.vert.size), dtype=flt64_t)
@@ -855,7 +866,12 @@ def cell_lsqr_mats(mesh):
         mesh.cell.xpos,
         mesh.cell.ypos, mesh.cell.zpos)).T
     
-    cnrm = cnrm / mesh.rsph
+    if (mesh.rsph is not None):
+        cnrm = cnrm / mesh.rsph
+    else:
+        cnrm = np.zeros(
+        (mesh.cell.size, 3), dtype=flt64_t)
+        cnrm[:, 2] = flt64_t(1)
        
     Amat = np.zeros(
         (np.max(mesh.cell.topo) + 1, 3, 
@@ -983,7 +999,12 @@ def edge_lsqr_mats(mesh):
         mesh.edge.xpos,
         mesh.edge.ypos, mesh.edge.zpos)).T
     
-    enrm = enrm / mesh.rsph
+    if (mesh.rsph is not None):
+        enrm = enrm / mesh.rsph
+    else:
+        enrm = np.zeros(
+        (mesh.edge.size, 3), dtype=flt64_t)
+        enrm[:, 2] = flt64_t(1)
 
     Amat = np.zeros(
         (np.max(mesh.edge.topo) + 1, 3,
@@ -1108,7 +1129,7 @@ def edge_lsqr_fxyz(mesh):
         shape=(mesh.edge.size, mesh.edge.size))
 
 
-def edge_lsqr_perp(mesh, trsk):
+def edge_lsqr_perp(mesh, mats):
 
     xprp = mesh.edge.xprp
     xprp = spdiags(
@@ -1124,13 +1145,13 @@ def edge_lsqr_perp(mesh, trsk):
             0, mesh.edge.size, mesh.edge.size)
   
     return (
-        +1.000 * xprp * trsk.edge_lsqr_xnrm +
-        +1.000 * yprp * trsk.edge_lsqr_ynrm +
-        +1.000 * zprp * trsk.edge_lsqr_znrm 
+        +1.000 * xprp * mats.edge_lsqr_xnrm +
+        +1.000 * yprp * mats.edge_lsqr_ynrm +
+        +1.000 * zprp * mats.edge_lsqr_znrm 
     )
     
     
-def edge_lsqr_norm(mesh, trsk):
+def edge_lsqr_norm(mesh, mats):
 
     xnrm = mesh.edge.xnrm
     xnrm = spdiags(
@@ -1146,13 +1167,13 @@ def edge_lsqr_norm(mesh, trsk):
             0, mesh.edge.size, mesh.edge.size)
 
     return (
-        +1.000 * xnrm * trsk.edge_lsqr_xprp +
-        +1.000 * ynrm * trsk.edge_lsqr_yprp +
-        +1.000 * znrm * trsk.edge_lsqr_zprp 
+        +1.000 * xnrm * mats.edge_lsqr_xprp +
+        +1.000 * ynrm * mats.edge_lsqr_yprp +
+        +1.000 * znrm * mats.edge_lsqr_zprp 
     )
 
 
-def edge_dual_reco(mesh, trsk):
+def edge_dual_reco(mesh, mats):
 
 #-- EDGE-DUAL-RECO: returns .5 * (xe - xv) * grad(F) part of
 #-- edge reconstruction operator,
@@ -1191,16 +1212,16 @@ def edge_dual_reco(mesh, trsk):
         np.hstack((zev1, zev2)), (ivec, jvec)))
 
     return (
-        +0.500 * xmat * (trsk.dual_lsqr_xprp * 
-                         trsk.edge_grad_perp) +
-        +0.500 * ymat * (trsk.dual_lsqr_yprp * 
-                         trsk.edge_grad_perp) +
-        +0.500 * zmat * (trsk.dual_lsqr_zprp * 
-                         trsk.edge_grad_perp)
+        +0.500 * xmat * (mats.dual_lsqr_xprp * 
+                         mats.edge_grad_perp) +
+        +0.500 * ymat * (mats.dual_lsqr_yprp * 
+                         mats.edge_grad_perp) +
+        +0.500 * zmat * (mats.dual_lsqr_zprp * 
+                         mats.edge_grad_perp)
     )
 
 
-def edge_cell_reco(mesh, trsk):
+def edge_cell_reco(mesh, mats):
 
 #-- EDGE-CELL-RECO: returns .5 * (xe - xc) * grad(F) part of
 #-- edge reconstruction operator,
@@ -1239,10 +1260,10 @@ def edge_cell_reco(mesh, trsk):
         np.hstack((zec1, zec2)), (ivec, jvec)))
 
     return (
-        +0.500 * xmat * (trsk.cell_lsqr_xnrm * 
-                         trsk.edge_grad_norm) +
-        +0.500 * ymat * (trsk.cell_lsqr_ynrm * 
-                         trsk.edge_grad_norm) +
-        +0.500 * zmat * (trsk.cell_lsqr_znrm * 
-                         trsk.edge_grad_norm)
+        +0.500 * xmat * (mats.cell_lsqr_xnrm * 
+                         mats.edge_grad_norm) +
+        +0.500 * ymat * (mats.cell_lsqr_ynrm * 
+                         mats.edge_grad_norm) +
+        +0.500 * zmat * (mats.cell_lsqr_znrm * 
+                         mats.edge_grad_norm)
     )

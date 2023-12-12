@@ -1,7 +1,10 @@
 
 """ Timers and log for SWE-solver space + time operators 
 """
+#-- Part of the PERISCOPE solver
 #-- Darren Engwirda
+#-- d.engwirda@gmail.com
+#-- https://github.com/dengwirda/
 
 class base: pass
 tcpu = base()

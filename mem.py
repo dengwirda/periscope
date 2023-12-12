@@ -3,7 +3,10 @@ import numpy as np
 
 """ Util. to setup memory pools for global & scratch arrays.
 """
-#-- Authors: Darren Engwirda
+#-- Part of the PERISCOPE solver
+#-- Darren Engwirda
+#-- d.engwirda@gmail.com
+#-- https://github.com/dengwirda/
 
 from _fp import flt32_t, flt64_t
 from _fp import reals_t, index_t

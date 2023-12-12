@@ -4,7 +4,10 @@ import numpy as np
 
 """ SWE time integration via various Runge-Kutta methods
 """
+#-- Part of the PERISCOPE solver
 #-- Darren Engwirda, Jeremy Lilly
+#-- d.engwirda@gmail.com
+#-- https://github.com/dengwirda/
 
 from _fp import flt32_t, flt64_t
 from _fp import reals_t, index_t
@@ -20,7 +23,7 @@ from _dx import computeCd
 from rhs import rhs_all_u, rhs_slw_u, rhs_fst_u, \
                 rhs_all_h, rhs_slw_h, rhs_fst_h
 
-def step_eqns(mesh, trsk, flow, cnfg, 
+def step_eqns(mesh, mats, flow, cnfg, 
               hh_cell, uu_edge,     # state
               ch_cell, cu_edge):    # compensators
 
@@ -30,20 +33,20 @@ def step_eqns(mesh, trsk, flow, cnfg,
 
         hh_cell, uu_edge, \
         ch_cell, cu_edge = step_RK22(
-            mesh, trsk, flow, cnfg, 
+            mesh, mats, flow, cnfg, 
             hh_cell, uu_edge, ch_cell, cu_edge)
 
     elif ("RK32" in cnfg.integrate):
 
         hh_cell, uu_edge, \
         ch_cell, cu_edge = step_RK32(
-            mesh, trsk, flow, cnfg, 
+            mesh, mats, flow, cnfg, 
             hh_cell, uu_edge, ch_cell, cu_edge)
 
     return hh_cell, uu_edge, ch_cell, cu_edge
     
     
-def step_bnds(mesh, trsk, flow, cnfg, 
+def step_bnds(mesh, mats, flow, cnfg, 
               hh_cell, uu_edge,     # state
               hh_min_, hh_max_,     # up/lo bounds
               uu_min_, uu_max_):
@@ -59,7 +62,7 @@ def step_bnds(mesh, trsk, flow, cnfg,
     return hh_min_, hh_max_, uu_min_, uu_max_
     
     
-def step_RK22(mesh, trsk, flow, cnfg, 
+def step_RK22(mesh, mats, flow, cnfg, 
               hh_cell, uu_edge,     # state
               ch_cell, cu_edge):    # compensators
 
@@ -100,7 +103,7 @@ def step_RK22(mesh, trsk, flow, cnfg,
         BETA = 0.333333333333333 * isFB
 
     rh_cell = rhs_all_h(
-        mesh, trsk, flow, cnfg, hh_cell, uu_edge, rh_cell)
+        mesh, mats, flow, cnfg, hh_cell, uu_edge, rh_cell)
 
     h1_cell = adv_x_fst(
         cnfg, hh_cell, k1_step, rh_cell, ch_cell, h1_cell)
@@ -115,14 +118,14 @@ def step_RK22(mesh, trsk, flow, cnfg,
                        1.0 - 1.0 * BETA, hh_cell)
 
     ru_edge = rhs_all_u(
-        mesh, trsk, flow, cnfg, hb_cell, uu_edge, ru_edge)
+        mesh, mats, flow, cnfg, hb_cell, uu_edge, ru_edge)
 
     u1_edge = adv_x_fst(
         cnfg, uu_edge, k1_step, ru_edge, cu_edge, u1_edge)
 
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, trsk, cnfg, h1_cell, u1_edge)
+            mesh, mats, cnfg, h1_cell, u1_edge)
 
     #-- euler scheme: implicit solve
         u1_edge = inv_x_1st(
@@ -148,7 +151,7 @@ def step_RK22(mesh, trsk, flow, cnfg,
                        0.5, u1_edge)
 
     rh_cell = rhs_all_h(
-        mesh, trsk, flow, cnfg, hm_cell, um_edge, rh_cell)
+        mesh, mats, flow, cnfg, hm_cell, um_edge, rh_cell)
 
     # compensation for fp round-off
     h2_cell, ch_cell = adv_x_cmp(
@@ -165,7 +168,7 @@ def step_RK22(mesh, trsk, flow, cnfg,
                        0.5             , hh_cell)
 
     ru_edge = rhs_all_u(
-        mesh, trsk, flow, cnfg, hb_cell, um_edge, ru_edge)
+        mesh, mats, flow, cnfg, hb_cell, um_edge, ru_edge)
 
     # compensation for fp round-off
     u2_edge, cu_edge = adv_x_cmp(
@@ -173,7 +176,7 @@ def step_RK22(mesh, trsk, flow, cnfg,
     
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, trsk, cnfg, hb_cell, um_edge)
+            mesh, mats, cnfg, hb_cell, um_edge)
 
     #-- theta scheme: implicit solve
         u2_edge = inv_x_2nd(
@@ -199,7 +202,7 @@ def step_RK22(mesh, trsk, flow, cnfg,
     return  hh_cell, uu_edge, ch_cell, cu_edge
 
 
-def step_RK32(mesh, trsk, flow, cnfg, 
+def step_RK32(mesh, mats, flow, cnfg, 
               hh_cell, uu_edge,     # state
               ch_cell, cu_edge):    # compensators
 
@@ -246,7 +249,7 @@ def step_RK32(mesh, trsk, flow, cnfg,
         BETA = 0.311875000000000 * isFB
 
     rh_cell = rhs_all_h(
-        mesh, trsk, flow, cnfg, hh_cell, uu_edge, rh_cell)
+        mesh, mats, flow, cnfg, hh_cell, uu_edge, rh_cell)
 
     h1_cell = adv_x_fst(
         cnfg, hh_cell, k1_step, rh_cell, ch_cell, h1_cell)
@@ -261,14 +264,14 @@ def step_RK32(mesh, trsk, flow, cnfg,
                        1.0 - 1.0 * BETA, hh_cell)
 
     ru_edge = rhs_all_u(
-        mesh, trsk, flow, cnfg, hb_cell, uu_edge, ru_edge)
+        mesh, mats, flow, cnfg, hb_cell, uu_edge, ru_edge)
 
     u1_edge = adv_x_fst(
         cnfg, uu_edge, k1_step, ru_edge, cu_edge, u1_edge)
 
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, trsk, cnfg, h1_cell, u1_edge)
+            mesh, mats, cnfg, h1_cell, u1_edge)
 
     #-- euler scheme: implicit solve
         u1_edge = inv_x_1st(
@@ -287,7 +290,7 @@ def step_RK32(mesh, trsk, flow, cnfg,
         BETA = 0.425000000000000 * isFB
 
     rh_cell = rhs_all_h(
-        mesh, trsk, flow, cnfg, h1_cell, u1_edge, rh_cell)
+        mesh, mats, flow, cnfg, h1_cell, u1_edge, rh_cell)
 
     h2_cell = adv_x_fst(
         cnfg, hh_cell, k2_step, rh_cell, ch_cell, h2_cell)
@@ -309,14 +312,14 @@ def step_RK32(mesh, trsk, flow, cnfg,
                        1.0 - 1.0 * isFB, h1_cell)
     
     ru_edge = rhs_all_u(
-        mesh, trsk, flow, cnfg, hb_cell, u1_edge, ru_edge)
+        mesh, mats, flow, cnfg, hb_cell, u1_edge, ru_edge)
 
     u2_edge = adv_x_fst(
         cnfg, uu_edge, k2_step, ru_edge, cu_edge, u2_edge)
 
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, trsk, cnfg, h2_cell, u2_edge)
+            mesh, mats, cnfg, h2_cell, u2_edge)
 
     #-- euler scheme: implicit solve
         u2_edge = inv_x_1st(
@@ -335,7 +338,7 @@ def step_RK32(mesh, trsk, flow, cnfg,
         BETA = 0.362500000000000 * isFB
 
     rh_cell = rhs_all_h(
-        mesh, trsk, flow, cnfg, h2_cell, u2_edge, rh_cell)
+        mesh, mats, flow, cnfg, h2_cell, u2_edge, rh_cell)
 
     # compensation for fp round-off
     h3_cell, ch_cell = adv_x_cmp(
@@ -352,7 +355,7 @@ def step_RK32(mesh, trsk, flow, cnfg,
                        0.0 + 1.0 * BETA, hh_cell)
     
     ru_edge = rhs_all_u(
-        mesh, trsk, flow, cnfg, hb_cell, u2_edge, ru_edge)
+        mesh, mats, flow, cnfg, hb_cell, u2_edge, ru_edge)
 
     # compensation for fp round-off
     u3_edge, cu_edge = adv_x_cmp(
@@ -360,7 +363,7 @@ def step_RK32(mesh, trsk, flow, cnfg,
    
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, trsk, cnfg, hb_cell, u2_edge)
+            mesh, mats, cnfg, hb_cell, u2_edge)
 
     #-- theta scheme: explicit tend.
         u3_edge = inv_x_2nd(

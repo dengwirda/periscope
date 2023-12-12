@@ -5,7 +5,10 @@ import netCDF4 as nc
 
 """ NETCDF-4 output for SWE-solver; MPAS-style variables  
 """
+#-- Part of the PERISCOPE solver
 #-- Darren Engwirda
+#-- d.engwirda@gmail.com
+#-- https://github.com/dengwirda/
 
 from _fp import flt32_t, flt64_t
 from _fp import reals_t, index_t
@@ -37,7 +40,7 @@ out_.uy_cell = False
 out_.uz_cell = False
 out_.nu_turb = False
 
-def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
+def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
 
     hh_edge, hh_dual, hh_bias, \
     ke_cell, ke_bias, \
@@ -45,7 +48,7 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
     rv_dual, pv_dual, \
     pv_edge, pv_bias, \
     vv_edge, nu_edge = diag_vars (
-        mesh, trsk, flow, cnfg, hh_cell, uu_edge
+        mesh, mats, flow, cnfg, hh_cell, uu_edge
         )
 
     ttic = time.time()
@@ -65,7 +68,7 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
                 mesh.edge.irev - 1], (1, mesh.edge.size, 1))
                 
     if (out_.hh_bias):
-        xt_dual = trsk.dual_tail_sums * hh_bias
+        xt_dual = mats.dual_tail_sums * hh_bias
         xt_dual/= mesh.vert.area
 
         data.variables["hh_bias"][step, :, :] = \
@@ -95,7 +98,7 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
 
     if (out_.du_cell):
-        xt_cell = trsk.cell_flux_sums * uu_edge
+        xt_cell = mats.cell_flux_sums * uu_edge
         xt_cell/= mesh.cell.area
 
         data.variables["du_cell"][step, :, :] = \
@@ -104,7 +107,7 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
 
     if (out_.uh_cell):
         xt_edge = uu_edge * hh_edge
-        xt_cell = trsk.cell_flux_sums * xt_edge
+        xt_cell = mats.cell_flux_sums * xt_edge
         xt_cell/= mesh.cell.area
 
         data.variables["uh_cell"][step, :, :] = \
@@ -117,7 +120,7 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1)) 
 
     if (out_.pv_bias):
-        xt_dual = trsk.dual_tail_sums * pv_bias
+        xt_dual = mats.dual_tail_sums * pv_bias
         xt_dual/= mesh.vert.area
 
         data.variables["pv_bias"][step, :, :] = \
@@ -145,28 +148,28 @@ def save_step(save, mesh, trsk, flow, cnfg, step, hh_cell, uu_edge):
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
                 
     if (out_.ux_cell):
-        xt_cell = trsk.cell_lsqr_xnrm * uu_edge
+        xt_cell = mats.cell_lsqr_xnrm * uu_edge
 
         data.variables["ux_cell"][step, :, :] = \
             np.reshape(xt_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
                 
     if (out_.uy_cell):
-        xt_cell = trsk.cell_lsqr_ynrm * uu_edge
+        xt_cell = mats.cell_lsqr_ynrm * uu_edge
 
         data.variables["uy_cell"][step, :, :] = \
             np.reshape(xt_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
                 
     if (out_.uz_cell):
-        xt_cell = trsk.cell_lsqr_znrm * uu_edge
+        xt_cell = mats.cell_lsqr_znrm * uu_edge
 
         data.variables["uz_cell"][step, :, :] = \
             np.reshape(xt_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))   
                 
     if (out_.nu_turb):
-        xt_dual = trsk.dual_tail_sums * nu_edge
+        xt_dual = mats.dual_tail_sums * nu_edge
         xt_dual/= mesh.vert.area
     
         data.variables["nu_turb"][step, :, :] = \

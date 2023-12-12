@@ -15,7 +15,7 @@ sys.path.insert(
 from stb import strtobool
 
 from msh import load_mesh, cell_quad, dual_quad
-from ops import trsk_mats
+from ops import operators
 
 #-- Idealised vortex-pair test-cases
 #-- Authors: Darren Engwirda
@@ -35,7 +35,7 @@ def init(name, save, rsph, case):
 
     print("Building coefficients...")
 
-    trsk = trsk_mats(mesh)
+    mats = operators(mesh)
 
 #------------------------------------ compute test-case IC's
 
@@ -43,10 +43,10 @@ def init(name, save, rsph, case):
         ValueError("Unsupported test-case.")
 
     if (case == 1): 
-        vtx1(name, save, rsph, mesh, trsk)
+        vtx1(name, save, rsph, mesh, mats)
         
     if (case == 2): 
-        vtx2(name, save, rsph, mesh, trsk)
+        vtx2(name, save, rsph, mesh, mats)
         
     if (case >= 3): 
         ValueError("Unsupported test-case.")
@@ -54,7 +54,7 @@ def init(name, save, rsph, case):
     return
 
 
-def vtx1(name, save, rsph, mesh, trsk):
+def vtx1(name, save, rsph, mesh, mats):
 
 #-- Merging (submesoscale) vortices:
 #-- G. Roullet & T. Gaillard (2022): A Fast Monotone Discretization 
@@ -88,10 +88,13 @@ def vtx1(name, save, rsph, mesh, trsk):
         
     print("Computing velocity field...")
 
-    uu_edge = -(grav / f) * trsk.edge_grad_perp * hh_vert
+    uu_edge = -(grav / f) * mats.edge_grad_perp * hh_vert
     
     bc_slip = np.zeros(uu_edge.shape, dtype=np.float64)
     bc_slip[mesh.edge.mask] = 1.  # free slip
+    
+    rv_dual = mats.dual_curl_sums * uu_edge
+    rv_dual/= mesh.vert.area
 
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
@@ -128,8 +131,8 @@ def vtx1(name, save, rsph, mesh, trsk):
         np.reshape(uu_edge, (1, mesh.edge.size, 1)))
 
     init["rv_dual"] = (
-        ("nVertices"),
-        (trsk.dual_curl_sums * uu_edge) / mesh.vert.area)
+        ("Time", "nVertices", "nVertLevels"),
+        np.reshape(rv_dual, (1, mesh.vert.size, 1)))
 
     init["bc_slip"] = (("nEdges"), bc_slip)
 
@@ -147,7 +150,7 @@ def vtx1(name, save, rsph, mesh, trsk):
     return
 
 
-def vtx2(name, save, rsph, mesh, trsk):
+def vtx2(name, save, rsph, mesh, mats):
 
 #-- Dipole//wall interaction:
 #-- G. Roullet & T. Gaillard (2022): A Fast Monotone Discretization 
@@ -181,10 +184,13 @@ def vtx2(name, save, rsph, mesh, trsk):
         
     print("Computing velocity field...")
 
-    uu_edge = -(grav / f) * trsk.edge_grad_perp * hh_vert
+    uu_edge = -(grav / f) * mats.edge_grad_perp * hh_vert
 
     bc_slip = np.zeros(uu_edge.shape, dtype=np.float64)
     bc_slip[mesh.edge.mask] = 0.  # no slip
+    
+    rv_dual = mats.dual_curl_sums * uu_edge
+    rv_dual/= mesh.vert.area
 
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
@@ -221,8 +227,8 @@ def vtx2(name, save, rsph, mesh, trsk):
         np.reshape(uu_edge, (1, mesh.edge.size, 1)))
 
     init["rv_dual"] = (
-        ("nVertices"),
-        (trsk.dual_curl_sums * uu_edge) / mesh.vert.area)
+        ("Time", "nVertices", "nVertLevels"),
+        np.reshape(rv_dual, (1, mesh.vert.size, 1)))
 
     init["bc_slip"] = (("nEdges"), bc_slip)
 

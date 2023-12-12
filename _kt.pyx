@@ -8,7 +8,10 @@
 
 """ Utilities for thread-parallel RK-FB time integration
 """
+#-- Part of the PERISCOPE solver
 #-- Darren Engwirda
+#-- d.engwirda@gmail.com
+#-- https://github.com/dengwirda/
 
 import numpy as np
 cimport numpy as np

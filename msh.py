@@ -24,12 +24,23 @@ def load_mesh(name, rsph=None):
 
     mesh = base()
     mesh.rsph = flt64_t(data.sphere_radius)
+    mesh.wrap = [None, None]
+    
+    if (str(data.on_a_sphere).upper() == "NO"):
+    #-- deal with planar domain silliness
+        mesh.rsph = None
+        mesh.wrap[0] = flt64_t(data.x_period)
+        if mesh.wrap[0] <= 0.: mesh.wrap[0] = None
+        
+        mesh.wrap[1] = flt64_t(data.y_period)
+        if mesh.wrap[1] <= 0.: mesh.wrap[1] = None
 
-    if (rsph is not None):
+    if (rsph is not None and mesh.rsph is not None):
+    #-- if the size of sphere is changing
         scal = rsph / mesh.rsph
         mesh.rsph = mesh.rsph * scal
     else:
-        scal = 1.0E+00
+        scal = flt64_t(1.)
 
     mesh.cell = base()
     mesh.cell.size = int(data.dimensions["nCells"].size)
@@ -147,13 +158,16 @@ def load_mesh(name, rsph=None):
     # local characteristic edge length, for AUST upwinding
     mesh.edge.slen = 0.5 * np.sqrt( mesh.edge.area * 2.0 )
 
+    # fixup area at boundaries
+    mesh.edge.slen[mesh.edge.mask]*= np.sqrt(2.0)
+
     ttoc = time.time()
     print("-AREA done (sec):", round(ttoc - ttic, 2))
 
     return mesh
 
 
-def mesh_kite(mesh):
+def circ_kite(mesh):
 
 #-- cell-dual overlapping areas
 
@@ -163,7 +177,7 @@ def mesh_kite(mesh):
         mesh.vert.cell[:, 0] >= 1, mesh.vert.edge[:, 1] >= 1
         ) )
         
-    kite[mask, 0]+= tria_area(
+    kite[mask, 0]+= circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mask], mesh.vert.ylat[mask])).T,
@@ -179,7 +193,7 @@ def mesh_kite(mesh):
         mesh.vert.cell[:, 0] >= 1, mesh.vert.edge[:, 0] >= 1
         ) )
         
-    kite[mask, 0]+= tria_area(
+    kite[mask, 0]+= circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mask], mesh.vert.ylat[mask])).T,
@@ -195,7 +209,7 @@ def mesh_kite(mesh):
         mesh.vert.cell[:, 1] >= 1, mesh.vert.edge[:, 2] >= 1
         ) )
         
-    kite[mask, 1]+= tria_area(
+    kite[mask, 1]+= circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mask], mesh.vert.ylat[mask])).T,
@@ -211,7 +225,7 @@ def mesh_kite(mesh):
         mesh.vert.cell[:, 1] >= 1, mesh.vert.edge[:, 1] >= 1
         ) )
         
-    kite[mask, 1]+= tria_area(
+    kite[mask, 1]+= circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mask], mesh.vert.ylat[mask])).T,
@@ -227,7 +241,7 @@ def mesh_kite(mesh):
         mesh.vert.cell[:, 2] >= 1, mesh.vert.edge[:, 0] >= 1
         ) )
         
-    kite[mask, 2]+= tria_area(
+    kite[mask, 2]+= circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mask], mesh.vert.ylat[mask])).T,
@@ -243,7 +257,7 @@ def mesh_kite(mesh):
         mesh.vert.cell[:, 2] >= 1, mesh.vert.edge[:, 2] >= 1
         ) )
         
-    kite[mask, 2]+= tria_area(
+    kite[mask, 2]+= circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mask], mesh.vert.ylat[mask])).T,
@@ -258,14 +272,124 @@ def mesh_kite(mesh):
     return kite
     
     
-def mesh_tail(mesh):
+def flat_kite(mesh):
+
+#-- cell-dual overlapping areas
+
+    kite = np.zeros((mesh.vert.size, 3), dtype=reals_t)
+    
+    mask = np.logical_and.reduce((
+        mesh.vert.cell[:, 0] >= 1, mesh.vert.edge[:, 1] >= 1
+        ) )
+        
+    kite[mask, 0]+= flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mask], mesh.vert.ypos[mask])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.vert.cell[mask, 0] - 1],
+            mesh.cell.ypos[mesh.vert.cell[mask, 0] - 1])).T,
+        np.vstack((
+            mesh.edge.xpos[mesh.vert.edge[mask, 1] - 1],
+            mesh.edge.ypos[mesh.vert.edge[mask, 1] - 1])).T
+    )
+    
+    mask = np.logical_and.reduce((
+        mesh.vert.cell[:, 0] >= 1, mesh.vert.edge[:, 0] >= 1
+        ) )
+        
+    kite[mask, 0]+= flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mask], mesh.vert.ypos[mask])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.vert.cell[mask, 0] - 1],
+            mesh.cell.ypos[mesh.vert.cell[mask, 0] - 1])).T,
+        np.vstack((
+            mesh.edge.xpos[mesh.vert.edge[mask, 0] - 1],
+            mesh.edge.ypos[mesh.vert.edge[mask, 0] - 1])).T
+    )
+
+    mask = np.logical_and.reduce((
+        mesh.vert.cell[:, 1] >= 1, mesh.vert.edge[:, 2] >= 1
+        ) )
+        
+    kite[mask, 1]+= flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mask], mesh.vert.ypos[mask])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.vert.cell[mask, 1] - 1],
+            mesh.cell.ypos[mesh.vert.cell[mask, 1] - 1])).T,
+        np.vstack((
+            mesh.edge.xpos[mesh.vert.edge[mask, 2] - 1],
+            mesh.edge.ypos[mesh.vert.edge[mask, 2] - 1])).T
+    )
+    
+    mask = np.logical_and.reduce((
+        mesh.vert.cell[:, 1] >= 1, mesh.vert.edge[:, 1] >= 1
+        ) )
+        
+    kite[mask, 1]+= flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mask], mesh.vert.ypos[mask])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.vert.cell[mask, 1] - 1],
+            mesh.cell.ypos[mesh.vert.cell[mask, 1] - 1])).T,
+        np.vstack((
+            mesh.edge.xpos[mesh.vert.edge[mask, 1] - 1],
+            mesh.edge.ypos[mesh.vert.edge[mask, 1] - 1])).T
+    )
+
+    mask = np.logical_and.reduce((
+        mesh.vert.cell[:, 2] >= 1, mesh.vert.edge[:, 0] >= 1
+        ) )
+        
+    kite[mask, 2]+= flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mask], mesh.vert.ypos[mask])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.vert.cell[mask, 2] - 1],
+            mesh.cell.ypos[mesh.vert.cell[mask, 2] - 1])).T,
+        np.vstack((
+            mesh.edge.xpos[mesh.vert.edge[mask, 0] - 1],
+            mesh.edge.ypos[mesh.vert.edge[mask, 0] - 1])).T
+    )
+    
+    mask = np.logical_and.reduce((
+        mesh.vert.cell[:, 2] >= 1, mesh.vert.edge[:, 2] >= 1
+        ) )
+        
+    kite[mask, 2]+= flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mask], mesh.vert.ypos[mask])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.vert.cell[mask, 2] - 1],
+            mesh.cell.ypos[mesh.vert.cell[mask, 2] - 1])).T,
+        np.vstack((
+            mesh.edge.xpos[mesh.vert.edge[mask, 2] - 1],
+            mesh.edge.ypos[mesh.vert.edge[mask, 2] - 1])).T
+    )
+
+    return kite
+    
+    
+def mesh_kite(mesh):
+    if (mesh.rsph is not None): return circ_kite(mesh)
+    if (mesh.rsph is     None): return flat_kite(mesh)
+    
+    
+def circ_tail(mesh):
 
 #-- edge-dual overlapping areas
 
     tail = np.zeros((mesh.edge.size, 2), dtype=reals_t)
     
     mask = mesh.edge.cell[:, 0] >= 1
-    tail[mask, 0]+= tria_area(
+    tail[mask, 0]+= circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mesh.edge.vert[mask, 0] - 1],
@@ -278,7 +402,7 @@ def mesh_tail(mesh):
     )
     
     mask = mesh.edge.cell[:, 1] >= 1
-    tail[mask, 0]+= tria_area(
+    tail[mask, 0]+= circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mesh.edge.vert[mask, 0] - 1],
@@ -291,7 +415,7 @@ def mesh_tail(mesh):
     )
     
     mask = mesh.edge.cell[:, 0] >= 1
-    tail[mask, 1]+= tria_area(
+    tail[mask, 1]+= circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mesh.edge.vert[mask, 1] - 1],
@@ -304,7 +428,7 @@ def mesh_tail(mesh):
     )
     
     mask = mesh.edge.cell[:, 1] >= 1
-    tail[mask, 1]+= tria_area(
+    tail[mask, 1]+= circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mesh.edge.vert[mask, 1] - 1],
@@ -319,14 +443,80 @@ def mesh_tail(mesh):
     return tail
     
     
-def mesh_wing(mesh):
+def flat_tail(mesh):
+
+#-- edge-dual overlapping areas
+
+    tail = np.zeros((mesh.edge.size, 2), dtype=reals_t)
+    
+    mask = mesh.edge.cell[:, 0] >= 1
+    tail[mask, 0]+= flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mesh.edge.vert[mask, 0] - 1],
+            mesh.vert.ypos[mesh.edge.vert[mask, 0] - 1])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.edge.cell[mask, 0] - 1],
+            mesh.cell.ypos[mesh.edge.cell[mask, 0] - 1])).T,
+        np.vstack((
+            mesh.edge.xpos[mask], mesh.edge.ypos[mask])).T
+    )
+    
+    mask = mesh.edge.cell[:, 1] >= 1
+    tail[mask, 0]+= flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mesh.edge.vert[mask, 0] - 1],
+            mesh.vert.ypos[mesh.edge.vert[mask, 0] - 1])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.edge.cell[mask, 1] - 1],
+            mesh.cell.ypos[mesh.edge.cell[mask, 1] - 1])).T,
+        np.vstack((
+            mesh.edge.xpos[mask], mesh.edge.ypos[mask])).T
+    )
+    
+    mask = mesh.edge.cell[:, 0] >= 1
+    tail[mask, 1]+= flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mesh.edge.vert[mask, 1] - 1],
+            mesh.vert.ypos[mesh.edge.vert[mask, 1] - 1])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.edge.cell[mask, 0] - 1],
+            mesh.cell.ypos[mesh.edge.cell[mask, 0] - 1])).T,
+        np.vstack((
+            mesh.edge.xpos[mask], mesh.edge.ypos[mask])).T
+    )
+    
+    mask = mesh.edge.cell[:, 1] >= 1
+    tail[mask, 1]+= flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mesh.edge.vert[mask, 1] - 1],
+            mesh.vert.ypos[mesh.edge.vert[mask, 1] - 1])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.edge.cell[mask, 1] - 1],
+            mesh.cell.ypos[mesh.edge.cell[mask, 1] - 1])).T,
+        np.vstack((
+            mesh.edge.xpos[mask], mesh.edge.ypos[mask])).T
+    )
+
+    return tail
+    
+    
+def mesh_tail(mesh):
+    if (mesh.rsph is not None): return circ_tail(mesh)
+    if (mesh.rsph is     None): return flat_tail(mesh)
+    
+    
+def circ_wing(mesh):
 
 #-- edge-cell overlapping areas
 
     wing = np.zeros((mesh.edge.size, 2), dtype=reals_t)
     
     mask = mesh.edge.cell[:, 0] >= 1
-    wing[mask, 0] = tria_area(
+    wing[mask, 0] = circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mesh.edge.vert[mask, 1] - 1],
@@ -340,7 +530,7 @@ def mesh_wing(mesh):
     )
     
     mask = mesh.edge.cell[:, 1] >= 1
-    wing[mask, 1] = tria_area(
+    wing[mask, 1] = circ_area(
         mesh.rsph,
         np.vstack((
             mesh.vert.xlon[mesh.edge.vert[mask, 0] - 1],
@@ -356,7 +546,49 @@ def mesh_wing(mesh):
     return wing
     
     
-def mesh_arcs(mesh):
+def flat_wing(mesh):
+
+#-- edge-cell overlapping areas
+
+    wing = np.zeros((mesh.edge.size, 2), dtype=reals_t)
+    
+    mask = mesh.edge.cell[:, 0] >= 1
+    wing[mask, 0] = flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mesh.edge.vert[mask, 1] - 1],
+            mesh.vert.ypos[mesh.edge.vert[mask, 1] - 1])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.edge.cell[mask, 0] - 1],
+            mesh.cell.ypos[mesh.edge.cell[mask, 0] - 1])).T,
+        np.vstack((
+            mesh.vert.xpos[mesh.edge.vert[mask, 0] - 1],
+            mesh.vert.ypos[mesh.edge.vert[mask, 0] - 1])).T
+    )
+    
+    mask = mesh.edge.cell[:, 1] >= 1
+    wing[mask, 1] = flat_area(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mesh.edge.vert[mask, 0] - 1],
+            mesh.vert.ypos[mesh.edge.vert[mask, 0] - 1])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.edge.cell[mask, 1] - 1],
+            mesh.cell.ypos[mesh.edge.cell[mask, 1] - 1])).T,
+        np.vstack((
+            mesh.vert.xpos[mesh.edge.vert[mask, 1] - 1],
+            mesh.vert.ypos[mesh.edge.vert[mask, 1] - 1])).T
+    )
+
+    return wing
+    
+    
+def mesh_wing(mesh):
+    if (mesh.rsph is not None): return circ_wing(mesh)
+    if (mesh.rsph is     None): return flat_wing(mesh)
+    
+    
+def circ_arcs(mesh):
 
 #-- arc-lengths: vert and cells
 
@@ -394,6 +626,49 @@ def mesh_arcs(mesh):
     return vlen, dlen
     
     
+def flat_arcs(mesh):
+
+#-- arc-lengths: vert and cells
+
+    vlen = np.zeros(mesh.edge.size, dtype=reals_t)
+    dlen = np.zeros(mesh.edge.size, dtype=reals_t)
+
+    mask = np.logical_and.reduce((
+        mesh.edge.vert[:, 0] >= 1, mesh.edge.vert[:, 1] >= 1
+        ) )
+        
+    vlen[mask] = flat_dist(
+        mesh.wrap,
+        np.vstack((
+            mesh.vert.xpos[mesh.edge.vert[mask, 0] - 1],
+            mesh.vert.ypos[mesh.edge.vert[mask, 0] - 1])).T,
+        np.vstack((
+            mesh.vert.xpos[mesh.edge.vert[mask, 1] - 1],
+            mesh.vert.ypos[mesh.edge.vert[mask, 1] - 1])).T
+    )
+        
+    mask = np.logical_and.reduce((
+        mesh.edge.cell[:, 0] >= 1, mesh.edge.cell[:, 1] >= 1
+        ) )
+        
+    dlen[mask] = flat_dist(
+        mesh.wrap,
+        np.vstack((
+            mesh.cell.xpos[mesh.edge.cell[mask, 0] - 1],
+            mesh.cell.ypos[mesh.edge.cell[mask, 0] - 1])).T,
+        np.vstack((
+            mesh.cell.xpos[mesh.edge.cell[mask, 1] - 1],
+            mesh.cell.ypos[mesh.edge.cell[mask, 1] - 1])).T
+    )
+
+    return vlen, dlen
+    
+    
+def mesh_arcs(mesh):
+    if (mesh.rsph is not None): return circ_arcs(mesh)
+    if (mesh.rsph is     None): return flat_arcs(mesh)
+    
+    
 def mesh_vecs(mesh):
 
 #-- edge vectors: norm and perp
@@ -418,6 +693,20 @@ def mesh_vecs(mesh):
         mesh.vert.zpos[mesh.edge.vert[mask, 1] - 1] -
         mesh.vert.zpos[mesh.edge.vert[mask, 0] - 1]
     )
+
+    if (mesh.wrap[0] is not None):
+        wide = xhat > +.5 * mesh.wrap[0]
+        xhat[wide] = xhat[wide] - mesh.wrap[0]
+        
+        wide = xhat < -.5 * mesh.wrap[0]
+        xhat[wide] = xhat[wide] + mesh.wrap[0]
+        
+    if (mesh.wrap[1] is not None):
+        wide = yhat > +.5 * mesh.wrap[1]
+        yhat[wide] = yhat[wide] - mesh.wrap[1]
+        
+        wide = yhat < -.5 * mesh.wrap[1]
+        yhat[wide] = yhat[wide] + mesh.wrap[1]
 
     lhat = np.sqrt(xhat ** 2 + yhat ** 2 + zhat ** 2)
     
@@ -480,6 +769,20 @@ def mesh_vecs(mesh):
         mesh.cell.zpos[mesh.edge.cell[mask, 0] - 1]
     )
     
+    if (mesh.wrap[0] is not None):
+        wide = xhat > +.5 * mesh.wrap[0]
+        xhat[wide] = xhat[wide] - mesh.wrap[0]
+        
+        wide = xhat < -.5 * mesh.wrap[0]
+        xhat[wide] = xhat[wide] + mesh.wrap[0]
+        
+    if (mesh.wrap[1] is not None):
+        wide = yhat > +.5 * mesh.wrap[1]
+        yhat[wide] = yhat[wide] - mesh.wrap[1]
+        
+        wide = yhat < -.5 * mesh.wrap[1]
+        yhat[wide] = yhat[wide] + mesh.wrap[1]
+    
     lhat = np.sqrt(xhat ** 2 + yhat ** 2 + zhat ** 2)
     
     xnrm = np.asarray (xhat / lhat, dtype=reals_t)
@@ -489,7 +792,7 @@ def mesh_vecs(mesh):
     return xprp, yprp, zprp, xnrm, ynrm, znrm
   
   
-def mesh_sine(mesh):
+def circ_sine(mesh):
 
 #-- compute edge-to-east angles
 
@@ -500,10 +803,13 @@ def mesh_sine(mesh):
     mask = mesh.edge.ylat >= 0.
     
     xnew = mesh.rsph * np.cos(mesh.edge.xlon[mask]) * \
-                       np.cos(mesh.edge.ylat[mask] - dphi[mask])
+                       np.cos(mesh.edge.ylat[mask] 
+                       - dphi[mask])
     ynew = mesh.rsph * np.sin(mesh.edge.xlon[mask]) * \
-                       np.cos(mesh.edge.ylat[mask] - dphi[mask])
-    znew = mesh.rsph * np.sin(mesh.edge.ylat[mask] - dphi[mask])
+                       np.cos(mesh.edge.ylat[mask] 
+                       - dphi[mask])
+    znew = mesh.rsph * np.sin(mesh.edge.ylat[mask] 
+                       - dphi[mask])
   
     xone = mesh.vert.xpos[mesh.edge.vert[mask, 0] - 1] - \
            mesh.edge.xpos[mask]        
@@ -520,15 +826,19 @@ def mesh_sine(mesh):
     len2 = np.sqrt(xtwo ** 2 + ytwo ** 2 + ztwo ** 2)
  
     beta[mask] = np.arccos(
-        (xone * xtwo + yone * ytwo + zone * ztwo) / len1 / len2)
+        (xone * xtwo + 
+         yone * ytwo + zone * ztwo) / len1 / len2)
  
     mask = mesh.edge.ylat <  0.
 
     xnew = mesh.rsph * np.cos(mesh.edge.xlon[mask]) * \
-                       np.cos(mesh.edge.ylat[mask] + dphi[mask])
+                       np.cos(mesh.edge.ylat[mask] 
+                       + dphi[mask])
     ynew = mesh.rsph * np.sin(mesh.edge.xlon[mask]) * \
-                       np.cos(mesh.edge.ylat[mask] + dphi[mask])
-    znew = mesh.rsph * np.sin(mesh.edge.ylat[mask] + dphi[mask])
+                       np.cos(mesh.edge.ylat[mask] 
+                       + dphi[mask])
+    znew = mesh.rsph * np.sin(mesh.edge.ylat[mask] 
+                       + dphi[mask])
   
     xone = mesh.vert.xpos[mesh.edge.vert[mask, 1] - 1] - \
            mesh.edge.xpos[mask]        
@@ -545,7 +855,8 @@ def mesh_sine(mesh):
     len2 = np.sqrt(xtwo ** 2 + ytwo ** 2 + ztwo ** 2)
  
     beta[mask] = np.arccos(
-        (xone * xtwo + yone * ytwo + zone * ztwo) / len1 / len2)
+        (xone * xtwo + 
+         yone * ytwo + zone * ztwo) / len1 / len2)
 
     sin_ = np.asarray(np.sin(beta), dtype=reals_t)
     cos_ = np.asarray(np.cos(beta), dtype=reals_t)
@@ -553,6 +864,47 @@ def mesh_sine(mesh):
     beta = np.asarray(beta, dtype=reals_t)
 
     return beta, sin_, cos_
+    
+    
+def flat_sine(mesh):
+    
+#-- compute edge-to-east angles
+    
+    mask = np.logical_and.reduce((
+        mesh.edge.vert[:, 0] >= 1, mesh.edge.vert[:, 1] >= 1
+        ) )
+    
+    xdel = mesh.vert.xpos[mesh.edge.vert[mask, 1] - 1] - \
+           mesh.vert.xpos[mesh.edge.vert[mask, 0] - 1]
+    
+    if (mesh.wrap[0] is not None):
+        wide = xdel > +.5 * mesh.wrap[0]
+        xdel[wide] = xdel[wide] - mesh.wrap[0]
+        wide = xdel < -.5 * mesh.wrap[0]
+        xdel[wide] = xdel[wide] + mesh.wrap[0]       
+           
+    ydel = mesh.vert.ypos[mesh.edge.vert[mask, 1] - 1] - \
+           mesh.vert.ypos[mesh.edge.vert[mask, 0] - 1]
+    
+    if (mesh.wrap[1] is not None):
+        wide = ydel > +.5 * mesh.wrap[1]
+        ydel[wide] = ydel[wide] - mesh.wrap[1]
+        wide = ydel < -.5 * mesh.wrap[1]
+        ydel[wide] = ydel[wide] + mesh.wrap[1]
+    
+    beta = np.arctan2(ydel, xdel)
+    
+    sin_ = np.asarray(np.sin(beta), dtype=reals_t)
+    cos_ = np.asarray(np.cos(beta), dtype=reals_t)
+    
+    beta = np.asarray(beta, dtype=reals_t)
+
+    return beta, sin_, cos_
+    
+    
+def mesh_sine(mesh):
+    if (mesh.rsph is not None): return circ_sine(mesh)
+    if (mesh.rsph is     None): return flat_sine(mesh)
     
 
 def sort_mesh(mesh, sort=None):
@@ -988,7 +1340,7 @@ def cell_adj_(mesh):
         np.ones(ivec.size, dtype=np.int8), (ivec, jvec)))
 
 
-def tria_area(rs, pa, pb, pc):
+def circ_area(rs, pa, pb, pc):
 
     lena = circ_dist(1., pa, pb)
     lenb = circ_dist(1., pb, pc)
@@ -1014,264 +1366,289 @@ def circ_dist(rs, pa, pb):
     dist = 2. * rs * np.arcsin(np.sqrt(
         np.sin(dlat) ** 2 +
         np.sin(dlon) ** 2 * np.cos(pa[:, 1]) * np.cos(pb[:, 1])
-    ))
+    ) )
 
     return dist
+    
+    
+def flat_vecs(wr, pa, pb):
+    
+    xdel = 1. * (pa[:, 0] - pb[:, 0])
+    
+    if (wr[0] is not None):
+        wide = xdel > +.5 * wr[0]
+        xdel[wide] = xdel[wide] - wr[0]
+        
+        wide = xdel < -.5 * wr[0]
+        xdel[wide] = xdel[wide] + wr[0]
+    
+    ydel = 1. * (pa[:, 1] - pb[:, 1])
+    
+    if (wr[1] is not None):
+        wide = ydel > +.5 * wr[1]
+        ydel[wide] = ydel[wide] - wr[1]
+        
+        wide = ydel < -.5 * wr[1]
+        ydel[wide] = ydel[wide] + wr[1]
+        
+    return xdel, ydel
+    
+    
+def flat_area(wr, pa, pb, pc):
+
+    x_ab, y_ab = flat_vecs(wr, pa, pb)
+    x_ac, y_ac = flat_vecs(wr, pa, pc)
+
+    return .5 * np.abs(x_ab * y_ac - y_ab * x_ac)
+    
+    
+def flat_dist(wr, pa, pb):
+
+    xdel, ydel = flat_vecs(wr, pa, pb)
+
+    return np.sqrt( xdel ** 2 + ydel ** 2 )
 
 
 def cell_area(mesh):
+      
+    ___, area = cell_quad(mesh, 
+        np.ones(mesh.cell.size), 
+        np.ones(mesh.vert.size), calc_area=True)
+
+    return area
+
+
+def cell_quad(mesh, fcel, fvrt, calc_area=False):
+
+#-- linear quadrature on cells
     
-    pcel = np.vstack(
-        (mesh.cell.xlon, mesh.cell.ylat)).T
-    pvrt = np.vstack(
-        (mesh.vert.xlon, mesh.vert.ylat)).T
-
-    abar = np.zeros(mesh.cell.size, dtype=np.float64)
-    
-    rsph = mesh.rsph
-
-    for epos in range(np.max(mesh.cell.topo)):
-
-        mask = mesh.cell.topo > epos
-
-        cidx = np.argwhere(mask).ravel()
-
-        ifac = mesh.cell.edge[mask, epos] - 1
-
-        ivrt = mesh.edge.vert[ifac, 0] - 1
-        jvrt = mesh.edge.vert[ifac, 1] - 1
-
-        atri = tria_area(
-            rsph, pcel[cidx], pvrt[ivrt], pvrt[jvrt])
-
-        abar[cidx] += atri
-        
-    return abar
-
-
-def cell_quad(mesh, fcel, fvrt):
-    
-    pcel = np.vstack(
-        (mesh.cell.xlon, mesh.cell.ylat)).T
-    pvrt = np.vstack(
-        (mesh.vert.xlon, mesh.vert.ylat)).T
-
     abar = np.zeros(mesh.cell.size, dtype=np.float64)
     fbar = np.zeros(mesh.cell.size, dtype=np.float64)
 
-    rsph = mesh.rsph
+    if (mesh.rsph is not None):
+    
+        pcel = np.vstack(
+            (mesh.cell.xlon, mesh.cell.ylat)).T
+        pvrt = np.vstack(
+            (mesh.vert.xlon, mesh.vert.ylat)).T
 
-    for epos in range(np.max(mesh.cell.topo)):
+        rsph = mesh.rsph
 
-        mask = mesh.cell.topo > epos
+        for epos in range(np.max(mesh.cell.topo)):
 
-        cidx = np.argwhere(mask).ravel()
+            mask = mesh.cell.topo > epos
 
-        ifac = mesh.cell.edge[mask, epos] - 1
+            cidx = np.argwhere(mask).ravel()
 
-        ivrt = mesh.edge.vert[ifac, 0] - 1
-        jvrt = mesh.edge.vert[ifac, 1] - 1
+            ifac = mesh.cell.edge[mask, epos] - 1
 
-        atri = tria_area(
-            rsph, pcel[cidx], pvrt[ivrt], pvrt[jvrt])
+            ivrt = mesh.edge.vert[ifac, 0] - 1
+            jvrt = mesh.edge.vert[ifac, 1] - 1
 
-        ftri = (fcel[cidx] + fvrt[ivrt] + fvrt[jvrt])
+            atri = circ_area(
+                rsph, pcel[cidx], pvrt[ivrt], pvrt[jvrt])
 
-        abar[cidx] += atri
-        fbar[cidx] += atri * ftri / 3.0
+            ftri = (fcel[cidx] + fvrt[ivrt] + fvrt[jvrt])
 
-    return fbar / abar
+            abar[cidx] += atri
+            fbar[cidx] += atri * ftri / 3.0
+
+    else:
+    
+        pcel = np.vstack(
+            (mesh.cell.xpos, mesh.cell.ypos)).T
+        pvrt = np.vstack(
+            (mesh.vert.xpos, mesh.vert.ypos)).T
+
+        wrap = mesh.wrap
+
+        for epos in range(np.max(mesh.cell.topo)):
+
+            mask = mesh.cell.topo > epos
+
+            cidx = np.argwhere(mask).ravel()
+
+            ifac = mesh.cell.edge[mask, epos] - 1
+
+            ivrt = mesh.edge.vert[ifac, 0] - 1
+            jvrt = mesh.edge.vert[ifac, 1] - 1
+
+            atri = flat_area(
+                wrap, pcel[cidx], pvrt[ivrt], pvrt[jvrt])
+
+            ftri = (fcel[cidx] + fvrt[ivrt] + fvrt[jvrt])
+
+            abar[cidx] += atri
+            fbar[cidx] += atri * ftri / 3.0
+
+    if (calc_area):
+        return fbar / abar, abar
+    else:
+        return fbar / abar
 
 
 def edge_area(mesh):
 
-    pcel = np.vstack(
-        (mesh.cell.xlon, mesh.cell.ylat)).T
-    pvrt = np.vstack(
-        (mesh.vert.xlon, mesh.vert.ylat)).T
+    ___, area = edge_quad(mesh, 
+        np.ones(mesh.cell.size), 
+        np.ones(mesh.vert.size), calc_area=True)
 
-    abar = np.zeros(mesh.edge.size, dtype=np.float64)
-    
-    rsph = mesh.rsph
-
-    for epos in range(1):
-
-        eidx = np.arange(0, mesh.edge.size)
-
-        ivrt = mesh.edge.vert[eidx, 0] - 1
-        jvrt = mesh.edge.vert[eidx, 1] - 1
-
-        icel = mesh.edge.cell[eidx, 0] - 1
-        jcel = mesh.edge.cell[eidx, 1] - 1
-
-        atri = tria_area(
-            rsph, pvrt[ivrt], pcel[icel], pcel[jcel])
-
-        abar[eidx] += atri
-
-        atri = tria_area(
-            rsph, pvrt[jvrt], pcel[jcel], pcel[icel])
-
-        abar[eidx] += atri
-
-    return abar
+    return area
 
 
-def edge_quad(mesh, fcel, fvrt):
+def edge_quad(mesh, fcel, fvrt, calc_area=False):
 
-    pcel = np.vstack(
-        (mesh.cell.xlon, mesh.cell.ylat)).T
-    pvrt = np.vstack(
-        (mesh.vert.xlon, mesh.vert.ylat)).T
+#-- linear quadrature on edges
 
     abar = np.zeros(mesh.edge.size, dtype=np.float64)
     fbar = np.zeros(mesh.edge.size, dtype=np.float64)
 
-    rsph = mesh.rsph
+    if (mesh.rsph is not None):
 
-    for epos in range(1):
+        pcel = np.vstack(
+            (mesh.cell.xlon, mesh.cell.ylat)).T
+        pvrt = np.vstack(
+            (mesh.vert.xlon, mesh.vert.ylat)).T
 
-        eidx = np.arange(0, mesh.edge.size)
+        rsph = mesh.rsph
 
-        ivrt = mesh.edge.vert[eidx, 0] - 1
-        jvrt = mesh.edge.vert[eidx, 1] - 1
+        for epos in range(1):
 
-        icel = mesh.edge.cell[eidx, 0] - 1
-        jcel = mesh.edge.cell[eidx, 1] - 1
+            eidx = np.arange(0, mesh.edge.size)
 
-        atri = tria_area(
-            rsph, pvrt[ivrt], pcel[icel], pcel[jcel])
+            ivrt = mesh.edge.vert[eidx, 0] - 1
+            jvrt = mesh.edge.vert[eidx, 1] - 1
 
-        ftri = (fvrt[ivrt] + fcel[icel] + fcel[jcel])
+            icel = mesh.edge.cell[eidx, 0] - 1
+            jcel = mesh.edge.cell[eidx, 1] - 1
 
-        abar[eidx] += atri
-        fbar[eidx] += atri * ftri / 3.0
+            atri = circ_area(
+                rsph, pvrt[ivrt], pcel[icel], pcel[jcel])
 
-        atri = tria_area(
-            rsph, pvrt[jvrt], pcel[jcel], pcel[icel])
+            ftri = (fvrt[ivrt] + fcel[icel] + fcel[jcel])
 
-        ftri = (fvrt[jvrt] + fcel[jcel] + fcel[icel])
+            abar[eidx] += atri
+            fbar[eidx] += atri * ftri / 3.0
 
-        abar[eidx] += atri
-        fbar[eidx] += atri * ftri / 3.0
+            atri = circ_area(
+                rsph, pvrt[jvrt], pcel[jcel], pcel[icel])
 
-    return fbar / abar
+            ftri = (fvrt[jvrt] + fcel[jcel] + fcel[icel])
+
+            abar[eidx] += atri
+            fbar[eidx] += atri * ftri / 3.0
+
+    else:
+
+        pcel = np.vstack(
+            (mesh.cell.xpos, mesh.cell.ypos)).T
+        pvrt = np.vstack(
+            (mesh.vert.xpos, mesh.vert.ypos)).T
+
+        wrap = mesh.wrap
+
+        for epos in range(1):
+
+            eidx = np.arange(0, mesh.edge.size)
+
+            ivrt = mesh.edge.vert[eidx, 0] - 1
+            jvrt = mesh.edge.vert[eidx, 1] - 1
+
+            icel = mesh.edge.cell[eidx, 0] - 1
+            jcel = mesh.edge.cell[eidx, 1] - 1
+
+            atri = flat_area(
+                wrap, pvrt[ivrt], pcel[icel], pcel[jcel])
+
+            ftri = (fvrt[ivrt] + fcel[icel] + fcel[jcel])
+
+            abar[eidx] += atri
+            fbar[eidx] += atri * ftri / 3.0
+
+            atri = flat_area(
+                wrap, pvrt[jvrt], pcel[jcel], pcel[icel])
+
+            ftri = (fvrt[jvrt] + fcel[jcel] + fcel[icel])
+
+            abar[eidx] += atri
+            fbar[eidx] += atri * ftri / 3.0
+
+    if (calc_area):
+        return fbar / abar, abar
+    else:
+        return fbar / abar
 
 
 def dual_area(mesh):
 
-    pcel = np.vstack(
-        (mesh.cell.xlon, mesh.cell.ylat)).T
-    pvrt = np.vstack(
-        (mesh.vert.xlon, mesh.vert.ylat)).T
-
-    abar = np.zeros(mesh.vert.size, dtype=np.float64)
-
-    rsph = mesh.rsph
-
-    for epos in range(3):
-
-        vidx = np.arange(0, mesh.vert.size)
-
-        ifac = mesh.vert.edge[vidx, epos] - 1
-
-        icel = mesh.edge.cell[ifac, 0] - 1
-        jcel = mesh.edge.cell[ifac, 1] - 1
-
-        atri = tria_area(
-            rsph, pvrt[vidx], pcel[icel], pcel[jcel])
-
-        abar[vidx] += atri
+    ___, area = dual_quad(mesh, 
+        np.ones(mesh.cell.size), 
+        np.ones(mesh.vert.size), calc_area=True)
         
-    return abar
+    return area
 
 
-def dual_quad(mesh, fcel, fvrt):
+def dual_quad(mesh, fcel, fvrt, calc_area=False):
 
-    pcel = np.vstack(
-        (mesh.cell.xlon, mesh.cell.ylat)).T
-    pvrt = np.vstack(
-        (mesh.vert.xlon, mesh.vert.ylat)).T
+#-- linear quadrature on duals
 
     abar = np.zeros(mesh.vert.size, dtype=np.float64)
     fbar = np.zeros(mesh.vert.size, dtype=np.float64)
 
-    rsph = mesh.rsph
+    if (mesh.rsph is not None):
 
-    for epos in range(3):
+        pcel = np.vstack(
+            (mesh.cell.xlon, mesh.cell.ylat)).T
+        pvrt = np.vstack(
+            (mesh.vert.xlon, mesh.vert.ylat)).T
 
-        vidx = np.arange(0, mesh.vert.size)
+        rsph = mesh.rsph
 
-        ifac = mesh.vert.edge[vidx, epos] - 1
+        for epos in range(3):
 
-        icel = mesh.edge.cell[ifac, 0] - 1
-        jcel = mesh.edge.cell[ifac, 1] - 1
+            vidx = np.arange(0, mesh.vert.size)
 
-        atri = tria_area(
-            rsph, pvrt[vidx], pcel[icel], pcel[jcel])
+            ifac = mesh.vert.edge[vidx, epos] - 1
 
-        ftri = (fvrt[vidx] + fcel[icel] + fcel[jcel])
+            icel = mesh.edge.cell[ifac, 0] - 1
+            jcel = mesh.edge.cell[ifac, 1] - 1
 
-        abar[vidx] += atri
-        fbar[vidx] += atri * ftri / 3.0
+            atri = circ_area(
+                rsph, pvrt[vidx], pcel[icel], pcel[jcel])
 
-    return fbar / abar
+            ftri = (fvrt[vidx] + fcel[icel] + fcel[jcel])
 
+            abar[vidx] += atri
+            fbar[vidx] += atri * ftri / 3.0
 
-def to_sphere(mesh, xpos, ypos, zpos):
-
-    radii = mesh.rsph * np.ones((3), dtype=np.float64)
+    else:
     
-    xmid = 0.5 * xpos
-    ymid = 0.5 * ypos
-    zmid = 0.5 * zpos
+        pcel = np.vstack(
+            (mesh.cell.xpos, mesh.cell.ypos)).T
+        pvrt = np.vstack(
+            (mesh.vert.xpos, mesh.vert.ypos)).T
 
-    ax = xmid ** 1 / radii[0] ** 1
-    ay = ymid ** 1 / radii[1] ** 1
-    az = zmid ** 1 / radii[2] ** 1
+        wrap = mesh.wrap
 
-    aa = ax ** 2 + ay ** 2 + az ** 2
+        for epos in range(3):
 
-    bx = xmid ** 2 / radii[0] ** 2
-    by = ymid ** 2 / radii[1] ** 2
-    bz = zmid ** 2 / radii[2] ** 2
+            vidx = np.arange(0, mesh.vert.size)
 
-    bb = bx * 2. + by * 2. + bz * 2.
+            ifac = mesh.vert.edge[vidx, epos] - 1
 
-    cx = xmid ** 1 / radii[0] ** 1
-    cy = ymid ** 1 / radii[1] ** 1
-    cz = zmid ** 1 / radii[2] ** 1
+            icel = mesh.edge.cell[ifac, 0] - 1
+            jcel = mesh.edge.cell[ifac, 1] - 1
 
-    cc = cx ** 2 + cy ** 2 + cz ** 2
-    cc = cc - 1.0
+            atri = flat_area(
+                wrap, pvrt[vidx], pcel[icel], pcel[jcel])
 
-    ts = bb * bb - 4. * aa * cc
+            ftri = (fvrt[vidx] + fcel[icel] + fcel[jcel])
 
-    ok = ts >= .0
+            abar[vidx] += atri
+            fbar[vidx] += atri * ftri / 3.0
 
-    AA = aa[ok]; BB = bb[ok]; CC = cc[ok]; TS = ts[ok]
+    if (calc_area):
+        return fbar / abar, abar
+    else:
+        return fbar / abar
 
-    t1 = (-BB + np.sqrt(TS)) / AA / 2.0
-    t2 = (-BB - np.sqrt(TS)) / AA / 2.0
-
-    tt = np.maximum(t1, t2)
-    
-    xprj = np.zeros(xpos.shape, dtype=np.float64)
-    xprj[ok] = (1. + tt) * xmid[ok]
-    
-    yprj = np.zeros(ypos.shape, dtype=np.float64)
-    yprj[ok] = (1. + tt) * ymid[ok]    
-
-    zprj = np.zeros(zpos.shape, dtype=np.float64)
-    zprj[ok] = (1. + tt) * zmid[ok]
-
-    xrad = xprj * radii[1]
-    yrad = yprj * radii[0]
-    zrad = zprj / radii[2]
-
-    zrad = np.maximum(np.minimum(zrad, +1.), -1.)
-
-    ylat = np.arcsin(zrad)
-    xlon = np.arctan2(yrad, xrad)
-
-    return xprj, yprj, zprj, xlon, ylat
