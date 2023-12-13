@@ -35,16 +35,20 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
 
     zb_cell = flow.zb_cell; gg_cell = flow.gravity
     
-    hE_edge = flow.hE_edge
-    uE_edge = flow.uE_edge
+    hE_prev = flow.prev.hE_edge
+    uE_prev = flow.prev.uE_edge
+    
+    hE_next = flow.next.hE_edge
+    uE_next = flow.next.uE_edge
 
     hh_dual, hh_edge, h2_edge, hh_bias = \
               compute_H(mesh, mats, cnfg, hh_cell, uu_edge)
 
     hh_edge, uu_edge = computeBC(
         mesh, mats, cnfg, 
-        hh_edge, uu_edge, 
-        gg_cell, hE_edge, uE_edge)
+        hh_edge, uu_edge, gg_cell, 
+        hE_prev, uE_prev,
+        hE_next, uE_next)
   
     # thickness advection
     hh_tend = addtendUH(mesh, mats, cnfg, hh_edge, uu_edge, 
@@ -80,23 +84,28 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
     
     if cnfg.no_u_tend: return uu_tend
     
-    gg_cell = flow.gravity
-    
     ff_cell = flow.ff_cell
     ff_edge = flow.ff_edge
     ff_dual = flow.ff_vert
     
-    Tu_edge = flow.Tu_edge
-    hE_edge = flow.hE_edge
-    uE_edge = flow.uE_edge
+    Tu_prev = flow.prev.Tu_edge
+    hE_prev = flow.prev.hE_edge
+    uE_prev = flow.prev.uE_edge
+    
+    Tu_next = flow.next.Tu_edge
+    hE_next = flow.next.hE_edge
+    uE_next = flow.next.uE_edge
+
+    gg_cell = flow.gravity
 
     hh_dual, hh_edge, h2_edge, hh_bias = \
               compute_H(mesh, mats, cnfg, hh_cell, uu_edge)
               
     hh_edge, uu_edge = computeBC(
         mesh, mats, cnfg, 
-        hh_edge, uu_edge, 
-        gg_cell, hE_edge, uE_edge)
+        hh_edge, uu_edge, gg_cell, 
+        hE_prev, uE_prev,
+        hE_next, uE_next)
 
     vv_edge = computeVV(
         mesh, mats, cnfg, uu_edge)
@@ -132,7 +141,8 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
                                           uu_tend)
     
     # external stresses
-    uu_tend = addtendTU(mesh, mats, cnfg, Tu_edge, h2_edge,
+    uu_tend = addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
+                                          h2_edge,
                                           uu_tend)
     
     uu_tend[mesh.edge.mask] = reals_t(0.0)

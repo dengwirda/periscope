@@ -75,7 +75,7 @@ def scalingVk(mesh, mats, cnfg):
     return s2_edge, s4_edge, \
            s2_cell, s4_cell
 
-
+ 
 def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
 
 #-- compute diagnostic variables from the current state
@@ -84,8 +84,11 @@ def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     ff_edge = flow.ff_edge
     ff_cell = flow.ff_cell
     
-    hE_edge = flow.hE_edge
-    uE_edge = flow.uE_edge
+    hE_prev = flow.prev.hE_edge
+    uE_prev = flow.prev.uE_edge
+    
+    hE_next = flow.next.hE_edge
+    uE_next = flow.next.uE_edge
     
     zb_cell = flow.zb_cell 
     gg_cell = flow.gravity
@@ -95,8 +98,9 @@ def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
 
     hh_edge, uu_edge = computeBC(
         mesh, mats, cnfg, 
-        hh_edge, uu_edge, 
-        gg_cell, hE_edge, uE_edge)
+        hh_edge, uu_edge, gg_cell, 
+        hE_prev, uE_prev,
+        hE_next, uE_next)
         
     vv_edge = computeVV(
         mesh, mats, cnfg, uu_edge)
@@ -133,8 +137,11 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     ff_edge = flow.ff_edge
     ff_cell = flow.ff_cell
 
-    hE_edge = flow.hE_edge
-    uE_edge = flow.uE_edge
+    hE_prev = flow.prev.hE_edge
+    uE_prev = flow.prev.uE_edge
+    
+    hE_next = flow.next.hE_edge
+    uE_next = flow.next.uE_edge
 
     zb_cell = flow.zb_cell
     gg_cell = flow.gravity
@@ -144,8 +151,9 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
 
     hh_edge, uu_edge = computeBC(
         mesh, mats, cnfg, 
-        hh_edge, uu_edge, 
-        gg_cell, hE_edge, uE_edge)
+        hh_edge, uu_edge, gg_cell, 
+        hE_prev, uE_prev,
+        hE_next, uE_next)
         
     vv_edge = computeVV(
         mesh, mats, cnfg, uu_edge)
@@ -179,18 +187,19 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
 
 
 def computeBC(mesh, mats, cnfg,
-        hh_edge, uu_edge, gg_cell, hE_edge, uE_edge):
+        hh_edge, uu_edge, gg_cell, hE_prev, uE_prev,
+                                   hE_next, uE_next):
         
 #-- setup open bnd. conditions
    
-    if (hE_edge is None): return hh_edge, uu_edge
-    if (uE_edge is None): return hh_edge, uu_edge
+    if (hE_prev is None): return hh_edge, uu_edge
+    if (uE_prev is None): return hh_edge, uu_edge
    
     ttic = time.time()
         
     hh_edge, uu_edge = _computeBC(
-        mesh, mats, cnfg, 
-        hh_edge, uu_edge, gg_cell, hE_edge, uE_edge)
+        mesh, mats, cnfg, hh_edge, uu_edge, gg_cell, 
+        hE_prev, uE_prev, hE_next, uE_next)
         
     ttoc = time.time()
     tcpu.computeBC = tcpu.computeBC + (ttoc - ttic)
@@ -450,18 +459,18 @@ def addtendVH(mesh, mats, cnfg, hh_cell, zb_cell,
     return hh_tend
     
     
-def addtendTU(mesh, mats, cnfg, Tu_edge, hh_edge, 
-                                uu_tend):
+def addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
+                                hh_edge, uu_tend):
 
 #-- forcing from external tau
 
-    if (Tu_edge is None): return uu_tend
+    if (Tu_prev is None): return uu_tend
 
     ttic = time.time()
 
     uu_tend = _computeTU(
         mesh, mats, cnfg, 
-            Tu_edge, hh_edge, uu_tend)
+            Tu_prev, Tu_next, hh_edge, uu_tend)
     
     ttoc = time.time()
     tcpu.computeTU = tcpu.computeTU + (ttoc - ttic)

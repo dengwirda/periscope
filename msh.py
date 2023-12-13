@@ -1251,11 +1251,14 @@ def load_forc(name, flow=None, lean=False, step=+0):
 
     if (flow is None): flow = base()
     
-    if (step == 0): flow.xx_time = None  
-    if (step >= 0): flow.uE_edge = None
-    if (step >= 0): flow.hE_edge = None
-    if (step >= 0): flow.Tu_edge = None
-    if (step >= 0): flow.Xi_cell = None
+    if (step == 0): flow.xx_time = None   
+    if (step == 0): flow.prev = base()
+    if (step == 0): flow.next = base()
+    
+    if (step >= 0): flow.next.uE_edge = None
+    if (step >= 0): flow.next.hE_edge = None
+    if (step >= 0): flow.next.Tu_edge = None
+    if (step >= 0): flow.next.Xi_cell = None
     
     flow.step = step
 
@@ -1269,24 +1272,24 @@ def load_forc(name, flow=None, lean=False, step=+0):
             data.variables["xx_time"][:], dtype=flt64_t)
             
     if ("uE_edge" in data.variables.keys()):
-        flow.uE_edge = np.asarray(
+        flow.next.uE_edge = np.asarray(
             data.variables[
                 "uE_edge"][step, :, +0 ], dtype=reals_t)
                 
     if ("hE_edge" in data.variables.keys()):
-        flow.hE_edge = np.asarray(
+        flow.next.hE_edge = np.asarray(
             data.variables[
                 "hE_edge"][step, :, +0 ], dtype=reals_t)
                 
     if ("Tu_edge" in data.variables.keys()):
-        flow.Tu_edge = np.asarray(
+        flow.next.Tu_edge = np.asarray(
             data.variables[
                 "Tu_edge"][step, :, +0 ], dtype=reals_t)
                 
     if ("Xi_cell" in data.variables.keys()):
-        flow.Xi_cell = np.asarray(
+        flow.next.Xi_cell = np.asarray(
             data.variables[
-                "Xi_cell"][step, :, +0 ], dtype=reals_t)  
+                "Xi_cell"][step, :, +0 ], dtype=reals_t)
     
     return flow
     
@@ -1295,21 +1298,21 @@ def sort_forc(flow, mesh=None, lean=False):
 
     if (mesh is None): return flow
 
-    if (flow.uE_edge is not None):
-        flow.uE_edge = \
-            flow.uE_edge[mesh.edge.ifwd - 1]
+    if (flow.next.uE_edge is not None):
+        flow.next.uE_edge = \
+            flow.next.uE_edge[mesh.edge.ifwd - 1]
             
-    if (flow.hE_edge is not None):
-        flow.hE_edge = \
-            flow.hE_edge[mesh.edge.ifwd - 1]
+    if (flow.next.hE_edge is not None):
+        flow.next.hE_edge = \
+            flow.next.hE_edge[mesh.edge.ifwd - 1]
             
-    if (flow.Tu_edge is not None):
-        flow.Tu_edge = \
-            flow.Tu_edge[mesh.edge.ifwd - 1]
+    if (flow.next.Tu_edge is not None):
+        flow.next.Tu_edge = \
+            flow.next.Tu_edge[mesh.edge.ifwd - 1]
             
-    if (flow.Xi_cell is not None):
-        flow.Xi_cell = \
-            flow.Xi_cell[mesh.cell.ifwd - 1]
+    if (flow.next.Xi_cell is not None):
+        flow.next.Xi_cell = \
+            flow.next.Xi_cell[mesh.cell.ifwd - 1]
             
     return flow
     

@@ -1,6 +1,7 @@
 
 import os
 import time
+import copy
 import numpy as np
 import netCDF4 as nc
 import argparse
@@ -27,9 +28,10 @@ from mem import init_pool
 
 from io_ import init_file, save_step
 
-from _dx import invariant, scalingVk, HH_TINY
+from _dt import step_eqns, step_bnds, \
+                mark_time
 
-from _dt import step_eqns, step_bnds
+from _dx import invariant, scalingVk, HH_TINY
 
 def swe(cnfg):
 
@@ -51,6 +53,7 @@ def swe(cnfg):
     cnfg.calc_slow = True
     cnfg.calc_fast = True
     cnfg.calc_drag = True
+    cnfg.timeisnow = cnfg.timestart
     
     cnfg.integrate = cnfg.integrate.upper()
     cnfg.equations = cnfg.equations.upper()
@@ -151,7 +154,7 @@ def swe(cnfg):
     print("")
     print("Integrating the flow...")
 
-    ttic = time.time(); next = 0; freq = 0; tsec = 0.
+    ttic = time.time(); next = 0; freq = 0;
     
     kp_sums = np.zeros((cnfg.iteration 
             // cnfg.stat_freq + 1), dtype=reals_t)
@@ -231,7 +234,11 @@ def swe(cnfg):
     
     cu_edge = uu_edge * 0.; ch_cell = hh_cell * 0.
 
+    flow.prev = flow.next  # if forc. time-invariant...
+
     for step in range(0, cnfg.iteration + 1):
+
+        tnow = cnfg.timeisnow
 
         if (step > 0):
         #-- 0-th step is just to write ICs to output...
@@ -239,13 +246,16 @@ def swe(cnfg):
                 # find needed forcing step to interp.
                 need = np.searchsorted(
                     flow.xx_time, 
-                        tsec + 0.5 * cnfg.time_step) - 1
+                        cnfg.timeisnow + cnfg.time_step)
+                        
+                need = min(need, flow.xx_time.size - 1)
                     
                 if (need > flow.step): 
-                # a piecewise const. interp. for now...       
+                # a piecewise linear interp. for now...
+                    flow.prev = copy.deepcopy(flow.next)
                     flow = load_forc(forc, flow, step=need)
                     flow = sort_forc(flow, mesh)
-        
+                    
             hh_cell, uu_edge, \
             ch_cell, cu_edge = step_eqns(
                 mesh, mats, flow, cnfg, hh_cell, uu_edge,
@@ -259,7 +269,7 @@ def swe(cnfg):
                                         uu_min_, uu_max_
             )
                                         
-            tsec = tsec + cnfg.time_step
+        cnfg = mark_time(cnfg, flow, tnow + cnfg.time_step)
             
         if (step % cnfg.stat_freq == 0):
         #-- eval. statistics on stat steps
@@ -384,6 +394,12 @@ if (__name__ == "__main__"):
     parser.add_argument(
         "--time-step", dest="time_step", type=float,
         required=True, help="Length of time steps.")
+        
+    parser.add_argument(
+        "--timestart", dest="timestart", type=float,
+        default=0.0,
+        required=False, 
+        help="Time at beginning of simulation {0.}")
 
     parser.add_argument(
         "--num-steps", dest="iteration", type=int,

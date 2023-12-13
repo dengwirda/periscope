@@ -40,29 +40,35 @@ def _computeBC(mesh, mats, cnfg,
     np.ndarray[REALS_t, ndim=1] hh_edge,
     np.ndarray[REALS_t, ndim=1] uu_edge,
     const REALS_t gg_cell,
-    np.ndarray[REALS_t, ndim=1] hE_edge,
-    np.ndarray[REALS_t, ndim=1] uE_edge
+    np.ndarray[REALS_t, ndim=1] hE_prev,
+    np.ndarray[REALS_t, ndim=1] uE_prev,
+    np.ndarray[REALS_t, ndim=1] hE_next,
+    np.ndarray[REALS_t, ndim=1] uE_next
             ):
             
 #-- update u, h variables to set open BCs
             
     cdef INDEX_t edge, eidx
-    cdef REALS_t RADIATE, UU_PRED
+    cdef REALS_t RADIATE, UU_PRED, HE_EDGE, UE_EDGE
     
     cdef REALS_t ZERO = 0.0
+    cdef REALS_t ONE_ = 1.0
     cdef REALS_t TWO_ = 2.0
     
     cdef INDEX_t cnfg_numthread = cnfg.numthread
     cdef INDEX_t cnfg_chunksize = cnfg.chunksize
     
     cdef REALS_t cnfg_time_step = cnfg.time_step
+    cdef REALS_t cnfg_frc_blend = cnfg.frc_blend
         
     cdef INDEX_t NBCS = mesh.edge.open.size
     
     cdef REALS_t *HH_EDGE = &hh_edge[0]
     cdef REALS_t *UU_EDGE = &uu_edge[0]
-    cdef REALS_t *HE_EDGE = &hE_edge[0]
-    cdef REALS_t *UE_EDGE = &uE_edge[0]
+    cdef REALS_t *HE_PREV = &hE_prev[0]
+    cdef REALS_t *UE_PREV = &uE_prev[0]
+    cdef REALS_t *HE_NEXT = &hE_next[0]
+    cdef REALS_t *UE_NEXT = &uE_next[0]
     
     cdef INDEX_t[::1] mesh_edge_open = mesh.edge.open
     
@@ -81,6 +87,16 @@ def _computeBC(mesh, mats, cnfg,
                     
                 eidx = MESH_EDGE_OPEN[edge]
                     
+                HE_EDGE = (
+                (ONE_ - cnfg_frc_blend) * HE_PREV[eidx]
+              + (ZERO + cnfg_frc_blend) * HE_NEXT[eidx]
+                          )
+                    
+                UE_EDGE = (
+                (ONE_ - cnfg_frc_blend) * UE_PREV[eidx]
+              + (ZERO + cnfg_frc_blend) * UE_NEXT[eidx]
+                          )
+                    
                 #-- Flather-type bnd. condition
                 RADIATE = sqrt_r(
                     gg_cell / HH_EDGE[eidx])
@@ -89,15 +105,15 @@ def _computeBC(mesh, mats, cnfg,
                 RADIATE = min(RADIATE, TWO_ * 
                     MESH_EDGE_SLEN[eidx] / cnfg_time_step)
                 
-                UU_PRED = UE_EDGE[eidx] + RADIATE * (
-                    HH_EDGE[eidx] - HE_EDGE[eidx]
+                UU_PRED = UE_EDGE + RADIATE * (
+                    HH_EDGE[eidx] - HE_EDGE
                     )
                 
                 if (UU_PRED <=  ZERO):
                 
                 #-- inflow: prescribe mass flux
                     UU_EDGE[eidx] = UU_PRED
-                    HH_EDGE[eidx] = HE_EDGE[eidx]
+                    HH_EDGE[eidx] = HE_EDGE
                     
                 else:
                 
@@ -1751,7 +1767,8 @@ def _computeVH(mesh, mats, cnfg,
     
     
 def _computeTU(mesh, mats, cnfg, 
-    np.ndarray[FLT32_t, ndim=1] Tu_edge,
+    np.ndarray[REALS_t, ndim=1] Tu_prev,
+    np.ndarray[REALS_t, ndim=1] Tu_next,
     np.ndarray[REALS_t, ndim=1] hh_edge,
     np.ndarray[REALS_t, ndim=1] uu_tend
               ):
@@ -1759,16 +1776,22 @@ def _computeTU(mesh, mats, cnfg,
 #-- forcing due to external stresses: tau / h
     
     cdef INDEX_t edge, cell, iptr, xidx
-    cdef REALS_t xval
+    cdef REALS_t xval, TU_EDGE
+    
+    cdef REALS_t ZERO = 0.0
+    cdef REALS_t ONE_ = 1.0
     
     cdef INDEX_t cnfg_numthread = cnfg.numthread
     cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    
+    cdef REALS_t cnfg_frc_blend = cnfg.frc_blend
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
     cdef INDEX_t NCEL = mesh.cell.size
     
-    cdef FLT32_t *TU_EDGE = &Tu_edge[0]
+    cdef REALS_t *TU_PREV = &Tu_prev[0]
+    cdef REALS_t *TU_NEXT = &Tu_next[0]
     cdef REALS_t *HH_EDGE = &hh_edge[0]
     cdef REALS_t *UU_TEND = &uu_tend[0]
     
@@ -1777,9 +1800,12 @@ def _computeTU(mesh, mats, cnfg,
         for edge in prange(0, NEDG, schedule="static", 
                 chunksize=cnfg_chunksize):
                 
-            UU_TEND[edge]-= (
-                    TU_EDGE[edge] / HH_EDGE[edge]
-                    )
+            TU_EDGE = (
+            (ONE_ - cnfg_frc_blend) * TU_PREV[edge]
+          + (ZERO + cnfg_frc_blend) * TU_NEXT[edge]
+                      )
+                
+            UU_TEND[edge]-= TU_EDGE / HH_EDGE[edge]
         
     return uu_tend
     

@@ -23,6 +23,28 @@ from _dx import computeCd
 from rhs import rhs_all_u, rhs_slw_u, rhs_fst_u, \
                 rhs_all_h, rhs_slw_h, rhs_fst_h
 
+def mark_time(cnfg, flow, time):
+
+#-- Update simulation time and interp. on forc. tendencies
+
+    if (flow.xx_time is not None):
+    
+    #-- linear interp. between prev and next
+        prev = flow.xx_time[flow.step - 1]
+        next = flow.xx_time[flow.step - 0]
+        cnfg.timeisnow = time
+        cnfg.frc_blend = min (
+            1.0, (time - prev) / (next - prev))
+        
+    else:
+    
+    #-- piecewise const. data, so do nothing
+        cnfg.timeisnow = time
+        cnfg.frc_blend = reals_t(0.0)
+    
+    return cnfg
+    
+
 def step_eqns(mesh, mats, flow, cnfg, 
               hh_cell, uu_edge,     # state
               ch_cell, cu_edge):    # compensators
@@ -76,9 +98,11 @@ def step_RK22(mesh, mats, flow, cnfg,
 
 #-- low-precision support via compensated summation
 
+    start_t = cnfg.timeisnow
+
     k1_step = 1.0 / 1.0 * cnfg.time_step
     k2_step = 1.0 / 1.0 * cnfg.time_step
-
+    
     isFB = 1.0 * ("FB" in cnfg.integrate)
 
     h1_cell = get_vec_c()
@@ -94,6 +118,9 @@ def step_RK22(mesh, mats, flow, cnfg,
 
     rh_cell = variables.hh_tend
     ru_edge = variables.uu_tend
+
+    cnfg = mark_time(
+        cnfg, flow, start_t + 0. / 1. * cnfg.time_step)
 
     ttic = time.time()
 
@@ -135,6 +162,9 @@ def step_RK22(mesh, mats, flow, cnfg,
     tcpu.momentum_+= (ttoc - ttic)
 
 #-- 2nd RK + FB stage
+
+    cnfg = mark_time(
+        cnfg, flow, start_t + 1. / 1. * cnfg.time_step)
 
     ttic = time.time()
 
@@ -221,6 +251,8 @@ def step_RK32(mesh, mats, flow, cnfg,
 
 #-- low-precision support via compensated summation
 
+    start_t = cnfg.timeisnow
+
     k1_step = 1.0 / 3.0 * cnfg.time_step
     k2_step = 1.0 / 2.0 * cnfg.time_step
     k3_step = 1.0 / 1.0 * cnfg.time_step
@@ -240,6 +272,9 @@ def step_RK32(mesh, mats, flow, cnfg,
 
     rh_cell = variables.hh_tend
     ru_edge = variables.uu_tend
+
+    cnfg = mark_time(
+        cnfg, flow, start_t + 0. / 1. * cnfg.time_step)
 
     ttic = time.time()
 
@@ -281,6 +316,9 @@ def step_RK32(mesh, mats, flow, cnfg,
     tcpu.momentum_+= (ttoc - ttic)
 
 #-- 2nd RK + FB stage
+
+    cnfg = mark_time(
+        cnfg, flow, start_t + 1. / 3. * cnfg.time_step)
 
     ttic = time.time()
 
@@ -329,6 +367,9 @@ def step_RK32(mesh, mats, flow, cnfg,
     tcpu.momentum_+= (ttoc - ttic)
 
 #-- 3rd RK + FB stage
+
+    cnfg = mark_time(
+        cnfg, flow, start_t + 1. / 2. * cnfg.time_step)
 
     ttic = time.time()
 
