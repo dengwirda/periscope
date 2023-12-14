@@ -47,12 +47,13 @@ jobs:
       - name: Build periscope back-end
         run: python setup.py build_ext --inplace
 
-      - name: Download mesh assets
+      - name: Download test assets
         uses: dsaltares/fetch-gh-release-asset@master
         with:
           repo: dengwirda/periscope
           file: mesh_w_elev_cvt_7.zip
           token: ${{ secrets.GITHUB_TOKEN }}
+        run: unzip mesh_w_elev_cvt_7.zip
 
       - name: Run periscope testcase 1
         run: |
