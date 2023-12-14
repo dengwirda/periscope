@@ -53,6 +53,8 @@ jobs:
           repo: dengwirda/periscope
           file: mesh_w_elev_cvt_7.zip
           token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Unpack test assets
         run: unzip mesh_w_elev_cvt_7.zip
 
       - name: Run periscope testcase 1
