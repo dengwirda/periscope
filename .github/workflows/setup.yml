@@ -54,8 +54,15 @@ jobs:
           file: mesh_w_elev_cvt_7.zip
           token: ${{ secrets.GITHUB_TOKEN }}
           
+      - name: Download test assets
+        uses: dsaltares/fetch-gh-release-asset@master
+        with:
+          repo: dengwirda/periscope
+          file: mesh_disk_2.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
       - name: Unpack test assets
-        run: unzip mesh_w_elev_cvt_7.zip
+        run: unzip *.zip
 
       - name: Run periscope testcase 1
         run: |
@@ -67,6 +74,49 @@ jobs:
           python swe.py \
           --mesh-file="wtc2_cvt_7.nc" \
           --numthread=2 \
-          --num-steps=576 --time-step=300 \
+          --num-steps=576 --time-step=300.0 \
           --save-freq=288 --stat-freq=144 \
           --integrate="RK32-FB"
+          
+      - name: Run periscope testcase 2
+        run: |
+          python3 ICs/jet.py \
+          --mesh-file="mesh_w_elev_cvt_7.nc" \
+          --init-file="bjet_cvt_7.nc" \
+          --radius=6371220. \
+          --with-pert=TRUE
+          python3 swe.py \
+          --mesh-file="bjet_cvt_7.nc" \
+          --numthread=2 \
+          --num-steps=640 --time-step=135.0 \
+          --save-freq=640 --stat-freq=160 \
+          --integrate="RK22-FB"
+          
+      - name: Run periscope testcase 3
+        run: |
+          python3 ICs/vtx.py \
+          --mesh-file="mesh_disk_2.nc" \
+          --init-file="merger_2.nc" \
+          --test-case=1
+          python3 swe.py \
+          --mesh-file="merger_2.nc" \
+          --numthread=2 \
+          --num-steps=500 --time-step=0.002 \
+          --save-freq=250 --stat-freq=250
+          
+      - name: Run periscope testcase 4
+        run: |
+          python3 ICs/obc.py \
+          --mesh-file="mesh_disk_2.nc" \
+          --init-file="wake_2.nc" \
+          --radius=50000.
+          python3 swe.py \
+          --mesh-file="wake_2.nc" \
+          --forc-file="frc_wake_2.nc" \
+          --num-steps=864 --time-step=0.125 \
+          --save-freq=144 --stat-freq=288 \
+          --hh-scheme="UPWIND" \
+          --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
+          --uu-visc-2=1.E+01 --uu-visc-4=2.E+11 \
+          --hh-diff-2=1.E+01 --hh-diff-4=2.E+11 \
+          --leith-chi=0.3875 --leith-max=1.E+04
