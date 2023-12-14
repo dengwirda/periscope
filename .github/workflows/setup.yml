@@ -62,7 +62,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Unpack test assets
-        run: unzip *.zip
+        run: unzip "*.zip"
 
       - name: Run periscope testcase 1
         run: |
