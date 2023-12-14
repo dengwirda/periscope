@@ -12,6 +12,7 @@ tcpu.thickness = 0.0E+00
 tcpu.momentum_ = 0.0E+00
 tcpu.filewrite = 0.0E+00
 tcpu.computeBC = 0.0E+00
+tcpu.limiterWD = 0.0E+00
 tcpu.upwinding = 0.0E+00
 tcpu.compute_H = 0.0E+00
 tcpu.advect_UH = 0.0E+00

@@ -122,6 +122,48 @@ def _computeBC(mesh, mats, cnfg,
                    #HH_EDGE[eidx] = upwind, from scheme
                           
     return hh_edge, uu_edge
+    
+    
+def _limiterWD(mesh, mats, cnfg,
+    np.ndarray[REALS_t, ndim=1] hh_edge,
+    np.ndarray[REALS_t, ndim=1] uu_edge
+            ):
+    
+#-- limit velocity near wet-dry threshold
+    
+    cdef INDEX_t edge
+    cdef REALS_t uu_ramp
+    
+    cdef REALS_t ZERO = 0.0
+    cdef REALS_t ONE_ = 1.0
+    cdef REALS_t TEN_ = 10.
+    
+    cdef INDEX_t cnfg_numthread = cnfg.numthread
+    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    
+    cdef REALS_t cnfg_wetdry_h0 = cnfg.wetdry_h0
+        
+    cdef INDEX_t NVRT = mesh.vert.size
+    cdef INDEX_t NEDG = mesh.edge.size
+    cdef INDEX_t NCEL = mesh.cell.size
+    
+    cdef REALS_t *HH_EDGE = &hh_edge[0]
+    cdef REALS_t *UU_EDGE = &uu_edge[0]
+    
+    if (cnfg_wetdry_h0 > ZERO):
+
+        with nogil, parallel(num_threads=cnfg_numthread):
+          
+            for edge in prange(0, NEDG, schedule="static", 
+                    chunksize=cnfg_chunksize):
+                    
+                uu_ramp = min(ONE_, 
+                    HH_EDGE[edge] / cnfg_wetdry_h0 
+                                  / TEN_ )
+                    
+                UU_EDGE[edge] *= uu_ramp * uu_ramp
+    
+    return uu_edge
             
 
 def _upwinding(mesh, mats, cnfg, 
@@ -1587,6 +1629,7 @@ def _computeVH(mesh, mats, cnfg,
     np.ndarray[REALS_t, ndim=1] hh_cell,
     np.ndarray[FLT32_t, ndim=1] zb_cell,
         const REALS_t gg_cell,
+        const REALS_t hh_tiny,
     np.ndarray[REALS_t, ndim=1] hh_tend
               ):
     
@@ -1690,7 +1733,8 @@ def _computeVH(mesh, mats, cnfg,
             OK_EDGE[edge]*=(
                 min(ZB_CELL[cel1]+ HH_CELL[cel1],
                     ZB_CELL[cel2]+ HH_CELL[cel2])
-              > max(ZB_CELL[cel1], ZB_CELL[cel2])
+              > max(ZB_CELL[cel1], ZB_CELL[cel2]) 
+                    + hh_tiny
                    )
                         
             HZ_EDGE[edge]*= OK_EDGE[edge]
@@ -1867,15 +1911,16 @@ def _computeCd(mesh, mats, cnfg,
             if (cel1 < 0): cel1 = cel2
             if (cel2 < 0): cel2 = cel1
 
-            hh_edge = TWO_ * HH_CELL[cel1] * \
-                             HH_CELL[cel2] / \
-                    (HH_CELL[cel1] + HH_CELL[cel2])
-                   
+            # geometric mean
+            hh_edge = sqrt_r (
+                HH_CELL[cel1] * HH_CELL[cel2]
+                )
+                  
             ke_edge = HALF * (
                 UU_EDGE[edge] * UU_EDGE[edge] 
               + VV_EDGE[edge] * VV_EDGE[edge]
                 )
-                   
+               
             hh_edge = max(hh_tiny, hh_edge)
             
             CD_EDGE[edge] = ZERO

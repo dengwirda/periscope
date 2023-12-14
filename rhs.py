@@ -13,7 +13,7 @@ from _fp import reals_t, index_t
 
 from log import tcpu
 
-from _dx import computeBC, \
+from _dx import computeBC, limiterWD, \
                 compute_H, addtendUH, addtendVH, \
                 computeKE, computePV, addtendUV, \
                 computeVV, addtendGZ, \
@@ -49,6 +49,8 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
         hh_edge, uu_edge, gg_cell, 
         hE_prev, uE_prev,
         hE_next, uE_next)
+        
+    uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
   
     # thickness advection
     hh_tend = addtendUH(mesh, mats, cnfg, hh_edge, uu_edge, 
@@ -106,6 +108,8 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
         hh_edge, uu_edge, gg_cell, 
         hE_prev, uE_prev,
         hE_next, uE_next)
+
+    uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
 
     vv_edge = computeVV(
         mesh, mats, cnfg, uu_edge)

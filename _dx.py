@@ -205,6 +205,23 @@ def computeBC(mesh, mats, cnfg,
     tcpu.computeBC = tcpu.computeBC + (ttoc - ttic)
         
     return hh_edge, uu_edge
+    
+    
+def limiterWD(mesh, mats, cnfg, hh_edge, uu_edge):
+        
+#-- apply wet-dry velocity lim.
+   
+    if (cnfg.wetdry_h0 <= 0.): return uu_edge
+   
+    ttic = time.time()
+        
+    uu_edge = _limiterWD(
+        mesh, mats, cnfg, hh_edge, uu_edge)
+        
+    ttoc = time.time()
+    tcpu.limiterWD = tcpu.limiterWD + (ttoc - ttic)
+        
+    return uu_edge
 
 
 def upwinding(mesh, mats, cnfg, 
@@ -450,8 +467,8 @@ def addtendVH(mesh, mats, cnfg, hh_cell, zb_cell,
     ttic = time.time()
 
     hh_tend = _computeVH(
-        mesh, mats, cnfg, 
-            hh_cell, zb_cell, gg_cell, hh_tend)
+        mesh, mats, cnfg, hh_cell, 
+            zb_cell, gg_cell, HH_TINY, hh_tend)
     
     ttoc = time.time()
     tcpu.computeVH = tcpu.computeVH + (ttoc - ttic)
@@ -500,6 +517,7 @@ def computeCd(mesh, mats, cnfg, hh_cell, uu_edge):
 try:
     # load cython kernels, if compiled
     from _kx import _computeBC
+    from _kx import _limiterWD
     from _kx import _upwinding
     from _kx import _computeHH
     from _kx import _computeKE

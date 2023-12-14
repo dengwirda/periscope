@@ -31,7 +31,7 @@ from io_ import init_file, save_step
 from _dt import step_eqns, step_bnds, \
                 mark_time
 
-from _dx import invariant, scalingVk, HH_TINY
+from _dx import invariant, scalingVk
 
 def swe(cnfg):
 
@@ -112,7 +112,8 @@ def swe(cnfg):
     h0_cell = flow.hh_cell
     hh_cell = h0_cell.copy()
     
-    hh_cell = np.maximum(HH_TINY, hh_cell)
+    hh_cell = np.maximum(
+        cnfg.wetdry_h0, hh_cell)
     
     ttoc = time.time()
     print("*SORT done (sec):", round(ttoc - ttic, 2))
@@ -304,6 +305,7 @@ def swe(cnfg):
     print("*thickness (sec):", round(tcpu.thickness, 2))
     print("*momentum_ (sec):", round(tcpu.momentum_, 2))
     print("*computeBC (sec):", round(tcpu.computeBC, 2))
+    print("*limiterWD (sec):", round(tcpu.limiterWD, 2))
     print("*upwinding (sec):", round(tcpu.upwinding, 2)) 
     print("*compute_H (sec):", round(tcpu.compute_H, 2))
     print("*advect_UH (sec):", round(tcpu.advect_UH, 2))
@@ -399,7 +401,7 @@ if (__name__ == "__main__"):
         "--timestart", dest="timestart", type=float,
         default=0.0,
         required=False, 
-        help="Time at beginning of simulation {0.}")
+        help="Time at simulation start {TIME = 0}.")
 
     parser.add_argument(
         "--num-steps", dest="iteration", type=int,
@@ -606,6 +608,12 @@ if (__name__ == "__main__"):
         default=0.E+00,
         required=False,
         help="Log-law maximum Cd coeff. {Cd < +0.E+00}.")
+    
+    parser.add_argument(
+        "--wetdry-h0", dest="wetdry_h0", type=float,
+        default=0.E+00,
+        required=False,
+        help="Thickness of wet-dry limiter {1.E-04}.")
 
     parser.add_argument(
         "--no-u-tend", dest="no_u_tend", 

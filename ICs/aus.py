@@ -54,6 +54,8 @@ def init(name, save, rsph=0.E+0):
     
     zb_cell = np.minimum(+10., +1 * zb_cell)
     
+   #zb_cell+= 5.  # just to test wet/dry
+    
     # smooth at grid-scale
     zb_dual = mats.dual_kite_sums * zb_cell
     zb_dual/= mesh.vert.area
