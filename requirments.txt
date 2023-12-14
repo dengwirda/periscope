@@ -1,0 +1,6 @@
+cython
+numpy
+scipy
+xarray
+netcdf4
+matplotlib
