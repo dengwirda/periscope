@@ -102,6 +102,9 @@ def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
         hE_prev, uE_prev,
         hE_next, uE_next)
         
+    uu_edge = limiterWD(
+        mesh, mats, cnfg, hh_edge, uu_edge)
+        
     vv_edge = computeVV(
         mesh, mats, cnfg, uu_edge)
 
@@ -154,6 +157,9 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
         hh_edge, uu_edge, gg_cell, 
         hE_prev, uE_prev,
         hE_next, uE_next)
+        
+    uu_edge = limiterWD(
+        mesh, mats, cnfg, hh_edge, uu_edge)
         
     vv_edge = computeVV(
         mesh, mats, cnfg, uu_edge)

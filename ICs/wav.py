@@ -338,7 +338,7 @@ def tsu2(name, save, rsph, mesh, mats, _ics):
     zb_cell+= np.asarray(
         data["ice_thickness"][:], dtype=np.float64)
 
-    zb_cell = np.minimum(-1., zb_cell)
+   #zb_cell = np.minimum(-1., zb_cell)
     
     uu_edge = np.zeros(mesh.edge.size, dtype=np.float64)
 
@@ -351,7 +351,7 @@ def tsu2(name, save, rsph, mesh, mats, _ics):
 
     zt_cell = maptocell(mesh, xlon, ylat, dlev)
 
-    hh_cell = np.maximum(1., zt_cell - zb_cell)
+    hh_cell = np.maximum(0., zt_cell - zb_cell)
     
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 

@@ -121,6 +121,7 @@ A number of test cases are available to run out-of-the-box:
     python3 ICs/wav.py \
     --mesh-file="mesh_w_elev_cvt_8.nc" \
     --init-file="tsu_cvt_8.nc" \
+    --radius=6371220. \
     --test-case=4 \
     --xydz-file="fujii.txydz"
     
@@ -131,6 +132,7 @@ A number of test cases are available to run out-of-the-box:
     --save-freq=40 \
     --stat-freq=40 \
     --hh-scheme="UPWIND" \
+    --wetdry-h0=1.E-04 \
     --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
     --uu-visc-2=1.E+01 --uu-visc-4=2.E+11 \
     --hh-diff-2=1.E+01 --hh-diff-4=2.E+11 \
