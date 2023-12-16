@@ -23,7 +23,7 @@ PV_TINY        = 1.0E-16
 
 def hrmn_mean(xone, xtwo):
 
-#-- harmonic mean of two vectors (ie. biased toward lesser)
+#-- harmonic mean of vectors (ie. biased toward lesser)
 
     return +2.0 * xone * xtwo / (xone + xtwo)
 
@@ -91,14 +91,14 @@ def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     uE_next = flow.next.uE_edge
     
     zb_cell = flow.zb_cell 
-    gg_cell = flow.gravity
+    gravity = flow.gravity
 
     hh_dual, hh_edge, h2_edge, hh_bias = compute_H(
         mesh, mats, cnfg, hh_cell, uu_edge)
 
     hh_edge, uu_edge = computeBC(
         mesh, mats, cnfg, 
-        hh_edge, uu_edge, gg_cell, 
+        hh_edge, uu_edge, gravity, 
         hE_prev, uE_prev,
         hE_next, uE_next)
         
@@ -147,14 +147,14 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     uE_next = flow.next.uE_edge
 
     zb_cell = flow.zb_cell
-    gg_cell = flow.gravity
+    gravity = flow.gravity
 
     hh_dual, hh_edge, h2_edge, hh_bias = compute_H(
         mesh, mats, cnfg, hh_cell, uu_edge)
 
     hh_edge, uu_edge = computeBC(
         mesh, mats, cnfg, 
-        hh_edge, uu_edge, gg_cell, 
+        hh_edge, uu_edge, gravity, 
         hE_prev, uE_prev,
         hE_next, uE_next)
         
@@ -193,7 +193,7 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
 
 
 def computeBC(mesh, mats, cnfg,
-        hh_edge, uu_edge, gg_cell, hE_prev, uE_prev,
+        hh_edge, uu_edge, gravity, hE_prev, uE_prev,
                                    hE_next, uE_next):
         
 #-- setup open bnd. conditions
@@ -204,7 +204,7 @@ def computeBC(mesh, mats, cnfg,
     ttic = time.time()
         
     hh_edge, uu_edge = _computeBC(
-        mesh, mats, cnfg, hh_edge, uu_edge, gg_cell, 
+        mesh, mats, cnfg, hh_edge, uu_edge, gravity, 
         hE_prev, uE_prev, hE_next, uE_next)
         
     ttoc = time.time()
@@ -392,7 +392,8 @@ def addtendUV(mesh, mats, cnfg, hh_edge, uu_edge,
     
     
 def addtendGZ(mesh, mats, cnfg, hh_cell, zb_cell, 
-                                gg_cell, uu_tend):
+                                gravity, 
+                                uu_tend):
 
 #-- get z pressure gradient
 
@@ -400,7 +401,7 @@ def addtendGZ(mesh, mats, cnfg, hh_cell, zb_cell,
 
     uu_tend = _computeGZ(
         mesh, mats, cnfg, 
-            hh_cell, zb_cell, gg_cell, uu_tend)
+            hh_cell, zb_cell, gravity, uu_tend)
         
     ttoc = time.time()
     tcpu.computeGZ = tcpu.computeGZ + (ttoc - ttic)
@@ -464,7 +465,8 @@ def addtendVU(mesh, mats, cnfg, uu_edge, nu_edge,
     
     
 def addtendVH(mesh, mats, cnfg, hh_cell, zb_cell, 
-                                gg_cell, hh_tend):
+                                gravity, 
+                                hh_tend):
 
 #-- diffusive del^k operators
 
@@ -474,7 +476,7 @@ def addtendVH(mesh, mats, cnfg, hh_cell, zb_cell,
 
     hh_tend = _computeVH(
         mesh, mats, cnfg, hh_cell, 
-            zb_cell, gg_cell, HH_TINY, hh_tend)
+            zb_cell, gravity, HH_TINY, hh_tend)
     
     ttoc = time.time()
     tcpu.computeVH = tcpu.computeVH + (ttoc - ttic)
@@ -483,7 +485,8 @@ def addtendVH(mesh, mats, cnfg, hh_cell, zb_cell,
     
     
 def addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
-                                hh_edge, uu_tend):
+                                hh_edge, 
+                                uu_tend):
 
 #-- forcing from external tau
 
@@ -501,18 +504,19 @@ def addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
     return uu_tend
 
 
-def computeCd(mesh, mats, cnfg, hh_cell, uu_edge):
+def computeCd(mesh, mats, cnfg, gravity, hh_cell, 
+                                uu_edge):
 
-#-- loglaw bottom drag term
+#-- composite bottom drag c_d
+
+    vv_edge = \
+        computeVV(mesh, mats, cnfg, uu_edge)
 
     ttic = time.time()
-
-    vv_edge = computeVV(
-            mesh, mats, cnfg, uu_edge)
-            
+        
     cd_edge = _computeCd(
-        mesh, mats, cnfg, 
-            HH_TINY, hh_cell, uu_edge, vv_edge)
+        mesh, mats, cnfg, HH_TINY, 
+            gravity, hh_cell, uu_edge, vv_edge)
             
     ttoc = time.time()
     tcpu.computeCd = tcpu.computeCd + (ttoc - ttic)

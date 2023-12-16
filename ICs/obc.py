@@ -41,7 +41,7 @@ def init(name, save, rsph=0.E+0):
 
     grav = 9.81                 # gravity
     f = 1.0E-04                 # coriolis
-    u0 = 3.0                    # velocity
+    u0 = 1.5                    # velocity
     h0 = 15.                    # depth
     z0 = 0.0                    # hill position
     y0 =-250.
@@ -55,12 +55,12 @@ def init(name, save, rsph=0.E+0):
     
     zb_cell = np.zeros(hh_cell.shape, dtype=np.float64)
     
-    zb_cell+= 0.95 * h0 * np.exp(
+    zb_cell+= 1.05 * h0 * np.exp(
         -.00025 * (mesh.cell.ypos - y0)**2 
         -.00025 * (mesh.cell.zpos - z0)**2
             )
  
-    hh_cell = hh_cell - zb_cell
+    hh_cell = np.maximum(0., hh_cell - zb_cell)
     
     # external signal at OBCs
     uE_edge = u0 * np.ones(

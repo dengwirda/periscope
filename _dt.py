@@ -105,6 +105,8 @@ def step_RK22(mesh, mats, flow, cnfg,
     
     isFB = 1.0 * ("FB" in cnfg.integrate)
 
+    gravity = flow.gravity
+
     h1_cell = get_vec_c()
     u1_edge = get_vec_e()
     h2_cell = get_vec_c()
@@ -152,7 +154,8 @@ def step_RK22(mesh, mats, flow, cnfg,
 
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, mats, cnfg, h1_cell, u1_edge)
+            mesh, mats, cnfg, 
+                gravity, h1_cell, u1_edge)
 
     #-- euler scheme: implicit solve
         u1_edge = inv_x_1st(
@@ -206,7 +209,8 @@ def step_RK22(mesh, mats, flow, cnfg,
     
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, mats, cnfg, hb_cell, um_edge)
+            mesh, mats, cnfg, 
+                gravity, hb_cell, um_edge)
 
     #-- theta scheme: implicit solve
         u2_edge = inv_x_2nd(
@@ -259,6 +263,8 @@ def step_RK32(mesh, mats, flow, cnfg,
 
     isFB = 1.0 * ("FB" in cnfg.integrate)
 
+    gravity = flow.gravity
+
     h1_cell = get_vec_c()
     u1_edge = get_vec_e()
     h2_cell = get_vec_c()
@@ -306,7 +312,8 @@ def step_RK32(mesh, mats, flow, cnfg,
 
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, mats, cnfg, h1_cell, u1_edge)
+            mesh, mats, cnfg, 
+                gravity, h1_cell, u1_edge)
 
     #-- euler scheme: implicit solve
         u1_edge = inv_x_1st(
@@ -357,7 +364,8 @@ def step_RK32(mesh, mats, flow, cnfg,
 
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, mats, cnfg, h2_cell, u2_edge)
+            mesh, mats, cnfg, 
+                gravity, h2_cell, u2_edge)
 
     #-- euler scheme: implicit solve
         u2_edge = inv_x_1st(
@@ -404,7 +412,8 @@ def step_RK32(mesh, mats, flow, cnfg,
    
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, mats, cnfg, hb_cell, u2_edge)
+            mesh, mats, cnfg, 
+                gravity, hb_cell, u2_edge)
 
     #-- theta scheme: explicit tend.
         u3_edge = inv_x_2nd(

@@ -17,7 +17,7 @@ import numpy as np
 cimport numpy as np
 cimport cython
 
-from cython.parallel import prange
+from cython.parallel import prange, parallel
 from libc.stdint cimport int32_t
 
 from _fp import flt32_t, flt64_t
@@ -39,25 +39,23 @@ def _bnd_x_vec(cnfg,
     cdef INDEX_t ipos
     cdef INDEX_t NDAT = xx_data.size
 
-    cdef INDEX_t \
-        cnfg_numthread = cnfg.numthread
-    cdef INDEX_t \
-        cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
 
     cdef REALS_t *XX_DATA = &xx_data[+0]
     cdef REALS_t *XX_MIN_ = &xx_min_[+0]
     cdef REALS_t *XX_MAX_ = &xx_max_[+0]
 
-    for ipos in prange(0, NDAT, nogil=True,
-                schedule="static",
-                num_threads=cnfg_numthread,
-                chunksize=cnfg_chunksize):
+    with nogil, parallel(num_threads=numthread):
+
+        for ipos in prange(0, NDAT, schedule="static",
+                chunksize=chunksize):
+                    
+            XX_MIN_[ipos] = min(
+                XX_MIN_[ipos], XX_DATA[ipos])
                 
-        XX_MIN_[ipos] = min(
-            XX_MIN_[ipos], XX_DATA[ipos])
-            
-        XX_MAX_[ipos] = max(
-            XX_MAX_[ipos], XX_DATA[ipos])
+            XX_MAX_[ipos] = max(
+                XX_MAX_[ipos], XX_DATA[ipos])
 
     return xx_min_, xx_max_
 
@@ -72,19 +70,17 @@ def _set_x_vec(cnfg,
     cdef INDEX_t ipos
     cdef INDEX_t NDAT = xx_data.size
 
-    cdef INDEX_t \
-        cnfg_numthread = cnfg.numthread
-    cdef INDEX_t \
-        cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
 
     cdef REALS_t *XX_DATA = &xx_data[+0]
 
-    for ipos in prange(0, NDAT, nogil=True,
-                schedule="static",
-                num_threads=cnfg_numthread,
-                chunksize=cnfg_chunksize):
+    with nogil, parallel(num_threads=numthread):
 
-        XX_DATA[ipos] = xx_fill
+        for ipos in prange(0, NDAT, schedule="static",
+                chunksize=chunksize):
+
+            XX_DATA[ipos] = xx_fill
 
     return xx_data
 
@@ -99,20 +95,18 @@ def _cpy_x_vec(cnfg,
     cdef INDEX_t ipos
     cdef INDEX_t NDAT = xx_data.size
     
-    cdef INDEX_t \
-        cnfg_numthread = cnfg.numthread
-    cdef INDEX_t \
-        cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef REALS_t *XX_DATA = &xx_data[+0]
     cdef REALS_t *YY_DATA = &yy_data[+0]
     
-    for ipos in prange(0, NDAT, nogil=True, 
-                schedule="static", 
-                num_threads=cnfg_numthread, 
-                chunksize=cnfg_chunksize):       
+    with nogil, parallel(num_threads=numthread):
     
-        YY_DATA[ipos] = XX_DATA[ipos]
+        for ipos in prange(0, NDAT, schedule="static", 
+                chunksize=chunksize):       
+        
+            YY_DATA[ipos] = XX_DATA[ipos]
             
     return yy_data
     
@@ -134,31 +128,29 @@ def _adv_x_cmp(cnfg,
     
     cdef REALS_t ZERO = 0.0
 
-    cdef INDEX_t \
-        cnfg_numthread = cnfg.numthread
-    cdef INDEX_t \
-        cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef REALS_t *XX_DATA = &xx_data[+0]
     cdef REALS_t *RH_DATA = &rh_data[+0]
     cdef REALS_t *CX_DATA = &cx_data[+0]
     cdef REALS_t *YY_DATA = &yy_data[+0]
     
-    for ipos in prange(0, NDAT, nogil=True, 
-                schedule="static", 
-                num_threads=cnfg_numthread, 
-                chunksize=cnfg_chunksize):        
-    #-- compensated state update; new compensator
+    with nogil, parallel(num_threads=numthread):
     
-        RH_TEMP       =-RH_DATA[ipos] * rh_coef - \
-                        CX_DATA[ipos]
-    
-        RH_DATA[ipos] = ZERO
-
-        YY_DATA[ipos] = XX_DATA[ipos] + RH_TEMP
+        for ipos in prange(0, NDAT, schedule="static",
+                chunksize=chunksize):        
+        #-- compensated state update; new compensator
         
-        CX_DATA[ipos] =(YY_DATA[ipos] - 
-                        XX_DATA[ipos])- RH_TEMP
+            RH_TEMP       =-RH_DATA[ipos] * rh_coef - \
+                            CX_DATA[ipos]
+        
+            RH_DATA[ipos] = ZERO
+
+            YY_DATA[ipos] = XX_DATA[ipos] + RH_TEMP
+            
+            CX_DATA[ipos] =(YY_DATA[ipos] - 
+                            XX_DATA[ipos])- RH_TEMP
             
     return yy_data, cx_data
     
@@ -180,28 +172,26 @@ def _adv_x_fst(cnfg,
     
     cdef REALS_t ZERO = 0.0
 
-    cdef INDEX_t \
-        cnfg_numthread = cnfg.numthread
-    cdef INDEX_t \
-        cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef REALS_t *XX_DATA = &xx_data[+0]
     cdef REALS_t *RH_DATA = &rh_data[+0]
     cdef REALS_t *CX_DATA = &cx_data[+0]
     cdef REALS_t *YY_DATA = &yy_data[+0]
     
-    for ipos in prange(0, NDAT, nogil=True, 
-                schedule="static", 
-                num_threads=cnfg_numthread, 
-                chunksize=cnfg_chunksize):
-    #-- compensated state update; old compensator
+    with nogil, parallel(num_threads=numthread):
     
-        RH_TEMP       =-RH_DATA[ipos] * rh_coef - \
-                        CX_DATA[ipos]
-    
-        RH_DATA[ipos] = ZERO
+        for ipos in prange(0, NDAT, schedule="static", 
+                chunksize=chunksize):
+        #-- compensated state update; old compensator
+        
+            RH_TEMP       =-RH_DATA[ipos] * rh_coef - \
+                            CX_DATA[ipos]
+        
+            RH_DATA[ipos] = ZERO
 
-        YY_DATA[ipos] = XX_DATA[ipos] + RH_TEMP
+            YY_DATA[ipos] = XX_DATA[ipos] + RH_TEMP
               
     return yy_data
     
@@ -218,23 +208,21 @@ def _inv_x_1st(cnfg,
     
     cdef REALS_t ONE_ = 1.0
     
-    cdef INDEX_t \
-        cnfg_numthread = cnfg.numthread
-    cdef INDEX_t \
-        cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef REALS_t *XX_DATA = &xx_data[+0]
     cdef REALS_t *CD_DATA = &cd_data[+0]
     cdef REALS_t *RH_DATA = &rh_data[+0]
     
-    for ipos in prange(0, NDAT, nogil=True, 
-                schedule="static", 
-                num_threads=cnfg_numthread, 
-                chunksize=cnfg_chunksize):
-    #-- 1st-order inversion for implicit drag
-                 
-        XX_DATA[ipos]/= CD_DATA[ipos] * rh_coef + \
-                        ONE_
+    with nogil, parallel(num_threads=numthread):
+    
+        for ipos in prange(0, NDAT, schedule="static", 
+                chunksize=chunksize):
+        #-- 1st-order inversion for implicit drag
+                     
+            XX_DATA[ipos]/= CD_DATA[ipos] * rh_coef + \
+                            ONE_
                         
     return xx_data
 
@@ -251,26 +239,24 @@ def _inv_x_2nd(cnfg,
     
     cdef REALS_t ONE_ = 1.0
     
-    cdef INDEX_t \
-        cnfg_numthread = cnfg.numthread
-    cdef INDEX_t \
-        cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef REALS_t *XX_DATA = &xx_data[+0]
     cdef REALS_t *CD_DATA = &cd_data[+0]
     cdef REALS_t *RH_DATA = &rh_data[+0]
     
-    for ipos in prange(0, NDAT, nogil=True, 
-                schedule="static", 
-                num_threads=cnfg_numthread, 
-                chunksize=cnfg_chunksize):
-    #-- 2nd-order inversion for implicit drag
-                
-        XX_DATA[ipos]-= CD_DATA[ipos] * rh_coef * \
-                        RH_DATA[ipos]
-                        
-        XX_DATA[ipos]/= CD_DATA[ipos] * rh_coef + \
-                        ONE_
+    with nogil, parallel(num_threads=numthread):
+    
+        for ipos in prange(0, NDAT, schedule="static", 
+                chunksize=chunksize):
+        #-- 2nd-order inversion for implicit drag
+                    
+            XX_DATA[ipos]-= CD_DATA[ipos] * rh_coef * \
+                            RH_DATA[ipos]
+                            
+            XX_DATA[ipos]/= CD_DATA[ipos] * rh_coef + \
+                            ONE_
                         
     return xx_data
     
@@ -289,23 +275,21 @@ def _sum_2_way(cnfg,
     
     cdef INDEX_t NDAT = x1_data.size
     
-    cdef INDEX_t \
-        cnfg_numthread = cnfg.numthread
-    cdef INDEX_t \
-        cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef REALS_t *X1_DATA = &x1_data[+0]
     cdef REALS_t *X2_DATA = &x2_data[+0]
     cdef REALS_t *YY_DATA = &yy_data[+0]
     
-    for ipos in prange(0, NDAT, nogil=True, 
-                schedule="static", 
-                num_threads=cnfg_numthread, 
-                chunksize=cnfg_chunksize):        
-    #-- 2-way forward-backward averaging
+    with nogil, parallel(num_threads=numthread):
     
-        YY_DATA[ipos] = X1_DATA[ipos] * x1_coef + \
-                        X2_DATA[ipos] * x2_coef
+        for ipos in prange(0, NDAT, schedule="static", 
+                chunksize=chunksize):        
+        #-- 2-way forward-backward averaging
+        
+            YY_DATA[ipos] = X1_DATA[ipos] * x1_coef + \
+                            X2_DATA[ipos] * x2_coef
               
     return yy_data
     
@@ -326,25 +310,23 @@ def _sum_3_way(cnfg,
     
     cdef INDEX_t NDAT = x1_data.size
     
-    cdef INDEX_t \
-        cnfg_numthread = cnfg.numthread
-    cdef INDEX_t \
-        cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef REALS_t *X1_DATA = &x1_data[+0]
     cdef REALS_t *X2_DATA = &x2_data[+0]
     cdef REALS_t *X3_DATA = &x3_data[+0]
     cdef REALS_t *YY_DATA = &yy_data[+0]
     
-    for ipos in prange(0, NDAT, nogil=True, 
-                schedule="static", 
-                num_threads=cnfg_numthread, 
-                chunksize=cnfg_chunksize):        
-    #-- 3-way forward-backward averaging
-        
-        YY_DATA[ipos] = X1_DATA[ipos] * x1_coef + \
-                        X2_DATA[ipos] * x2_coef + \
-                        X3_DATA[ipos] * x3_coef
+    with nogil, parallel(num_threads=numthread):
+    
+        for ipos in prange(0, NDAT, schedule="static", 
+                chunksize=chunksize):        
+        #-- 3-way forward-backward averaging
+            
+            YY_DATA[ipos] = X1_DATA[ipos] * x1_coef + \
+                            X2_DATA[ipos] * x2_coef + \
+                            X3_DATA[ipos] * x3_coef
                                      
     return yy_data
 
@@ -365,25 +347,23 @@ def _sym_3_way(cnfg,
     
     cdef INDEX_t NDAT = x1_data.size
     
-    cdef INDEX_t \
-        cnfg_numthread = cnfg.numthread
-    cdef INDEX_t \
-        cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef REALS_t *X1_DATA = &x1_data[+0]
     cdef REALS_t *X2_DATA = &x2_data[+0]
     cdef REALS_t *X3_DATA = &x3_data[+0]
     cdef REALS_t *YY_DATA = &yy_data[+0]
     
-    for ipos in prange(0, NDAT, nogil=True, 
-                schedule="static", 
-                num_threads=cnfg_numthread, 
-                chunksize=cnfg_chunksize):        
-    #-- 3-way forward-backward averaging
-        
-        YY_DATA[ipos] = X2_DATA[ipos] * x2_coef + \
-                       (X1_DATA[ipos] + 
-                        X3_DATA[ipos])* x1_coef
+    with nogil, parallel(num_threads=numthread):
+    
+        for ipos in prange(0, NDAT, schedule="static",
+                chunksize=chunksize):        
+        #-- 3-way forward-backward averaging
+            
+            YY_DATA[ipos] = X2_DATA[ipos] * x2_coef + \
+                           (X1_DATA[ipos] + 
+                            X3_DATA[ipos])* x1_coef
                                      
     return yy_data
 

@@ -24,6 +24,7 @@ from _fp import flt32_t, flt64_t
 from _fp import reals_t, index_t
 
 from lib cimport sqrtf as sqrt_r
+from lib cimport cbrtf as cbrt_r
 from lib cimport logf as log_r
 from lib cimport fabsf as fabs_r
 
@@ -39,7 +40,7 @@ ctypedef float   REALS_t  # or double
 def _computeBC(mesh, mats, cnfg,
     np.ndarray[REALS_t, ndim=1] hh_edge,
     np.ndarray[REALS_t, ndim=1] uu_edge,
-    const REALS_t gg_cell,
+    const REALS_t gravity,
     np.ndarray[REALS_t, ndim=1] hE_prev,
     np.ndarray[REALS_t, ndim=1] uE_prev,
     np.ndarray[REALS_t, ndim=1] hE_next,
@@ -55,11 +56,11 @@ def _computeBC(mesh, mats, cnfg,
     cdef REALS_t ONE_ = 1.0
     cdef REALS_t TWO_ = 2.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t cnfg_time_step = cnfg.time_step
-    cdef REALS_t cnfg_frc_blend = cnfg.frc_blend
+    cdef REALS_t time_step = cnfg.time_step
+    cdef REALS_t frc_blend = cnfg.frc_blend
         
     cdef INDEX_t NBCS = mesh.edge.open.size
     
@@ -80,36 +81,36 @@ def _computeBC(mesh, mats, cnfg,
     
     if (NBCS > 0):
 
-        with nogil, parallel(num_threads=cnfg_numthread):
+        with nogil, parallel(num_threads=numthread):
           
             for edge in prange(0, NBCS, schedule="static", 
-                    chunksize=cnfg_chunksize):
+                    chunksize=chunksize):
                     
                 eidx = MESH_EDGE_OPEN[edge]
                     
                 HE_EDGE = (
-                (ONE_ - cnfg_frc_blend) * HE_PREV[eidx]
-              + (ZERO + cnfg_frc_blend) * HE_NEXT[eidx]
+                    (ONE_ - frc_blend) * HE_PREV[eidx]
+                  + (ZERO + frc_blend) * HE_NEXT[eidx]
                           )
                     
                 UE_EDGE = (
-                (ONE_ - cnfg_frc_blend) * UE_PREV[eidx]
-              + (ZERO + cnfg_frc_blend) * UE_NEXT[eidx]
+                    (ONE_ - frc_blend) * UE_PREV[eidx]
+                  + (ZERO + frc_blend) * UE_NEXT[eidx]
                           )
                     
                 #-- Flather-type bnd. condition
                 RADIATE = sqrt_r(
-                    gg_cell / HH_EDGE[eidx])
+                    gravity / HH_EDGE[eidx])
                     
                 #-- CFL-like limiter
                 RADIATE = min(RADIATE, TWO_ * 
-                    MESH_EDGE_SLEN[eidx] / cnfg_time_step)
+                    MESH_EDGE_SLEN[eidx] /  time_step)
                 
                 UU_PRED = UE_EDGE + RADIATE * (
                     HH_EDGE[eidx] - HE_EDGE
                     )
                 
-                if (UU_PRED <=  ZERO):
+                if (UU_PRED <= ZERO):
                 
                 #-- inflow: prescribe mass flux
                     UU_EDGE[eidx] = UU_PRED
@@ -138,10 +139,10 @@ def _limiterWD(mesh, mats, cnfg,
     cdef REALS_t ONE_ = 1.0
     cdef REALS_t TEN_ = 10.
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t cnfg_wetdry_h0 = cnfg.wetdry_h0
+    cdef REALS_t wetdry_h0 = cnfg.wetdry_h0
         
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -150,18 +151,19 @@ def _limiterWD(mesh, mats, cnfg,
     cdef REALS_t *HH_EDGE = &hh_edge[0]
     cdef REALS_t *UU_EDGE = &uu_edge[0]
     
-    if (cnfg_wetdry_h0 > ZERO):
+    if (wetdry_h0 > ZERO):
 
-        with nogil, parallel(num_threads=cnfg_numthread):
+        wetdry_h0*= TEN_  # numerical ramp
+
+        with nogil, parallel(num_threads=numthread):
           
             for edge in prange(0, NEDG, schedule="static", 
-                    chunksize=cnfg_chunksize):
+                    chunksize=chunksize):
                     
-                uu_ramp = min(ONE_, 
-                    HH_EDGE[edge] / cnfg_wetdry_h0 
-                                  / TEN_ )
+                uu_ramp = min(
+                    ONE_, HH_EDGE[edge]/ wetdry_h0)
                     
-                UU_EDGE[edge] *= uu_ramp * uu_ramp
+                UU_EDGE[edge]*= (uu_ramp * uu_ramp)
     
     return uu_edge
             
@@ -191,8 +193,8 @@ def _upwinding(mesh, mats, cnfg,
     cdef REALS_t HALF = 0.5
     cdef REALS_t ONE_ = 1.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
         
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -269,10 +271,10 @@ def _upwinding(mesh, mats, cnfg,
         #-- formulation. Upwind departure points, appears
         #-- to be inconsistent in time...
   
-        with nogil, parallel(num_threads=cnfg_numthread):
+        with nogil, parallel(num_threads=numthread):
       
             for edge in prange(0, NEDG, schedule="static", 
-                    chunksize=cnfg_chunksize):        
+                    chunksize=chunksize):        
             #-- dN_edge = edge_grad_norm * ss_cell
                 dN_EDGE = ZERO
                 for iptr in range(GRAD_NORM_XPTR[edge +0], 
@@ -311,10 +313,10 @@ def _upwinding(mesh, mats, cnfg,
 
         #-- const. upwinding version
 
-        with nogil, parallel(num_threads=cnfg_numthread):
+        with nogil, parallel(num_threads=numthread):
 
             for edge in prange(0, NEDG, schedule="static", 
-                    chunksize=cnfg_chunksize):      
+                    chunksize=chunksize):      
             #-- dN_edge = edge_grad_norm * ss_cell
                 dN_EDGE = ZERO
                 for iptr in range(GRAD_NORM_XPTR[edge +0], 
@@ -361,10 +363,10 @@ def _upwinding(mesh, mats, cnfg,
 
         #-- adapt. upwinding version
 
-        with nogil, parallel(num_threads=cnfg_numthread):
+        with nogil, parallel(num_threads=numthread):
 
             for vert in prange(0, NVRT, schedule="static", 
-                    chunksize=cnfg_chunksize):
+                    chunksize=chunksize):
             #-- ds_vert = |large - small| stencils
                 DS_VERT[vert] = ( 
                     SS_DUAL[vert] - SW_DUAL[vert])
@@ -372,7 +374,7 @@ def _upwinding(mesh, mats, cnfg,
                 DS_VERT[vert]*= DS_VERT[vert]
                 
             for edge in prange(0, NEDG, schedule="static", 
-                    chunksize=cnfg_chunksize):    
+                    chunksize=chunksize):    
             #-- up_bias = edge_dual_maps * ds_vert
                 UP_BIAS[edge] = ZERO
                 for iptr in range(EDGE_VERT_XPTR[edge +0], 
@@ -458,8 +460,8 @@ def _computeHH(mesh, mats, cnfg,
     cdef REALS_t FOUR = 4.0
     cdef REALS_t SIX_ = 6.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef REALS_t up_max_ = cnfg.hh_max_up
     cdef REALS_t up_min_ = cnfg.hh_min_up
@@ -521,10 +523,10 @@ def _computeHH(mesh, mats, cnfg,
    
     if (cnfg.hh_scheme == "CENTRE"):
     
-        with nogil, parallel(num_threads=cnfg_numthread):
+        with nogil, parallel(num_threads=numthread):
         
             for vert in prange(0, NVRT, schedule="static", 
-                    chunksize=cnfg_chunksize):
+                    chunksize=chunksize):
             #-- compute dual-centred thickness
                 HH_DUAL[vert] = ZERO
                 for iptr in range(DUAL_KITE_XPTR[vert +0], 
@@ -538,7 +540,7 @@ def _computeHH(mesh, mats, cnfg,
                 HH_DUAL[vert]/= MESH_DUAL_AREA[vert]
         
             for edge in prange(0, NEDG, schedule="static", 
-                    chunksize=cnfg_chunksize):
+                    chunksize=chunksize):
             #-- compute edge-centred thickness
                 HH_EDGE[edge] = ZERO
                 UP_BIAS[edge] = ZERO
@@ -565,10 +567,10 @@ def _computeHH(mesh, mats, cnfg,
             
     else:  # hh_scheme == "UPWIND"
     
-        with nogil, parallel(num_threads=cnfg_numthread):
+        with nogil, parallel(num_threads=numthread):
         
             for vert in prange(0, NVRT, schedule="static", 
-                    chunksize=cnfg_chunksize):
+                    chunksize=chunksize):
             #-- compute dual-centred thickness               
                 HH_DUAL[vert] = ZERO
                 for iptr in range(DUAL_KITE_XPTR[vert +0], 
@@ -584,7 +586,7 @@ def _computeHH(mesh, mats, cnfg,
                 HH_DUAL[vert] = max (ZERO , HH_DUAL[vert])
         
             for edge in prange(0, NEDG, schedule="static", 
-                    chunksize=cnfg_chunksize):
+                    chunksize=chunksize):
                         
                 cel1 = mesh_edge_cell[edge, 0] - 1
                 cel2 = mesh_edge_cell[edge, 1] - 1
@@ -654,8 +656,8 @@ def _computeKE(mesh, mats, cnfg,
     cdef REALS_t ZERO = 0.0
     cdef REALS_t HALF = 0.5
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -683,10 +685,10 @@ def _computeKE(mesh, mats, cnfg,
         
     cdef REALS_t *KE_CELL = &ke_cell[0]
     
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
         
         for cell in prange(0, NCEL, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- remap kinetic energy M_(c,e) * 1/2 * |u|^2
             KE_CELL[cell] = ZERO
             for iptr in range(CELL_WING_XPTR[cell +0],
@@ -724,9 +726,9 @@ def _computePV(mesh, mats, cnfg,
     cdef REALS_t ZERO = 0.0
     cdef REALS_t ONE_ = 1.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
-    cdef REALS_t cnfg_do_advect = (not cnfg.no_advect)
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
+    cdef REALS_t do_advect = (not cnfg.no_advect)
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -818,10 +820,10 @@ def _computePV(mesh, mats, cnfg,
     cdef REALS_t *RV_EDGE = &rv_edge[0]
     cdef REALS_t *PV_EDGE = &pv_edge[0]
    
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
     
         for vert in prange(0, NVRT, schedule="static",
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- compute dual-centred vorticity
             RV_DUAL[vert] = ZERO
             for iptr in range(DUAL_CURL_XPTR[vert +0], 
@@ -833,13 +835,13 @@ def _computePV(mesh, mats, cnfg,
                 RV_DUAL[vert]+= (xval * UU_EDGE[xidx])
             
             # circulation, not curl(u) yet
-            RV_DUAL[vert]*= (
+            RV_DUAL[vert]*=(
                 ONE_ - MESH_VERT_SLIP[vert]
                         )
-            RV_DUAL[vert]*=(cnfg_do_advect)
+            RV_DUAL[vert]*=(do_advect)
             
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- compute edge-centred vorticity
             RV_EDGE[edge] = ZERO
             for iptr in range(EDGE_VERT_XPTR[edge +0], 
@@ -856,7 +858,7 @@ def _computePV(mesh, mats, cnfg,
                     (RV_EDGE[edge] + FF_EDGE[edge])
             
         for vert in prange(0, NVRT, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- average rhombi to dual -- a'la Gassmann
             R2_DUAL[vert] = ZERO
             for iptr in range(VERT_TAIL_XPTR[vert +0], 
@@ -881,7 +883,7 @@ def _computePV(mesh, mats, cnfg,
                     (RV_DUAL[vert] + FF_DUAL[vert])
                         
         for cell in prange(0, NCEL, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- compute cell-centred vorticity
             RV_CELL[cell] = ZERO
             for iptr in range(CELL_KITE_XPTR[cell +0], 
@@ -919,8 +921,8 @@ def _advect_UH(mesh, mats, cnfg,
     
     cdef REALS_t ZERO = 0.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -945,10 +947,10 @@ def _advect_UH(mesh, mats, cnfg,
     
     cdef REALS_t *MESH_CELL_AREA = &mesh_cell_area[0]
     
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
         
         for cell in prange(0, NCEL, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- divergence of edge thickness fluxes D * uh
             UH_TEND = ZERO
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
@@ -957,13 +959,13 @@ def _advect_UH(mesh, mats, cnfg,
                 xval = CELL_FLUX_XVAL[iptr]
                 xidx = CELL_FLUX_XIDX[iptr]
                 
-                UH_TEND = UH_TEND + (
-                                xval * UU_EDGE[xidx] * 
-                                       HH_EDGE[xidx]
+                UH_TEND = UH_TEND + ( 
+                            xval * UU_EDGE[xidx] * 
+                                   HH_EDGE[xidx]
                                     )
         
             HH_TEND[cell]+= \
-                UH_TEND / MESH_CELL_AREA [cell]
+                    UH_TEND / MESH_CELL_AREA[cell]
     
     return hh_tend
     
@@ -986,9 +988,9 @@ def _advect_UV(mesh, mats, cnfg,
     cdef REALS_t HALF = 0.5
     cdef REALS_t ZERO = 0.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
-    cdef REALS_t cnfg_do_advect = (not cnfg.no_advect)
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
+    cdef REALS_t do_advect = (not cnfg.no_advect)
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -1022,10 +1024,10 @@ def _advect_UV(mesh, mats, cnfg,
     cdef INDEX_t *GRAD_NORM_XIDX = &grad_norm_xidx[0]
     cdef REALS_t *GRAD_NORM_XVAL = &grad_norm_xval[0]
     
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
 
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- gradient of kinetic energy G * 1/2 * |u|^2
             KE_GRAD = ZERO
             for iptr in range(GRAD_NORM_XPTR[edge +0], 
@@ -1036,7 +1038,7 @@ def _advect_UV(mesh, mats, cnfg,
                 
                 KE_GRAD = KE_GRAD + xval * KE_CELL[xidx]
                 
-            KE_GRAD = KE_GRAD * cnfg_do_advect
+            KE_GRAD = KE_GRAD * do_advect
 
         #-- energy neutral flux 1/2 * (W*qhu + q*W*hu)
             UV_FLUX = ZERO
@@ -1060,7 +1062,7 @@ def _advect_UV(mesh, mats, cnfg,
 def _computeGZ(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] hh_cell,
     np.ndarray[FLT32_t, ndim=1] zb_cell,
-        const REALS_t gg_cell,
+        const REALS_t gravity,
     np.ndarray[REALS_t, ndim=1] uu_tend
               ):
     
@@ -1073,8 +1075,8 @@ def _computeGZ(mesh, mats, cnfg,
     
     cdef REALS_t ZERO = 0.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -1095,10 +1097,10 @@ def _computeGZ(mesh, mats, cnfg,
     cdef INDEX_t *GRAD_NORM_XIDX = &grad_norm_xidx[0]
     cdef REALS_t *GRAD_NORM_XVAL = &grad_norm_xval[0]
 
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
 
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- surface pressure gradient g * G * (h + zb)
             GZ_EDGE = ZERO
             for iptr in range(GRAD_NORM_XPTR[edge +0], 
@@ -1108,10 +1110,10 @@ def _computeGZ(mesh, mats, cnfg,
                 xidx = GRAD_NORM_XIDX[iptr]
                     
                 GZ_EDGE = GZ_EDGE + \
-                    xval* gg_cell * (
+                    xval* gravity * (
                         HH_CELL[xidx] + ZB_CELL[xidx])
                         
-            UU_TEND[edge] = UU_TEND[edge] + GZ_EDGE
+            UU_TEND[edge]+= GZ_EDGE
     
     return uu_tend
 
@@ -1127,8 +1129,8 @@ def _computeVV(mesh, mats, cnfg,
     
     cdef REALS_t ZERO = 0.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -1151,10 +1153,10 @@ def _computeVV(mesh, mats, cnfg,
         
     cdef REALS_t *VV_EDGE = &vv_edge[0]
     
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
         
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- LSQR .^perp reconstruction: v = W_lsqr * u
             VV_EDGE[edge] = ZERO
             for iptr in range(EDGE_LSQR_XPTR[edge +0], 
@@ -1182,9 +1184,9 @@ def _computeNu(mesh, mats, cnfg,
     cdef REALS_t ZERO = 0.0
     cdef REALS_t TWO_ = 2.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
-    cdef REALS_t cnfg_leith_chi = cnfg.leith_chi
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
+    cdef REALS_t leith_chi = cnfg.leith_chi
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -1226,10 +1228,10 @@ def _computeNu(mesh, mats, cnfg,
     
     cdef REALS_t *NU_TURB = &nu_edge[0]
 
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
   
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):        
+                chunksize=chunksize):        
         #-- dN_edge = edge_grad_norm * rv_cell
             dN_EDGE = ZERO
             for iptr in range(GRAD_NORM_XPTR[edge +0], 
@@ -1257,12 +1259,13 @@ def _computeNu(mesh, mats, cnfg,
                             dN_EDGE * dN_EDGE + 
                             dP_EDGE * dP_EDGE )
             
-            NU_SCAL = (cnfg_leith_chi * MESH_EDGE_SLEN[edge])
+            NU_SCAL = (leith_chi * MESH_EDGE_SLEN[edge])
             NU_SCAL*= TWO_  # slen is only half
                     
             NU_TURB[edge]*= NU_SCAL * NU_SCAL * NU_SCAL
             
-            NU_TURB[edge] = min(NU_TURB[edge], NU_MAX_[edge])
+            NU_TURB[edge] = min( NU_TURB[edge], 
+                                 NU_MAX_[edge])
         
     return nu_edge
 
@@ -1279,8 +1282,8 @@ def _computeDU(mesh, mats, cnfg,
     
     cdef REALS_t ZERO = 0.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -1331,10 +1334,10 @@ def _computeDU(mesh, mats, cnfg,
         
     cdef REALS_t *DU_CELL = &du_cell[0]
         
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
             
         for cell in prange(0, NCEL, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- compute div(u.n)
             DU_CELL[cell] = ZERO
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
@@ -1348,7 +1351,7 @@ def _computeDU(mesh, mats, cnfg,
             DU_CELL[cell]/= MESH_CELL_AREA[cell]
             
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- D^2 = vk * grad(div(u.n))
             D2_EDGE[edge] = ZERO
             for iptr in range(GRAD_NORM_XPTR[edge +0], 
@@ -1364,7 +1367,7 @@ def _computeDU(mesh, mats, cnfg,
                    )
                 
         for cell in prange(0, NCEL, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- compute div(D^2)
             DU_CELL[cell] = ZERO
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
@@ -1378,7 +1381,7 @@ def _computeDU(mesh, mats, cnfg,
             DU_CELL[cell]/= MESH_CELL_AREA[cell]
 
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- D^4 = vk * grad(div(D^2))
             D4_EDGE[edge] = ZERO
             for iptr in range(GRAD_NORM_XPTR[edge +0], 
@@ -1415,8 +1418,8 @@ def _computeVU(mesh, mats, cnfg,
     cdef REALS_t ZERO = 0.0
     cdef REALS_t ONE_ = 1.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -1502,10 +1505,10 @@ def _computeVU(mesh, mats, cnfg,
     cdef REALS_t *RV_DUAL = &rv_dual[0]
     cdef REALS_t *DU_CELL = &du_cell[0]
     
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
         
         for cell in prange(0, NCEL, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- compute div(u.n)
             DU_CELL[cell] = ZERO
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
@@ -1519,7 +1522,7 @@ def _computeVU(mesh, mats, cnfg,
             DU_CELL[cell]/= MESH_CELL_AREA[cell]
             
         for vert in prange(0, NVRT, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- compute rot(u.n)
             RV_DUAL[vert] = ZERO
             for iptr in range(DUAL_CURL_XPTR[vert +0], 
@@ -1536,7 +1539,7 @@ def _computeVU(mesh, mats, cnfg,
             RV_DUAL[vert]/= MESH_DUAL_AREA[vert]
             
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- V^2 = vk * grad(div(u.n)) - 
         #--       vk * grad(rot(u.n))
             V2_EDGE[edge] = ZERO
@@ -1563,7 +1566,7 @@ def _computeVU(mesh, mats, cnfg,
                    )
                 
         for cell in prange(0, NCEL, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- compute div(V^2)
             DU_CELL[cell] = ZERO
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
@@ -1577,7 +1580,7 @@ def _computeVU(mesh, mats, cnfg,
             DU_CELL[cell]/= MESH_CELL_AREA[cell]
 
         for vert in prange(0, NVRT, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- compute rot(V^2)
             RV_DUAL[vert] = ZERO
             for iptr in range(DUAL_CURL_XPTR[vert +0], 
@@ -1591,7 +1594,7 @@ def _computeVU(mesh, mats, cnfg,
             RV_DUAL[vert]/= MESH_DUAL_AREA[vert]
             
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- V^4 = vk * grad(div(V^2)) - 
         #--       vk * grad(rot(V^2))
             V4_EDGE[edge] = ZERO
@@ -1628,7 +1631,7 @@ def _computeVU(mesh, mats, cnfg,
 def _computeVH(mesh, mats, cnfg, 
     np.ndarray[REALS_t, ndim=1] hh_cell,
     np.ndarray[FLT32_t, ndim=1] zb_cell,
-        const REALS_t gg_cell,
+        const REALS_t gravity,
         const REALS_t hh_tiny,
     np.ndarray[REALS_t, ndim=1] hh_tend
               ):
@@ -1643,8 +1646,8 @@ def _computeVH(mesh, mats, cnfg,
     cdef REALS_t ONE_ = 1.0
     cdef REALS_t HALF = 0.5
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -1705,10 +1708,10 @@ def _computeVH(mesh, mats, cnfg,
     cdef np.ndarray[INDEX_t, ndim=2] \
         mesh_edge_cell = mesh.edge.cell
     
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
         
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
                 
             cel1 = mesh_edge_cell[edge, 0] - 1
             cel2 = mesh_edge_cell[edge, 1] - 1
@@ -1725,7 +1728,7 @@ def _computeVH(mesh, mats, cnfg,
                 xidx = GRAD_NORM_XIDX[iptr]
                     
                 HZ_EDGE[edge]+= \
-                    xval * gg_cell * (
+                    xval * gravity * (
                         HH_CELL[xidx] + ZB_CELL[xidx])
          
         #-- flux-limiter: don't diffuse to topography!
@@ -1740,7 +1743,7 @@ def _computeVH(mesh, mats, cnfg,
             HZ_EDGE[edge]*= OK_EDGE[edge]
             
         for cell in prange(0, NCEL, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- compute div(H.n)
             V2_CELL[cell] = ZERO
             OK_CELL[cell] = ZERO
@@ -1758,7 +1761,7 @@ def _computeVH(mesh, mats, cnfg,
             V2_CELL[cell]/= MESH_CELL_AREA[cell]
             
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- pressure gradient tend.: g * G * (hh + zb)
             last = HZ_EDGE[edge]
             HZ_EDGE[edge] = ZERO
@@ -1769,7 +1772,7 @@ def _computeVH(mesh, mats, cnfg,
                 xidx = GRAD_NORM_XIDX[iptr]
                     
                 HZ_EDGE[edge]+= \
-                    xval * gg_cell * (
+                    xval * gravity * (
                         V2_CELL[xidx] * V4_DIFF[xidx])
                 
                 # if incident edges okay        
@@ -1783,7 +1786,7 @@ def _computeVH(mesh, mats, cnfg,
                 HZ_EDGE[edge]* last < ZERO)
             
         for cell in prange(0, NCEL, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
         #-- compute div(H^2)
             V4_CELL[cell] = ZERO
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
@@ -1825,10 +1828,10 @@ def _computeTU(mesh, mats, cnfg,
     cdef REALS_t ZERO = 0.0
     cdef REALS_t ONE_ = 1.0
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t cnfg_frc_blend = cnfg.frc_blend
+    cdef REALS_t frc_blend = cnfg.frc_blend
     
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
@@ -1839,29 +1842,30 @@ def _computeTU(mesh, mats, cnfg,
     cdef REALS_t *HH_EDGE = &hh_edge[0]
     cdef REALS_t *UU_TEND = &uu_tend[0]
     
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
     
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
                 
             TU_EDGE = (
-            (ONE_ - cnfg_frc_blend) * TU_PREV[edge]
-          + (ZERO + cnfg_frc_blend) * TU_NEXT[edge]
+                (ONE_ - frc_blend) * TU_PREV[edge]
+              + (ZERO + frc_blend) * TU_NEXT[edge]
                       )
                 
-            UU_TEND[edge]-= TU_EDGE / HH_EDGE[edge]
+            UU_TEND[edge]-= TU_EDGE/ HH_EDGE[edge]
         
     return uu_tend
     
     
 def _computeCd(mesh, mats, cnfg, 
         const REALS_t hh_tiny,
+        const REALS_t gravity,
     np.ndarray[REALS_t, ndim=1] hh_cell,
     np.ndarray[REALS_t, ndim=1] uu_edge,
     np.ndarray[REALS_t, ndim=1] vv_edge
               ):
     
-#-- cd = cd_lin + (cd_sqr + cd_log) * |u| / h
+#-- cd = cd_lin + (cd_sqr + cd_log + cd_man) * |u| / h
     
     cdef REALS_t VONK = 0.4  # von karman
     
@@ -1874,14 +1878,19 @@ def _computeCd(mesh, mats, cnfg,
     cdef INDEX_t cel1, cel2
     cdef REALS_t xval
     
-    cdef INDEX_t cnfg_numthread = cnfg.numthread
-    cdef INDEX_t cnfg_chunksize = cnfg.chunksize
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t hh_edge, ke_edge
+    cdef REALS_t hh_edge, ke_edge, cd_temp
     
     cdef REALS_t loglaw_z0 = cnfg.loglaw_z0
     cdef REALS_t loglaw_hi = cnfg.loglaw_hi
     cdef REALS_t loglaw_lo = cnfg.loglaw_lo
+    
+    cdef REALS_t manlaw_n2 = cnfg.manlaw_n0 \
+                           * cnfg.manlaw_n0
+    cdef REALS_t manlaw_hi = cnfg.manlaw_hi
+    cdef REALS_t manlaw_lo = cnfg.manlaw_lo
     
     cdef REALS_t sqrlaw_cd = cnfg.sqrlaw_cd
     cdef REALS_t linlaw_cd = cnfg.linlaw_cd
@@ -1900,10 +1909,10 @@ def _computeCd(mesh, mats, cnfg,
     
     cdef INDEX_t[:, ::1] mesh_edge_cell = mesh.edge.cell
     
-    with nogil, parallel(num_threads=cnfg_numthread):
+    with nogil, parallel(num_threads=numthread):
     
         for edge in prange(0, NEDG, schedule="static", 
-                chunksize=cnfg_chunksize):
+                chunksize=chunksize):
 
             cel1 = mesh_edge_cell[edge, 0] - 1
             cel2 = mesh_edge_cell[edge, 1] - 1
@@ -1925,19 +1934,28 @@ def _computeCd(mesh, mats, cnfg,
             
             CD_EDGE[edge] = ZERO
        
-            if (loglaw_z0 > ZERO):            
+            if (loglaw_z0 > ZERO):
                 # NB. log(1+z/z0) "fix" to loglaw
-                CD_EDGE[edge] = (VONK / log_r (
+                cd_temp = (VONK / log_r (
                     ONE_ + HALF * hh_edge / loglaw_z0)
                     )
                     
-                CD_EDGE[edge]*= CD_EDGE[edge]
+                cd_temp*= cd_temp
                     
-                CD_EDGE[edge] = \
-                    min(CD_EDGE[edge], loglaw_hi)
+                cd_temp = min(cd_temp, loglaw_hi)
+                cd_temp = max(cd_temp, loglaw_lo)
+                
+                CD_EDGE[edge]+= cd_temp
                     
-                CD_EDGE[edge] = \
-                    max(CD_EDGE[edge], loglaw_lo)
+            if (manlaw_n2 > ZERO):
+                cd_temp = ( 
+                gravity * manlaw_n2 / cbrt_r (hh_edge)
+                    )
+                    
+                cd_temp = min(cd_temp, manlaw_hi)
+                cd_temp = max(cd_temp, manlaw_lo)
+
+                CD_EDGE[edge]+= cd_temp
             
             CD_EDGE[edge]+= sqrlaw_cd
             

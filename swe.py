@@ -30,7 +30,6 @@ from io_ import init_file, save_step
 
 from _dt import step_eqns, step_bnds, \
                 mark_time
-
 from _dx import invariant, scalingVk
 
 def swe(cnfg):
@@ -199,7 +198,8 @@ def swe(cnfg):
     
     cnfg.anylaw_cd = \
         max([cnfg.linlaw_cd, cnfg.sqrlaw_cd, 
-             cnfg.loglaw_z0] )
+             cnfg.loglaw_z0, cnfg.manlaw_n0] 
+           )
 
     cnfg.du_visc_k = \
         max (cnfg.du_visc_2, cnfg.du_visc_4)
@@ -608,6 +608,24 @@ if (__name__ == "__main__"):
         default=0.E+00,
         required=False,
         help="Log-law maximum Cd coeff. {Cd < +0.E+00}.")
+        
+    parser.add_argument(
+        "--manlaw-n0", dest="manlaw_n0", type=float,
+        default=0.E+00,
+        required=False,
+        help="Manning roughness lengths {N0 = +0.E+00}.")
+
+    parser.add_argument(
+        "--manlaw-lo", dest="manlaw_lo", type=float,
+        default=0.E+00,
+        required=False,
+        help="Manning minimum Cd coeff. {Cd > +0.E+00}.")
+
+    parser.add_argument(
+        "--manlaw-hi", dest="manlaw_hi", type=float,
+        default=0.E+00,
+        required=False,
+        help="Manning maximum Cd coeff. {Cd < +0.E+00}.")
     
     parser.add_argument(
         "--wetdry-h0", dest="wetdry_h0", type=float,
