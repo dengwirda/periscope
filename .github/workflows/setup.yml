@@ -37,6 +37,8 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: |
           brew install llvm libomp
+          export LDFLAGS="-L/usr/local/opt/llvm/lib"
+          export CPPFLAGS="-I/usr/local/opt/llvm/include"
           clang++ --version
           
       - name: Install dependencies
