@@ -1642,6 +1642,8 @@ def _computeVH(mesh, mats, cnfg,
     cdef INDEX_t cel1, cel2
     cdef REALS_t xval, last
     
+    cdef REALS_t hz_diff
+    
     cdef REALS_t ZERO = 0.0
     cdef REALS_t ONE_ = 1.0
     cdef REALS_t HALF = 0.5
@@ -1708,6 +1710,8 @@ def _computeVH(mesh, mats, cnfg,
     cdef np.ndarray[INDEX_t, ndim=2] \
         mesh_edge_cell = mesh.edge.cell
     
+    hh_tiny = max(hh_tiny, cnfg.wetdry_h0)
+    
     with nogil, parallel(num_threads=numthread):
         
         for edge in prange(0, NEDG, schedule="static", 
@@ -1733,12 +1737,17 @@ def _computeVH(mesh, mats, cnfg,
          
         #-- flux-limiter: don't diffuse to topography!
             OK_EDGE[edge] = MESH_EDGE_MASK[edge]
+            
+            hz_diff = fabs_r(
+                    ZB_CELL[cel1]+ HH_CELL[cel1] - 
+                    ZB_CELL[cel2]- HH_CELL[cel2])
+            
             OK_EDGE[edge]*=(
                 min(ZB_CELL[cel1]+ HH_CELL[cel1],
                     ZB_CELL[cel2]+ HH_CELL[cel2])
+                  - hz_diff
               > max(ZB_CELL[cel1], ZB_CELL[cel2]) 
-                    + hh_tiny
-                   )
+                  + hh_tiny)
                         
             HZ_EDGE[edge]*= OK_EDGE[edge]
             
@@ -1775,7 +1784,7 @@ def _computeVH(mesh, mats, cnfg,
                     xval * gravity * (
                         V2_CELL[xidx] * V4_DIFF[xidx])
                 
-                # if incident edges okay        
+                # if incident cells okay        
                 OK_EDGE[edge]*=(OK_CELL[xidx] >= ZERO)
                         
             HZ_EDGE[edge]*= OK_EDGE[edge]
@@ -1783,7 +1792,7 @@ def _computeVH(mesh, mats, cnfg,
         #-- flux limiter: don't allow up-gradient flux
         #-- see M. Xue (2000): MWR.
             HZ_EDGE[edge]*= (
-                HZ_EDGE[edge]* last < ZERO)
+                HZ_EDGE[edge] * last <= ZERO)
             
         for cell in prange(0, NCEL, schedule="static", 
                 chunksize=chunksize):

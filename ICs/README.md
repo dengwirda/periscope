@@ -134,8 +134,8 @@ A number of test cases are available to run out-of-the-box:
     --hh-scheme="UPWIND" \
     --wetdry-h0=1.E-04 \
     --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
-    --uu-visc-2=1.E+01 --uu-visc-4=2.E+11 \
-    --hh-diff-2=1.E+01 --hh-diff-4=2.E+11 \
+    --uu-visc-2=1.E+02 --uu-visc-4=2.E+11 \
+    --hh-diff-2=1.E+02 --hh-diff-4=2.E+11 \
     --leith-chi=0.3875 --leith-max=1.E+04 \
     --numthread=cores
 
@@ -175,8 +175,8 @@ A number of test cases are available to run out-of-the-box:
     --time-step=0.001 \
     --save-freq=250 \
     --stat-freq=125 \
-    --uu-visc-2=1.E-01 --uu-visc-4=2.E+09 \
-    --hh-diff-2=1.E-01 --hh-diff-4=2.E+09 \
+    --uu-visc-2=1.E+00 --uu-visc-4=2.E+09 \
+    --hh-diff-2=1.E+00 --hh-diff-4=2.E+09 \
     --leith-chi=0.3875 --leith-max=1.E+02 \
     --numthread=cores
         
@@ -195,9 +195,10 @@ A number of test cases are available to run out-of-the-box:
     --save-freq=144 \
     --stat-freq=288 \
     --hh-scheme="UPWIND" \
+    --wetdry-h0=1.E-04 \
     --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
-    --uu-visc-2=1.E+01 --uu-visc-4=2.E+11 \
-    --hh-diff-2=1.E+01 --hh-diff-4=2.E+11 \
+    --uu-visc-2=1.E+02 --uu-visc-4=2.E+11 \
+    --hh-diff-2=1.E+02 --hh-diff-4=2.E+11 \
     --leith-chi=0.3875 --leith-max=1.E+04 \
     --numthread=cores
 
