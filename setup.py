@@ -1,19 +1,42 @@
 
 import os
 import io
+import platform
 from setuptools import setup
 from setuptools.extension import Extension
 import numpy as np
 
 EXT_MODULES = []
 
-#-- GCC
-COMPILE_ARGS = [
-    "-O3", "-flto", "-fopenmp", "-ffast-math"]
+if   ("linux" in platform.system().lower()):
 
-#-- MSVC
-#COMPILE_ARGS = [
-#    "/Ox", "/GS-", "/GL", "/LTCG", "/openmp:llvm", "/fp:fast"]
+    print("*Compiling for Linux")
+    COMPILE_ARGS = [
+        "-O3", "-flto", "-fopenmp", "-ffast-math"]
+    LINKER_ARGS = [
+        "-O3", "-flto", "-fopenmp", "-ffast-math"]
+
+elif ("darwin" in platform.system().lower()):
+
+    print("*Compiling for MacOS")
+    COMPILE_ARGS = [
+        "-O3", "-flto", "-Xclang", "-fopenmp", "-ffast-math"]
+    LINKER_ARGS = [
+        "-O3", "-flto", "-lomp", "-ffast-math"]
+
+elif ("win" in platform.system.lower()):
+
+    print("*Compiling for Windows")
+    COMPILE_ARGS = [
+        "/Ox", "/GS-", 
+        "/GL", "/LTCG", "/openmp:llvm", "/fp:fast"]
+    LINKER_ARGS = [
+        "/Ox", "/GS-", 
+        "/GL", "/LTCG", "/openmp:llvm", "/fp:fast"]
+        
+else:
+
+    print("*Unknown operating system")
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
@@ -27,7 +50,7 @@ try:
         "_kx",
         sources=[os.path.join(HERE, "_kx.pyx")],
         extra_compile_args=COMPILE_ARGS,
-        extra_link_args=COMPILE_ARGS,
+        extra_link_args=LINKER_ARGS,
         include_dirs=[np.get_include()]),
         annotate=True
     )
@@ -36,7 +59,7 @@ try:
         "_kt",
         sources=[os.path.join(HERE, "_kt.pyx")],
         extra_compile_args=COMPILE_ARGS,
-        extra_link_args=COMPILE_ARGS,
+        extra_link_args=LINKER_ARGS,
         include_dirs=[np.get_include()]),
         annotate=True
     )
@@ -46,7 +69,7 @@ except ImportError:
         "_kx",
         sources=[os.path.join(HERE, "_kx.c")],
         extra_compile_args=COMPILE_ARGS,
-        extra_link_args=COMPILE_ARGS,
+        extra_link_args=LINKER_ARGS,
         include_dirs=[np.get_include()])
     ]
     
@@ -54,7 +77,7 @@ except ImportError:
         "_kt",
         sources=[os.path.join(HERE, "_kt.c")],
         extra_compile_args=COMPILE_ARGS,
-        extra_link_args=COMPILE_ARGS,
+        extra_link_args=LINKER_ARGS,
         include_dirs=[np.get_include()])
     ]
 
