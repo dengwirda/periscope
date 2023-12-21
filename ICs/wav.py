@@ -324,7 +324,13 @@ def tsu2(name, save, rsph, mesh, mats, _ics):
 
     erot = 7.292E-05            # Earth's omega
     grav = 9.80616              # gravity
-    
+
+#-- scalar self-attraction and loading approx.:
+#-- D. Inazu & T. Saito (2013): Simulation of distant 
+#-- tsunami propagation with a radial loading deformation effect
+    beta = 0.015
+    grav = (1. - beta) * grav
+
     data = xarray.open_dataset(name)
 
     if ("bed_elevation" not in data.variables.keys()):
@@ -338,8 +344,12 @@ def tsu2(name, save, rsph, mesh, mats, _ics):
     zb_cell+= np.asarray(
         data["ice_thickness"][:], dtype=np.float64)
 
-   #zb_cell = np.minimum(-1., zb_cell)
-    
+    # smooth at grid-scale
+    zb_dual = mats.dual_kite_sums * zb_cell
+    zb_dual/= mesh.vert.area
+    zb_cell = mats.cell_kite_sums * zb_dual
+    zb_cell/= mesh.cell.area
+
     uu_edge = np.zeros(mesh.edge.size, dtype=np.float64)
 
     dz_data = np.loadtxt(_ics)

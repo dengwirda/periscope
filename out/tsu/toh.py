@@ -38,13 +38,11 @@ if (__name__ == "__main__"):
     
     args = parser.parse_args()
     
-    # March 11, 05:46:23
-    # Add 3-mins, which is 1/2 of the 6-min earthquake
+    # March 11, 05:46:23 event occurs
     init = 31. + 28. + 11. + \
         (5. * 60. * 60. + 
         46. * 60. + 
-        23. + 
-        180.
+        23.
         ) / 24. / 60./ 60.
     
     print("Loading the mesh file...")
@@ -60,11 +58,11 @@ if (__name__ == "__main__"):
     time = dart[:, 0]
     zlev = dart[:, 9]
     zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
-    zlev-= np.nanmean(zlev)  # correct any const. bias
     mask = np.logical_and.reduce((
         time >= init + 1. / 24.,  # skip seismic waves
         time <= init + 8. / 24. ))
-       
+    zlev-= np.nanmean(zlev[mask]) # remove const. bias
+
     near = find_cell(
         mesh, np.array([xlon]), np.array([ylat]))
         
@@ -97,11 +95,11 @@ if (__name__ == "__main__"):
     time = dart[:, 0]
     zlev = dart[:, 9]
     zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
-    zlev-= np.nanmean(zlev)  # correct any const. bias
     mask = np.logical_and.reduce((
         time >= init + 3. / 24.,  # skip seismic waves
         time <= init + 8. / 24. ))
-       
+    zlev-= np.nanmean(zlev[mask]) # remove const. bias 
+
     near = find_cell(
         mesh, np.array([xlon]), np.array([ylat]))
         
@@ -134,11 +132,11 @@ if (__name__ == "__main__"):
     time = dart[:, 0]
     zlev = dart[:, 9]
     zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
-    zlev-= np.nanmean(zlev)  # correct any const. bias
     mask = np.logical_and.reduce((
         time >= init + 2. / 24.,  # skip seismic waves
         time <= init + 8. / 24. ))
-       
+    zlev-= np.nanmean(zlev[mask]) # remove const. bias 
+
     near = find_cell(
         mesh, np.array([xlon]), np.array([ylat]))
         
