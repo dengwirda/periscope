@@ -651,10 +651,15 @@ def _computeKE(mesh, mats, cnfg,
 #-- compute the kinetic energy 1/2 |u|^2
     
     cdef INDEX_t cell, iptr, xidx
-    cdef REALS_t xval
+    cdef REALS_t xval, yval, zval
+
+    cdef REALS_t K2_CELL
+    cdef REALS_t UX_CELL, UY_CELL, UZ_CELL
     
     cdef REALS_t ZERO = 0.0
     cdef REALS_t HALF = 0.5
+    cdef REALS_t ONE_ = 1.0
+    cdef REALS_t BIAS = 3.0 / 4.0
     
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
@@ -677,6 +682,23 @@ def _computeKE(mesh, mats, cnfg,
     cdef INDEX_t *CELL_WING_XIDX = &cell_wing_xidx[0]
     cdef REALS_t *CELL_WING_XVAL = &cell_wing_xval[0]
     
+    cdef INDEX_t[::1] cell_lsqr_xptr = \
+        mats.cell_lsqr_xnrm.indptr
+    cdef INDEX_t[::1] cell_lsqr_xidx = \
+        mats.cell_lsqr_xnrm.indices
+    cdef REALS_t[::1] cell_lsqr_xval = \
+        mats.cell_lsqr_xnrm.data
+    cdef REALS_t[::1] cell_lsqr_yval = \
+        mats.cell_lsqr_ynrm.data
+    cdef REALS_t[::1] cell_lsqr_zval = \
+        mats.cell_lsqr_znrm.data
+
+    cdef INDEX_t *CELL_LSQR_XPTR = &cell_lsqr_xptr[0]
+    cdef INDEX_t *CELL_LSQR_XIDX = &cell_lsqr_xidx[0]
+    cdef REALS_t *CELL_LSQR_XVAL = &cell_lsqr_xval[0]
+    cdef REALS_t *CELL_LSQR_YVAL = &cell_lsqr_yval[0]
+    cdef REALS_t *CELL_LSQR_ZVAL = &cell_lsqr_zval[0]
+
     cdef REALS_t[::1] mesh_cell_area = mesh.cell.area
     
     cdef REALS_t *MESH_CELL_AREA = &mesh_cell_area[0]
@@ -703,6 +725,31 @@ def _computeKE(mesh, mats, cnfg,
                       + VV_EDGE[xidx] * VV_EDGE[xidx])
         
             KE_CELL[cell]/= MESH_CELL_AREA[cell]
+
+        #-- cell-centred approx. from LSQR reconstruct
+            UX_CELL = UY_CELL = UZ_CELL = ZERO
+            for iptr in range(CELL_LSQR_XPTR[cell +0],
+                              CELL_LSQR_XPTR[cell +1]):
+                    
+                xval = CELL_LSQR_XVAL[iptr]
+                yval = CELL_LSQR_YVAL[iptr]
+                zval = CELL_LSQR_ZVAL[iptr]
+
+                xidx = CELL_LSQR_XIDX[iptr]
+
+                UX_CELL = \
+                    UX_CELL + xval * UU_EDGE[xidx]
+                UY_CELL = \
+                    UY_CELL + yval * UU_EDGE[xidx]
+                UZ_CELL = \
+                    UZ_CELL + zval * UU_EDGE[xidx]
+
+            K2_CELL = UX_CELL * UX_CELL + \
+                      UY_CELL * UY_CELL + \
+                      UZ_CELL * UZ_CELL
+
+            KE_CELL[cell] = BIAS * KE_CELL[cell] + \
+                    (ONE_ - BIAS) * HALF * K2_CELL
     
     return ke_cell
     
