@@ -60,7 +60,7 @@ if (__name__ == "__main__"):
     zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
     mask = np.logical_and.reduce((
         time >= init + 1. / 24.,  # skip seismic waves
-        time <= init + 8. / 24. ))
+        time <= init + 9. / 24. ))
     zlev-= np.nanmean(zlev[mask]) # remove const. bias
 
     near = find_cell(
@@ -79,7 +79,7 @@ if (__name__ == "__main__"):
     plt.figure(1)
     plt.plot((time[mask] - init) * 24, zlev[mask])
     plt.plot(hh_time, hh_data)
-    plt.xlim([0, 8])
+    plt.xlim([0, 9])
     plt.legend(("DART-21413", "SWE"), loc="upper right")
     plt.grid(True, linestyle="-.")
     plt.ylabel("Sea Surface Height [m]")
@@ -97,7 +97,7 @@ if (__name__ == "__main__"):
     zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
     mask = np.logical_and.reduce((
         time >= init + 3. / 24.,  # skip seismic waves
-        time <= init + 8. / 24. ))
+        time <= init + 9. / 24. ))
     zlev-= np.nanmean(zlev[mask]) # remove const. bias 
 
     near = find_cell(
@@ -116,7 +116,7 @@ if (__name__ == "__main__"):
     plt.figure(2)
     plt.plot((time[mask] - init) * 24, zlev[mask])
     plt.plot(hh_time, hh_data)
-    plt.xlim([0, 8])
+    plt.xlim([0, 9])
     plt.legend(("DART-52402", "SWE"), loc="upper right")
     plt.grid(True, linestyle="-.")
     plt.ylabel("Sea Surface Height [m]")
@@ -134,7 +134,7 @@ if (__name__ == "__main__"):
     zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
     mask = np.logical_and.reduce((
         time >= init + 2. / 24.,  # skip seismic waves
-        time <= init + 8. / 24. ))
+        time <= init + 9. / 24. ))
     zlev-= np.nanmean(zlev[mask]) # remove const. bias 
 
     near = find_cell(
@@ -153,7 +153,7 @@ if (__name__ == "__main__"):
     plt.figure(3)
     plt.plot((time[mask] - init) * 24, zlev[mask])
     plt.plot(hh_time, hh_data)
-    plt.xlim([0, 8])
+    plt.xlim([0, 9])
     plt.legend(("DART-21416", "SWE"), loc="upper right")
     plt.grid(True, linestyle="-.")
     plt.ylabel("Sea Surface Height [m]")
@@ -171,7 +171,7 @@ if (__name__ == "__main__"):
     zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
     mask = np.logical_and.reduce((
         time >= init + 4. / 24.,  # skip seismic waves
-        time <= init + 8. / 24. ))
+        time <= init + 9. / 24. ))
     zlev-= np.nanmean(zlev[mask]) # remove const. bias 
 
     near = find_cell(
@@ -190,7 +190,7 @@ if (__name__ == "__main__"):
     plt.figure(4)
     plt.plot((time[mask] - init) * 24, zlev[mask])
     plt.plot(hh_time, hh_data)
-    plt.xlim([0, 8])
+    plt.xlim([0, 9])
     plt.legend(("DART-46402", "SWE"), loc="upper right")
     plt.grid(True, linestyle="-.")
     plt.ylabel("Sea Surface Height [m]")
@@ -208,7 +208,7 @@ if (__name__ == "__main__"):
     zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
     mask = np.logical_and.reduce((
         time >= init + 5. / 24.,  # skip seismic waves
-        time <= init + 8. / 24. ))
+        time <= init + 9. / 24. ))
     zlev-= np.nanmean(zlev[mask]) # remove const. bias 
 
     near = find_cell(
@@ -227,8 +227,8 @@ if (__name__ == "__main__"):
     plt.figure(5)
     plt.plot((time[mask] - init) * 24, zlev[mask])
     plt.plot(hh_time, hh_data)
-    plt.xlim([0, 8])
-    plt.legend(("DART-52406", "SWE"), loc="upper right")
+    plt.xlim([0, 9])
+    plt.legend(("DART-52406", "SWE"), loc="upper left")
     plt.grid(True, linestyle="-.")
     plt.ylabel("Sea Surface Height [m]")
     plt.xlabel("Hours since event")
