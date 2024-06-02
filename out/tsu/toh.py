@@ -161,6 +161,80 @@ if (__name__ == "__main__"):
     
     plt.savefig(os.path.splitext(args.mesh_file)[0] + "_21416.png", 
                 bbox_inches="tight", dpi=300)
+
+    dart = np.loadtxt(os.path.join(HERE,
+        "dart46402_20110301to20110320_meter.txt"))
+    xlon =-164.005 * np.pi / 180.
+    ylat = 51.0680 * np.pi / 180.
+    time = dart[:, 0]
+    zlev = dart[:, 9]
+    zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
+    mask = np.logical_and.reduce((
+        time >= init + 4. / 24.,  # skip seismic waves
+        time <= init + 8. / 24. ))
+    zlev-= np.nanmean(zlev[mask]) # remove const. bias 
+
+    near = find_cell(
+        mesh, np.array([xlon]), np.array([ylat]))
+        
+    data = nc.Dataset(args.mesh_file, "r")    
+    hh_data = np.asarray(
+        data["hh_cell"][:, near, 0], dtype=np.float32) 
+    hh_data+= data["zb_cell"][near]
     
+    hh_step = int(data.dimensions["Time"].size)
+    hh_time = np.linspace(0., hh_step, hh_step)
+    hh_time*= data.time_step * data.save_freq / 60. / 60.
+    data.close()
+    
+    plt.figure(4)
+    plt.plot((time[mask] - init) * 24, zlev[mask])
+    plt.plot(hh_time, hh_data)
+    plt.xlim([0, 8])
+    plt.legend(("DART-46402", "SWE"), loc="upper right")
+    plt.grid(True, linestyle="-.")
+    plt.ylabel("Sea Surface Height [m]")
+    plt.xlabel("Hours since event")
+    
+    plt.savefig(os.path.splitext(args.mesh_file)[0] + "_46402.png", 
+                bbox_inches="tight", dpi=300)
+
+    dart = np.loadtxt(os.path.join(HERE,
+        "dart52406_20110301to20110320_meter.txt"))
+    xlon = 165.002 * np.pi / 180.
+    ylat = -5.2930 * np.pi / 180.
+    time = dart[:, 0]
+    zlev = dart[:, 9]
+    zlev[np.abs(zlev) >= 9999.] = np.nan  # not signal
+    mask = np.logical_and.reduce((
+        time >= init + 5. / 24.,  # skip seismic waves
+        time <= init + 8. / 24. ))
+    zlev-= np.nanmean(zlev[mask]) # remove const. bias 
+
+    near = find_cell(
+        mesh, np.array([xlon]), np.array([ylat]))
+        
+    data = nc.Dataset(args.mesh_file, "r")    
+    hh_data = np.asarray(
+        data["hh_cell"][:, near, 0], dtype=np.float32) 
+    hh_data+= data["zb_cell"][near]
+    
+    hh_step = int(data.dimensions["Time"].size)
+    hh_time = np.linspace(0., hh_step, hh_step)
+    hh_time*= data.time_step * data.save_freq / 60. / 60.
+    data.close()
+    
+    plt.figure(5)
+    plt.plot((time[mask] - init) * 24, zlev[mask])
+    plt.plot(hh_time, hh_data)
+    plt.xlim([0, 8])
+    plt.legend(("DART-52406", "SWE"), loc="upper right")
+    plt.grid(True, linestyle="-.")
+    plt.ylabel("Sea Surface Height [m]")
+    plt.xlabel("Hours since event")
+    
+    plt.savefig(os.path.splitext(args.mesh_file)[0] + "_52406.png", 
+                bbox_inches="tight", dpi=300)
+
     if args.show_plot: plt.show()
     
