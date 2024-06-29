@@ -908,13 +908,13 @@ def _computePV(mesh, mats, cnfg,
             R2_DUAL[vert] = (
                     RV_SUM_ / MESH_DUAL_AREA[vert])
             
+            # circulation to curl(u) final
+            RV_DUAL[vert]/=   MESH_DUAL_AREA[vert]
+
             P2_DUAL[vert] = \
                 (ONE_ / HH_DUAL[vert]) * \
                     (R2_DUAL[vert] + FF_DUAL[vert])
             
-            # circulation to curl(u) final
-            RV_DUAL[vert]/= MESH_DUAL_AREA[vert]
-        
             PV_DUAL[vert] = \
                 (ONE_ / HH_DUAL[vert]) * \
                     (RV_DUAL[vert] + FF_DUAL[vert])

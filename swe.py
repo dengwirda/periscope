@@ -273,8 +273,8 @@ def swe(cnfg):
                                         uu_min_, uu_max_
             )
                        
-        if (np.min(hh_min_) <= 0.0): 
-            print("-ve layer thickness:", np.min(hh_min_) )
+       #if (np.min(hh_min_) <= 0.0): 
+       #    print("-ve layer thickness:", np.min(hh_min_) )
                  
         cnfg = mark_time(cnfg, flow, tnow + cnfg.time_step)
             
