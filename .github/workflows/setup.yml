@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.11"]
+        python-version: ["3.12"]
 
     steps:
       - uses: actions/checkout@v3
@@ -75,7 +75,7 @@ jobs:
           --mesh-file="wtc2_cvt_7.nc" \
           --numthread=2 \
           --num-steps=576 --time-step=300.0 \
-          --save-freq=288 --stat-freq=144 \
+          --save-freq=288 --stat-freq=288 \
           --integrate="RK32-FB"
           
       - name: Run periscope testcase 2
@@ -89,7 +89,7 @@ jobs:
           --mesh-file="bjet_cvt_7.nc" \
           --numthread=2 \
           --num-steps=640 --time-step=135.0 \
-          --save-freq=640 --stat-freq=160 \
+          --save-freq=640 --stat-freq=320 \
           --integrate="RK22-FB"
           
       - name: Run periscope testcase 3
@@ -114,10 +114,10 @@ jobs:
           --mesh-file="wake_2.nc" \
           --forc-file="frc_wake_2.nc" \
           --num-steps=864 --time-step=0.125 \
-          --save-freq=144 --stat-freq=288 \
-          --hh-scheme="UPWIND" \
-          --wetdry-h0=1.E-04 \
+          --save-freq=288 --stat-freq=288 \
+          --hh-scheme="upwind" \
+          --wetdry-h0=1.E-03 \
           --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
-          --uu-visc-2=1.E+02 --uu-visc-4=2.E+11 \
-          --hh-diff-2=1.E+02 --hh-diff-4=2.E+11 \
+          --uu-visc-2=1.E+02 --uu-visc-4=1.E+11 \
+          --hh-diff-2=1.E+02 --hh-diff-4=1.E+11 \
           --leith-chi=0.3875 --leith-max=1.E+04
