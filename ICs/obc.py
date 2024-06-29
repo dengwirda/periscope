@@ -20,7 +20,7 @@ from ops import operators
 #-- Open BCs and wakes around obstructions
 #-- Authors: Darren Engwirda
 
-def init(name, save, rsph=0.E+0):
+def init(name, save, rsph, case):
 
 #------------------------------------ load an MPAS mesh file
 
@@ -36,6 +36,17 @@ def init(name, save, rsph=0.E+0):
     print("Building coefficients...")
 
     mats = operators(mesh)
+
+    if (case == 1): 
+        obc1(name, save, rsph, mesh, mats)
+
+    if (case == 2): 
+        obc2(name, save, rsph, mesh, mats)
+
+    return
+
+
+def obc1(name, save, rsph, mesh, mats):
 
 #-- requires rsph = 50000. to scale disk to 1000m
 
@@ -135,7 +146,120 @@ def init(name, save, rsph=0.E+0):
     forc.to_netcdf(save, format="NETCDF4")
 
     return
+
+
+def obc2(name, save, rsph, mesh, mats):
+
+#-- requires rsph = 50000. to scale disk to 1000m
+
+    grav = 9.81                 # gravity
+    f = 1.0E-04                 # coriolis
+    u0 = 0.0
+    h0 = 10.                    # depth
+    hh = 40.
+    zw = 200.                  # wave position
+   #yw = 350.    
+    z0 = 375.                  # hill position
+    y0 = 350.
+
+    uu_edge = u0 * np.ones(
+        (mesh.edge.size), dtype=np.float64)
     
+    hh_cell = h0 * np.ones(
+        (mesh.cell.size), dtype=np.float64)
+
+    hh_cell+= 5. * np.exp(
+        -0.0001 * (mesh.cell.ypos - 0.)**2 
+        -0.0001 * (mesh.cell.zpos + zw)**2
+            )
+    
+    zb_cell = np.zeros(hh_cell.shape, dtype=np.float64)
+    
+    zb_cell+= hh * np.exp(
+        -.00001 * (mesh.cell.ypos - y0)**2 
+        -.00001 * (mesh.cell.zpos - z0)**2
+            )
+    zb_cell+= hh * np.exp(
+        -.00001 * (mesh.cell.ypos + y0)**2 
+        -.00001 * (mesh.cell.zpos - z0)**2
+            )
+ 
+    hh_cell = np.maximum(0., hh_cell - zb_cell)
+    
+    # external signal at OBCs
+    uE_edge = u0 * np.ones(
+        (mesh.edge.size), dtype=np.float64)
+    
+    hE_edge = mats.edge_wing_sums * hh_cell
+    hE_edge/= mesh.edge.area
+
+#-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
+
+    print("Output written to:", save)
+
+    init = xarray.open_dataset(name)
+    init.attrs.update({"sphere_radius": mesh.rsph})
+    init.attrs.update({"config_gravity": grav})
+    init["xCell"] = (("nCells"), mesh.cell.xpos)
+    init["yCell"] = (("nCells"), mesh.cell.ypos)
+    init["zCell"] = (("nCells"), mesh.cell.zpos)
+    init["areaCell"] = (("nCells"), mesh.cell.area)
+
+    init["xEdge"] = (("nEdges"), mesh.edge.xpos)
+    init["yEdge"] = (("nEdges"), mesh.edge.ypos)
+    init["zEdge"] = (("nEdges"), mesh.edge.zpos)
+    init["dvEdge"] = (("nEdges"), mesh.edge.vlen)
+    init["dcEdge"] = (("nEdges"), mesh.edge.clen)
+
+    init["xVertex"] = (("nVertices"), mesh.vert.xpos)
+    init["yVertex"] = (("nVertices"), mesh.vert.ypos)
+    init["zVertex"] = (("nVertices"), mesh.vert.zpos)
+    init["areaTriangle"] = (("nVertices"), mesh.vert.area)
+    init["kiteAreasOnVertex"] = (
+        ("nVertices", "vertexDegree"), mesh.vert.kite)
+
+    init["hh_cell"] = (
+        ("Time", "nCells", "nVertLevels"),
+        np.reshape(hh_cell, (1, mesh.cell.size, 1)))
+    
+    init["zb_cell"] = (("nCells"), zb_cell)
+
+    init["uu_edge"] = (
+        ("Time", "nEdges", "nVertLevels"),
+        np.reshape(uu_edge, (1, mesh.edge.size, 1)))
+    
+    init["ff_cell"] = (("nCells"), 
+        f * np.ones(mesh.cell.size))
+    init["ff_edge"] = (("nEdges"),
+        f * np.ones(mesh.edge.size))
+    init["ff_vert"] = (("nVertices"),
+        f * np.ones(mesh.vert.size))
+
+    init["is_open"] = (("nEdges"), mesh.edge.mask>0)
+
+    print(init)
+
+    init.to_netcdf(save, format="NETCDF4")
+    
+    path, file = os.path.split(save)
+    save = os.path.join(path, "frc_" + file)
+    
+    forc = xarray.Dataset()
+    forc["hE_edge"] = (
+        ("Time", "nEdges", "nVertLevels"),
+        np.reshape(hE_edge, (1, mesh.edge.size, 1)))
+        
+    forc["uE_edge"] = (
+        ("Time", "nEdges", "nVertLevels"),
+        np.reshape(uE_edge, (1, mesh.edge.size, 1)))
+
+    print(forc)
+
+    forc.to_netcdf(save, format="NETCDF4")
+
+    return
+    
+
 if (__name__ == "__main__"):
     parser = argparse.ArgumentParser(
         description=__doc__,
@@ -150,6 +274,10 @@ if (__name__ == "__main__"):
         required=True, help="IC's filename to write.")
 
     parser.add_argument(
+        "--test-case", dest="test_case", type=int,
+        required=True, help="Test case number (1-2).")
+
+    parser.add_argument(
         "--radius", dest="radius", type=float,
         default=0., required=False, 
         help="Value of sphere_radius; zero to use mesh data.")
@@ -158,5 +286,6 @@ if (__name__ == "__main__"):
 
     init(name=args.mesh_file,
          save=args.init_file,
-         rsph=args.radius)
+         rsph=args.radius,
+         case=args.test_case)
 

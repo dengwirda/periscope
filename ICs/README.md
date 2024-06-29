@@ -131,11 +131,11 @@ A number of test cases are available to run out-of-the-box:
     --time-step=15. \
     --save-freq=40 \
     --stat-freq=40 \
-    --hh-scheme="UPWIND" \
-    --wetdry-h0=1.E-04 \
+    --hh-scheme="upwind" \
+    --wetdry-h0=1.E-03 \
     --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
-    --uu-visc-2=1.E+02 --uu-visc-4=2.E+11 \
-    --hh-diff-2=1.E+02 --hh-diff-4=2.E+11 \
+    --uu-visc-2=1.E+02 --uu-visc-4=1.E+11 \
+    --hh-diff-2=1.E+02 --hh-diff-4=1.E+11 \
     --leith-chi=0.3875 --leith-max=1.E+04 \
     --numthread=cores
 
@@ -151,7 +151,7 @@ A number of test cases are available to run out-of-the-box:
     --num-steps=10000 \
     --time-step=0.001 \
     --save-freq=250 \
-    --stat-freq=125 \
+    --stat-freq=250 \
     --numthread=cores
 
 ### `Dipole-wall interaction`
@@ -166,7 +166,7 @@ A number of test cases are available to run out-of-the-box:
     --num-steps=10000 \
     --time-step=0.001 \
     --save-freq=250 \
-    --stat-freq=125 \
+    --stat-freq=250 \
     --numthread=cores
     
     python3 swe.py \
@@ -174,9 +174,8 @@ A number of test cases are available to run out-of-the-box:
     --num-steps=10000 \
     --time-step=0.001 \
     --save-freq=250 \
-    --stat-freq=125 \
-    --uu-visc-2=1.E+00 --uu-visc-4=2.E+09 \
-    --hh-diff-2=1.E+00 --hh-diff-4=2.E+09 \
+    --stat-freq=250 \
+    --uu-visc-2=1.E+00 --uu-visc-4=1.E+08 \
     --leith-chi=0.3875 --leith-max=1.E+02 \
     --numthread=cores
         
@@ -185,7 +184,8 @@ A number of test cases are available to run out-of-the-box:
     python3 ICs/obc.py \
     --mesh-file="mesh_disk_3.nc" \
     --init-file="wake_3.nc" \
-    --radius=50000.
+    --radius=50000. \
+    --test-case=1
 
     python3 swe.py \
     --mesh-file="wake_3.nc" \
@@ -193,12 +193,34 @@ A number of test cases are available to run out-of-the-box:
     --time-step=0.0625 \
     --num-steps=1440 \
     --save-freq=144 \
-    --stat-freq=288 \
-    --hh-scheme="UPWIND" \
-    --wetdry-h0=1.E-04 \
+    --stat-freq=144 \
+    --hh-scheme="upwind" \
+    --wetdry-h0=1.E-03 \
     --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
-    --uu-visc-2=1.E+02 --uu-visc-4=2.E+11 \
-    --hh-diff-2=1.E+02 --hh-diff-4=2.E+11 \
+    --uu-visc-2=1.E+02 --uu-visc-4=1.E+11 \
+    --hh-diff-2=1.E+02 --hh-diff-4=1.E+11 \
     --leith-chi=0.3875 --leith-max=1.E+04 \
+    --numthread=cores
+
+### `Wet-dry shore run-up`
+
+    python3 ICs/obc.py \
+    --mesh-file="mesh_disk_3.nc" \
+    --init-file="hill_3.nc" \
+    --radius=50000. \
+    --test-case=2
+
+    python3 swe.py \
+    --mesh-file="hill_3.nc" \
+    --forc-file="frc_hill_3.nc" \
+    --time-step=0.1 \
+    --num-steps=2500 \
+    --save-freq=50 \
+    --stat-freq=50 \
+    --hh-scheme="upwind" \
+    --wetdry-h0=1.E-03 \
+    --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
+    --uu-visc-2=1.E+02 --uu-visc-4=1.E+11 \
+    --hh-diff-2=1.E+02 --hh-diff-4=1.E+11 \
     --numthread=cores
 
