@@ -4,7 +4,6 @@ import sys
 import os
 import numpy as np
 from scipy.sparse.linalg import gcrotmk
-from scipy.integrate import quadrature
 
 import xarray
 import argparse
@@ -75,7 +74,7 @@ def init(name, save, rsph=0.E+0):
     sf_cell, info = gcrotmk(
         mats.cell_flux_sums * 
         mats.edge_grad_norm, rv_cell, 
-            tol=1.E-08, atol=1.E-08, m=50, k=25)
+            rtol=1.E-04, atol=1.E-04, m=50, k=25)
             
     sf_vert = mats.dual_kite_sums * sf_cell
     sf_vert/= mesh.vert.area
@@ -89,8 +88,8 @@ def init(name, save, rsph=0.E+0):
     sf_vert, info = gcrotmk(
         mats.dual_flux_sums * 
         mats.edge_grad_perp, rv_dual, 
-            tol=1.E-04, atol=1.E-04, m=50, k=25)
-            
+            rtol=1.E-04, atol=1.E-04, m=50, k=25)
+        
     sf_cell = mats.cell_kite_sums * sf_vert
     sf_cell/= mesh.cell.area
 

@@ -4,7 +4,6 @@ import sys
 import os
 import numpy as np
 from scipy.sparse.linalg import gcrotmk
-from scipy.integrate import quadrature
 
 import xarray
 import argparse
@@ -518,9 +517,9 @@ def wtc6(name, save, rsph, mesh, mats):
     
     ttic = time.time()
     hh_cell, info = gcrotmk(
-        mats.cell_flux_sums * 
-        mats.edge_grad_norm, rh_edge, 
-            tol=1.E-08, atol=1.E-08, m=50, k=25)
+        mats.cell_flux_sums *
+        mats.edge_grad_norm, 
+            rh_edge, rtol=1.E-8, atol=1.E-8, m=50, k=25)
     ttoc = time.time()
    #print(ttoc - ttic)    
 

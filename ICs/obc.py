@@ -4,7 +4,6 @@ import sys
 import os
 import numpy as np
 from scipy.sparse.linalg import gcrotmk
-from scipy.integrate import quadrature
 
 import xarray
 import argparse

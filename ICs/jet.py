@@ -4,7 +4,7 @@ import sys
 import os
 import numpy as np
 from scipy.sparse.linalg import gcrotmk
-from scipy.integrate import quadrature
+from scipy.integrate import quad
 
 import xarray
 import argparse
@@ -16,7 +16,6 @@ from stb import strtobool
 
 from msh import load_mesh, cell_quad, dual_quad
 from ops import operators
-
 
 def ujet(alat, lat0, lat1, uamp, rsph):
     """
@@ -30,8 +29,8 @@ def ujet(alat, lat0, lat1, uamp, rsph):
     vals = -rsph * uamp * np.exp(
         1.0E+0 / ((alat - lat0) * (alat - lat1)))
 
-    vals[alat < lat0] = 0.0
-    vals[alat > lat1] = 0.0
+    if (alat < lat0): vals = 0.0
+    if (alat > lat1): vals = 0.0
 
     return vals
 
@@ -101,8 +100,8 @@ def init(name, save, rsph=0.E+0, pert=True):
     for vert in range(mesh.vert.size):
         alat = mesh.vert.ylat[vert]
         if (alat >= lat0 and alat < lat1):
-            vpsi[vert], _ = quadrature(
-                ujet, lat0, alat, miniter=8,
+            vpsi[vert], _ = quad(
+                ujet, lat0, alat,
                 args=(lat0, lat1, uamp, mesh.rsph))
 
     vpsi[mesh.vert.ylat[:] >= lat1] = np.min(vpsi)
@@ -112,8 +111,8 @@ def init(name, save, rsph=0.E+0, pert=True):
     for cell in range(mesh.cell.size):
         alat = mesh.cell.ylat[cell]
         if (alat >= lat0 and alat < lat1):
-            cpsi[cell], _ = quadrature(
-                ujet, lat0, alat, miniter=8,
+            cpsi[cell], _ = quad(
+                ujet, lat0, alat,
                 args=(lat0, lat1, uamp, mesh.rsph))
 
     cpsi[mesh.cell.ylat[:] >= lat1] = np.min(cpsi)
@@ -159,8 +158,8 @@ def init(name, save, rsph=0.E+0, pert=True):
     ttic = time.time()
     hdel, info = gcrotmk(
         mats.cell_flux_sums *
-        mats.edge_grad_norm, vrhs, 
-            tol=1.E-8, atol=1.E-8, m=50, k=25)
+        mats.edge_grad_norm, 
+            vrhs, rtol=1.E-8, atol=1.E-8, m=50, k=25)
     ttoc = time.time()
    #print(ttoc - ttic)    
     
