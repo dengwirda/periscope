@@ -18,10 +18,11 @@ cimport numpy as np
 cimport cython
 
 from cython.parallel import prange, parallel
-from libc.stdint cimport int32_t
 
 from _fp import flt32_t, flt64_t
+from _kp cimport FLT32_t, FLT64_t
 from _fp import reals_t, index_t
+from _kp cimport REALS_t, INDEX_t
 
 from lib cimport sqrtf as sqrt_r
 from lib cimport cbrtf as cbrt_r
@@ -31,11 +32,6 @@ from lib cimport fabsf as fabs_r
 from mem import variables
 from mem import get_vec_v, get_vec_e, get_vec_c, \
                 put_vec_v, put_vec_e, put_vec_c
-
-ctypedef float   FLT32_t
-ctypedef double  FLT64_t
-ctypedef int32_t INDEX_t
-ctypedef float   REALS_t  # or double
 
 def _computeBC(mesh, mats, cnfg,
     np.ndarray[REALS_t, ndim=1] hh_edge,

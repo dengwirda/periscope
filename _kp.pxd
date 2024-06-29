@@ -1,5 +1,5 @@
 
-import numpy as np
+from libc.stdint cimport int32_t
 
 """ typedef's for discrete SWE spatio-temporal operators
 """
@@ -8,8 +8,8 @@ import numpy as np
 #-- d.engwirda@gmail.com
 #-- https://github.com/dengwirda/
 
-flt32_t = np.float32
-flt64_t = np.float64
-index_t = np.int32
-reals_t = np.float32 # or np.float64
+ctypedef float   FLT32_t
+ctypedef double  FLT64_t
+ctypedef int32_t INDEX_t
+ctypedef float   REALS_t # or double
 

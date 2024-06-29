@@ -18,15 +18,11 @@ cimport numpy as np
 cimport cython
 
 from cython.parallel import prange, parallel
-from libc.stdint cimport int32_t
 
 from _fp import flt32_t, flt64_t
+from _kp cimport FLT32_t, FLT64_t
 from _fp import reals_t, index_t
-
-ctypedef float   FLT32_t
-ctypedef double  FLT64_t
-ctypedef int32_t INDEX_t
-ctypedef float   REALS_t  # or double
+from _kp cimport REALS_t, INDEX_t
 
 def _bnd_x_vec(cnfg,
     np.ndarray[REALS_t, ndim=1] xx_data,
