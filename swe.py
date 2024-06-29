@@ -136,14 +136,17 @@ def swe(cnfg):
     # remap fe,fc is more accurate?
     flow.ff_edge = mats.edge_tail_sums*flow.ff_vert
     flow.ff_edge/= mesh.edge.area
-    flow.ff_edge = np.asarray(
-           flow.ff_edge, dtype=flt32_t)
     
     flow.ff_cell = mats.cell_kite_sums*flow.ff_vert
     flow.ff_cell/= mesh.cell.area
+
+    flow.ff_vert = np.asarray(
+           flow.ff_vert, dtype=flt32_t)
+    flow.ff_edge = np.asarray(
+           flow.ff_edge, dtype=flt32_t)
     flow.ff_cell = np.asarray(
            flow.ff_cell, dtype=flt32_t)
-    
+
     flow.ff_cell*= (not cnfg.no_rotate)
     flow.ff_edge*= (not cnfg.no_rotate)
     flow.ff_vert*= (not cnfg.no_rotate)
@@ -269,7 +272,10 @@ def swe(cnfg):
                                         hh_min_, hh_max_,
                                         uu_min_, uu_max_
             )
-                                        
+                       
+        if (np.min(hh_min_) <= 0.0): 
+            print("-ve layer thickness:", np.min(hh_min_) )
+                 
         cnfg = mark_time(cnfg, flow, tnow + cnfg.time_step)
             
         if (step % cnfg.stat_freq == 0):
@@ -530,6 +536,12 @@ if (__name__ == "__main__"):
         default=30.E+3,
         required=False,
         help="Ref-len. for visc. scales {DX = 30.E+03}.")
+
+    parser.add_argument(
+        "--msh-fixes", dest="msh_fixes", type=float,
+        default=1.E+00,
+        required=False,
+        help="Mesh quality visc. scales {MF = +1.E+00}.")
         
     parser.add_argument(
         "--hh-diff-2", dest="hh_diff_2", type=float,

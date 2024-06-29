@@ -35,21 +35,30 @@ def scalingVk(mesh, mats, cnfg):
     # diam. of equiv. circle
     dx_cell = 2. * np.sqrt(mesh.cell.area / np.pi)
 
+    # cell topo. dissipation
+    sf_cell = cnfg.msh_fixes * \
+        np.sqrt(np.abs(mesh.cell.topo - 6))
+
     # smooth near grid-scale
     dx_edge = mats.edge_wing_sums * dx_cell
     dx_edge/= mesh.edge.area
     dx_cell = mats.cell_wing_sums * dx_edge
     dx_cell/= mesh.cell.area
     
+    sf_edge = mats.edge_wing_sums * sf_cell
+    sf_edge/= mesh.edge.area
+    sf_cell = mats.cell_wing_sums * sf_edge
+    sf_cell/= mesh.cell.area
+
     dx_edge = mats.edge_wing_sums * dx_cell
     dx_edge/= mesh.edge.area
     dx_cell = mats.cell_wing_sums * dx_edge
     dx_cell/= mesh.cell.area
     
-    dx_edge = mats.edge_wing_sums * dx_cell
-    dx_edge/= mesh.edge.area
-    dx_cell = mats.cell_wing_sums * dx_edge
-    dx_cell/= mesh.cell.area
+    sf_edge = mats.edge_wing_sums * sf_cell
+    sf_edge/= mesh.edge.area
+    sf_cell = mats.cell_wing_sums * sf_edge
+    sf_cell/= mesh.cell.area
     
     if (cnfg.ref_scale > 0.0):
         s2_cell = (dx_cell / cnfg.ref_scale) ** 1
@@ -60,8 +69,14 @@ def scalingVk(mesh, mats, cnfg):
         s4_cell = np.ones(
             (mesh.cell.size), dtype=reals_t)
     
+    s2_cell*= (1. + sf_cell)
+    s4_cell*= (1. + sf_cell)
+
     dx_edge = mats.edge_wing_sums * dx_cell
     dx_edge/= mesh.edge.area
+
+    sf_edge = mats.edge_wing_sums * sf_cell
+    sf_edge/= mesh.edge.area
 
     if (cnfg.ref_scale > 0.0):
         s2_edge = (dx_edge / cnfg.ref_scale) ** 1
@@ -72,8 +87,10 @@ def scalingVk(mesh, mats, cnfg):
         s4_edge = np.ones(
             (mesh.edge.size), dtype=reals_t)
 
-    return s2_edge, s4_edge, \
-           s2_cell, s4_cell
+    s2_edge*= (1. + sf_edge)
+    s4_edge*= (1. + sf_edge)
+
+    return s2_edge, s4_edge, s2_cell, s4_cell
 
  
 def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
@@ -280,7 +297,8 @@ def computeKE(mesh, mats, cnfg,
     up_edge = variables.ke_bias
  
     ke_cell = _computeKE(
-        mesh, mats, cnfg, uu_edge, vv_edge)
+        mesh, mats, cnfg, 
+            hh_cell, hh_edge, uu_edge, vv_edge)
         
     ttoc = time.time()
     tcpu.computeKE = tcpu.computeKE + (ttoc - ttic)
@@ -509,8 +527,8 @@ def computeCd(mesh, mats, cnfg, gravity, hh_cell,
 
 #-- composite bottom drag c_d
 
-    vv_edge = \
-        computeVV(mesh, mats, cnfg, uu_edge)
+    vv_edge = computeVV(
+        mesh, mats, cnfg, uu_edge)
 
     ttic = time.time()
         

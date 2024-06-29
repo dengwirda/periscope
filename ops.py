@@ -214,7 +214,7 @@ def operators(mesh):
     
     # build LSQR-<OP> from edge-wise reconstructions
     mats.edge_lsqr_perp = edge_lsqr_perp(mesh, mats)
-    
+   
     # operators for piecewise linear reconstructions
     # fe = fi + (xe - xi) * grad(f)
    #mats.edge_dual_reco = edge_dual_reco(mesh, mats)
@@ -1036,9 +1036,19 @@ def edge_lsqr_mats(mesh):
 
         have = eidx >= 0;
         mask[enum[np.logical_not(have)]] = False
+        enum = enum[have]        
         eidx = eidx[have]
 
-        Wmat[edge, edge, mask] = wval[eidx]
+        dist = np.sqrt(
+            (mesh.edge.xpos[eidx] -
+             mesh.edge.xpos[enum]) ** 2 +
+            (mesh.edge.ypos[eidx] -
+             mesh.edge.ypos[enum]) ** 2 +
+            (mesh.edge.zpos[eidx] -
+             mesh.edge.zpos[enum]) ** 2
+            )
+
+        Wmat[edge, edge, mask] = wval[eidx] / dist
 
         Amat[edge,    :, mask] = ndir[eidx]
         Bmat[edge,    :, mask] = pdir[eidx]

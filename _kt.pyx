@@ -114,7 +114,7 @@ def _cpy_x_vec(cnfg,
 def _adv_x_cmp(cnfg, 
     np.ndarray[REALS_t, ndim=1] xx_data,
     const REALS_t rh_coef, 
-    np.ndarray[REALS_t, ndim=1] rh_data, 
+    np.ndarray[FLT64_t, ndim=1] rh_data, 
     np.ndarray[REALS_t, ndim=1] cx_data,
     np.ndarray[REALS_t, ndim=1] yy_data
               ):
@@ -126,13 +126,13 @@ def _adv_x_cmp(cnfg,
     
     cdef REALS_t RH_TEMP
     
-    cdef REALS_t ZERO = 0.0
+    cdef FLT64_t ZERO = 0.0
 
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef REALS_t *XX_DATA = &xx_data[+0]
-    cdef REALS_t *RH_DATA = &rh_data[+0]
+    cdef FLT64_t *RH_DATA = &rh_data[+0]
     cdef REALS_t *CX_DATA = &cx_data[+0]
     cdef REALS_t *YY_DATA = &yy_data[+0]
     
@@ -158,7 +158,7 @@ def _adv_x_cmp(cnfg,
 def _adv_x_fst(cnfg, 
     np.ndarray[REALS_t, ndim=1] xx_data,
     const REALS_t rh_coef, 
-    np.ndarray[REALS_t, ndim=1] rh_data, 
+    np.ndarray[FLT64_t, ndim=1] rh_data, 
     np.ndarray[REALS_t, ndim=1] cx_data,
     np.ndarray[REALS_t, ndim=1] yy_data
               ):
@@ -170,13 +170,13 @@ def _adv_x_fst(cnfg,
     
     cdef REALS_t RH_TEMP
     
-    cdef REALS_t ZERO = 0.0
+    cdef FLT64_t ZERO = 0.0
 
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
     
     cdef REALS_t *XX_DATA = &xx_data[+0]
-    cdef REALS_t *RH_DATA = &rh_data[+0]
+    cdef FLT64_t *RH_DATA = &rh_data[+0]
     cdef REALS_t *CX_DATA = &cx_data[+0]
     cdef REALS_t *YY_DATA = &yy_data[+0]
     

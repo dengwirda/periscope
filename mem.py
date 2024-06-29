@@ -35,12 +35,9 @@ def init_pool(mesh):
             np.empty(mesh.cell.size, dtype=reals_t))
     
     variables.hh_tend = \
-            np.empty(mesh.cell.size, dtype=reals_t)
+            np.zeros(mesh.cell.size, dtype=flt64_t)
     variables.uu_tend = \
-            np.empty(mesh.edge.size, dtype=reals_t)
-
-    variables.hh_tend[:] = 0.0
-    variables.uu_tend[:] = 0.0
+            np.zeros(mesh.edge.size, dtype=flt64_t)
 
     variables.hh_dual = \
             np.empty(mesh.vert.size, dtype=reals_t)
@@ -71,16 +68,14 @@ def init_pool(mesh):
             np.empty(mesh.edge.size, dtype=reals_t)
 
     variables.hh_bias = \
-            np.empty(mesh.edge.size, dtype=reals_t)
+            np.zeros(mesh.edge.size, dtype=reals_t)
     variables.pv_bias = \
-            np.empty(mesh.edge.size, dtype=reals_t)
+            np.zeros(mesh.edge.size, dtype=reals_t)
     variables.ke_bias = \
-            np.empty(mesh.edge.size, dtype=reals_t)
+            np.zeros(mesh.edge.size, dtype=reals_t)
     
     variables.nu_edge = \
-            np.empty(mesh.edge.size, dtype=reals_t)
-        
-    variables.nu_edge[:] = 0.0
+            np.zeros(mesh.edge.size, dtype=reals_t)
         
     variables.cd_edge = \
             np.empty(mesh.edge.size, dtype=reals_t)

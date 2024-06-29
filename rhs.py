@@ -111,12 +111,11 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
 
     uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
 
-    vv_edge = computeVV(
-        mesh, mats, cnfg, uu_edge)
+    vv_edge = computeVV(mesh, mats, cnfg, uu_edge)
 
     ke_cell, ke_bias = computeKE(
         mesh, mats, cnfg, 
-        hh_cell, hh_edge, hh_dual, 
+        hh_cell, h2_edge, hh_dual, 
         uu_edge, vv_edge,
         +1. / 2. * cnfg.time_step)
 
