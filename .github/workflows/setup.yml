@@ -110,7 +110,8 @@ jobs:
           python3 ICs/obc.py \
           --mesh-file="mesh_disk_2.nc" \
           --init-file="wake_2.nc" \
-          --radius=50000.
+          --radius=50000. \
+          --test-case=1
           python3 swe.py \
           --mesh-file="wake_2.nc" \
           --forc-file="frc_wake_2.nc" \
