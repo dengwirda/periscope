@@ -29,7 +29,10 @@ associated with geophysical flows.
 compiled:
 
     python3 setup.py build_ext --inplace
-    
+
+Ensure`pythonX.YY-dev` is installed, to support `Cython`; 
+from `3.12` onwards, `pythonX.YY -m pip install setuptools --upgrade` may also be needed.
+
 While not currently intended for massively parallel HPC workflows, `PERISCOPE` is
 written to exploit thread-based parallelism via `OpenMP` and is well suited to run 
 on single-node systems.
