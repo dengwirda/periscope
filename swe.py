@@ -155,9 +155,9 @@ def swe(cnfg):
     ttic = time.time(); next = 0; freq = 0;
     
     kp_sums = np.zeros((cnfg.iteration 
-            // cnfg.stat_freq + 1), dtype=reals_t)
+        // max(1, cnfg.stat_freq+1)), dtype=reals_t)
     en_sums = np.zeros((cnfg.iteration 
-            // cnfg.stat_freq + 1), dtype=reals_t)
+        // max(1, cnfg.stat_freq+1)), dtype=reals_t)
    
     init_pool(mesh)  # alloc. internal arrays
 
@@ -273,8 +273,9 @@ def swe(cnfg):
                  
         cnfg = mark_time(cnfg, flow, tnow + cnfg.time_step)
             
-        if (step % cnfg.stat_freq == 0):
-        #-- eval. statistics on stat steps
+        if (cnfg.stat_freq > 0 and 
+                step % cnfg.stat_freq == 0):
+        #-- eval. statistics at every stat steps
             kp_sums[next], \
             en_sums[next] = invariant(
                 mesh, mats, flow, cnfg, hh_cell, uu_edge
@@ -289,8 +290,9 @@ def swe(cnfg):
 
             next = next + 1
 
-        if (step % cnfg.save_freq == 0):
-        #-- & save all state on save steps
+        if (cnfg.save_freq > 0 and 
+                step % cnfg.save_freq == 0):
+        #-- & save all state at every save steps
             save_step(save, mesh, mats,
                       flow, cnfg, freq, hh_cell, uu_edge
             )
