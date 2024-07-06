@@ -107,19 +107,20 @@ def step_RK22(mesh, mats, flow, cnfg,
 
     gravity = flow.gravity
 
-    h1_cell = get_vec_c()
-    u1_edge = get_vec_e()
-    h2_cell = get_vec_c()
-    u2_edge = get_vec_e()
-    
-    hm_cell = get_vec_c()
-    um_edge = get_vec_e()  
-    hb_cell = get_vec_c()
+    h1_cell = variables.h1_cell
+    u1_edge = variables.u1_edge
+    h2_cell = variables.h2_cell
+    u2_edge = variables.u2_edge
 
-#-- 1st RK + FB stage
+    hm_cell = variables.h3_cell
+    um_edge = variables.u3_edge
+      
+    hb_cell = variables.hb_cell
 
     rh_cell = variables.hh_tend
     ru_edge = variables.uu_tend
+    
+#-- 1st RK + FB stage
 
     cnfg = mark_time(
         cnfg, flow, start_t + 0. / 1. * cnfg.time_step)
@@ -154,8 +155,7 @@ def step_RK22(mesh, mats, flow, cnfg,
 
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, mats, cnfg, 
-                gravity, h1_cell, u1_edge)
+            mesh, mats, cnfg, gravity, h1_cell, u1_edge)
 
     #-- euler scheme: implicit solve
         u1_edge = inv_x_1st(
@@ -209,8 +209,7 @@ def step_RK22(mesh, mats, flow, cnfg,
     
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, mats, cnfg, 
-                gravity, hb_cell, um_edge)
+            mesh, mats, cnfg, gravity, hb_cell, um_edge)
 
     #-- theta scheme: implicit solve
         u2_edge = inv_x_2nd(
@@ -224,14 +223,6 @@ def step_RK22(mesh, mats, flow, cnfg,
 
     hh_cell = cpy_x_vec(cnfg, h2_cell, hh_cell)
     uu_edge = cpy_x_vec(cnfg, u2_edge, uu_edge)
-
-    put_vec_c(hb_cell)
-    put_vec_c(hm_cell)
-    put_vec_e(um_edge)
-    put_vec_c(h2_cell)
-    put_vec_e(u2_edge)
-    put_vec_c(h1_cell)
-    put_vec_e(u1_edge)
 
     return  hh_cell, uu_edge, ch_cell, cu_edge
 
@@ -265,19 +256,19 @@ def step_RK32(mesh, mats, flow, cnfg,
 
     gravity = flow.gravity
 
-    h1_cell = get_vec_c()
-    u1_edge = get_vec_e()
-    h2_cell = get_vec_c()
-    u2_edge = get_vec_e()
-    h3_cell = get_vec_c()
-    u3_edge = get_vec_e()
+    h1_cell = variables.h1_cell
+    u1_edge = variables.u1_edge
+    h2_cell = variables.h2_cell
+    u2_edge = variables.u2_edge
+    h3_cell = variables.h3_cell
+    u3_edge = variables.u3_edge
       
-    hb_cell = get_vec_c()
-
-#-- 1st RK + FB stage
+    hb_cell = variables.hb_cell
 
     rh_cell = variables.hh_tend
     ru_edge = variables.uu_tend
+
+#-- 1st RK + FB stage
 
     cnfg = mark_time(
         cnfg, flow, start_t + 0. / 1. * cnfg.time_step)
@@ -312,8 +303,7 @@ def step_RK32(mesh, mats, flow, cnfg,
 
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, mats, cnfg, 
-                gravity, h1_cell, u1_edge)
+            mesh, mats, cnfg, gravity, h1_cell, u1_edge)
 
     #-- euler scheme: implicit solve
         u1_edge = inv_x_1st(
@@ -364,8 +354,7 @@ def step_RK32(mesh, mats, flow, cnfg,
 
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, mats, cnfg, 
-                gravity, h2_cell, u2_edge)
+            mesh, mats, cnfg, gravity, h2_cell, u2_edge)
 
     #-- euler scheme: implicit solve
         u2_edge = inv_x_1st(
@@ -412,8 +401,7 @@ def step_RK32(mesh, mats, flow, cnfg,
    
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
         cd_edge = computeCd(
-            mesh, mats, cnfg, 
-                gravity, hb_cell, u2_edge)
+            mesh, mats, cnfg, gravity, hb_cell, u2_edge)
 
     #-- theta scheme: explicit tend.
         u3_edge = inv_x_2nd(
@@ -427,14 +415,6 @@ def step_RK32(mesh, mats, flow, cnfg,
 
     hh_cell = cpy_x_vec(cnfg, h3_cell, hh_cell)
     uu_edge = cpy_x_vec(cnfg, u3_edge, uu_edge)
-
-    put_vec_c(hb_cell)
-    put_vec_c(h3_cell)
-    put_vec_e(u3_edge)
-    put_vec_c(h2_cell)
-    put_vec_e(u2_edge)
-    put_vec_c(h1_cell)
-    put_vec_e(u1_edge)
     
     return  hh_cell, uu_edge, ch_cell, cu_edge
 

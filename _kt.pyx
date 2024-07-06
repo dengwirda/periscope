@@ -25,7 +25,7 @@ from _fp import reals_t, index_t
 from _kp cimport REALS_t, INDEX_t
 
 def _bnd_x_vec(cnfg,
-    np.ndarray[REALS_t, ndim=1] xx_data,
+    np.ndarray[FLT64_t, ndim=1] xx_data,
     np.ndarray[REALS_t, ndim=1] xx_min_,
     np.ndarray[REALS_t, ndim=1] xx_max_
               ):
@@ -38,7 +38,7 @@ def _bnd_x_vec(cnfg,
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
 
-    cdef REALS_t *XX_DATA = &xx_data[+0]
+    cdef FLT64_t *XX_DATA = &xx_data[+0]
     cdef REALS_t *XX_MIN_ = &xx_min_[+0]
     cdef REALS_t *XX_MAX_ = &xx_max_[+0]
 
@@ -57,8 +57,8 @@ def _bnd_x_vec(cnfg,
 
 
 def _set_x_vec(cnfg,
-        const REALS_t xx_fill,
-    np.ndarray[REALS_t, ndim=1] xx_data,
+    const FLT64_t xx_fill,
+    np.ndarray[FLT64_t, ndim=1] xx_data,
               ):
 
 #-- xx = fv, straight-up vector fill - that's it!
@@ -69,7 +69,7 @@ def _set_x_vec(cnfg,
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
 
-    cdef REALS_t *XX_DATA = &xx_data[+0]
+    cdef FLT64_t *XX_DATA = &xx_data[+0]
 
     with nogil, parallel(num_threads=numthread):
 
@@ -82,8 +82,8 @@ def _set_x_vec(cnfg,
 
 
 def _cpy_x_vec(cnfg, 
-    np.ndarray[REALS_t, ndim=1] xx_data,
-    np.ndarray[REALS_t, ndim=1] yy_data
+    np.ndarray[FLT64_t, ndim=1] xx_data,
+    np.ndarray[FLT64_t, ndim=1] yy_data
               ):
 
 #-- yy = xx, straight-up vector copy - that's it!
@@ -94,8 +94,8 @@ def _cpy_x_vec(cnfg,
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t *XX_DATA = &xx_data[+0]
-    cdef REALS_t *YY_DATA = &yy_data[+0]
+    cdef FLT64_t *XX_DATA = &xx_data[+0]
+    cdef FLT64_t *YY_DATA = &yy_data[+0]
     
     with nogil, parallel(num_threads=numthread):
     
@@ -108,11 +108,11 @@ def _cpy_x_vec(cnfg,
     
 
 def _adv_x_cmp(cnfg, 
-    np.ndarray[REALS_t, ndim=1] xx_data,
-    const REALS_t rh_coef, 
+    np.ndarray[FLT64_t, ndim=1] xx_data,
+    const FLT64_t rh_coef, 
     np.ndarray[FLT64_t, ndim=1] rh_data, 
-    np.ndarray[REALS_t, ndim=1] cx_data,
-    np.ndarray[REALS_t, ndim=1] yy_data
+    np.ndarray[FLT64_t, ndim=1] cx_data,
+    np.ndarray[FLT64_t, ndim=1] yy_data
               ):
 
 #-- yy = xx + beta * rh, with fp error compensation
@@ -120,17 +120,17 @@ def _adv_x_cmp(cnfg,
     cdef INDEX_t ipos
     cdef INDEX_t NDAT = xx_data.size
     
-    cdef REALS_t RH_TEMP
+    cdef FLT64_t RH_TEMP
     
     cdef FLT64_t ZERO = 0.0
 
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t *XX_DATA = &xx_data[+0]
+    cdef FLT64_t *XX_DATA = &xx_data[+0]
     cdef FLT64_t *RH_DATA = &rh_data[+0]
-    cdef REALS_t *CX_DATA = &cx_data[+0]
-    cdef REALS_t *YY_DATA = &yy_data[+0]
+    cdef FLT64_t *CX_DATA = &cx_data[+0]
+    cdef FLT64_t *YY_DATA = &yy_data[+0]
     
     with nogil, parallel(num_threads=numthread):
     
@@ -152,11 +152,11 @@ def _adv_x_cmp(cnfg,
     
     
 def _adv_x_fst(cnfg, 
-    np.ndarray[REALS_t, ndim=1] xx_data,
-    const REALS_t rh_coef, 
+    np.ndarray[FLT64_t, ndim=1] xx_data,
+    const FLT64_t rh_coef, 
     np.ndarray[FLT64_t, ndim=1] rh_data, 
-    np.ndarray[REALS_t, ndim=1] cx_data,
-    np.ndarray[REALS_t, ndim=1] yy_data
+    np.ndarray[FLT64_t, ndim=1] cx_data,
+    np.ndarray[FLT64_t, ndim=1] yy_data
               ):
     
 #-- yy = xx + beta * rh, with fp error compensation
@@ -164,17 +164,17 @@ def _adv_x_fst(cnfg,
     cdef INDEX_t ipos
     cdef INDEX_t NDAT = xx_data.size
     
-    cdef REALS_t RH_TEMP
+    cdef FLT64_t RH_TEMP
     
     cdef FLT64_t ZERO = 0.0
 
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t *XX_DATA = &xx_data[+0]
+    cdef FLT64_t *XX_DATA = &xx_data[+0]
     cdef FLT64_t *RH_DATA = &rh_data[+0]
-    cdef REALS_t *CX_DATA = &cx_data[+0]
-    cdef REALS_t *YY_DATA = &yy_data[+0]
+    cdef FLT64_t *CX_DATA = &cx_data[+0]
+    cdef FLT64_t *YY_DATA = &yy_data[+0]
     
     with nogil, parallel(num_threads=numthread):
     
@@ -193,10 +193,10 @@ def _adv_x_fst(cnfg,
     
 
 def _inv_x_1st(cnfg, 
-    np.ndarray[REALS_t, ndim=1] xx_data,
+    np.ndarray[FLT64_t, ndim=1] xx_data,
     const REALS_t rh_coef, 
     np.ndarray[REALS_t, ndim=1] cd_data,
-    np.ndarray[REALS_t, ndim=1] rh_data
+    np.ndarray[FLT64_t, ndim=1] rh_data
               ):
               
     cdef INDEX_t ipos
@@ -207,9 +207,9 @@ def _inv_x_1st(cnfg,
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t *XX_DATA = &xx_data[+0]
+    cdef FLT64_t *XX_DATA = &xx_data[+0]
     cdef REALS_t *CD_DATA = &cd_data[+0]
-    cdef REALS_t *RH_DATA = &rh_data[+0]
+    cdef FLT64_t *RH_DATA = &rh_data[+0]
     
     with nogil, parallel(num_threads=numthread):
     
@@ -224,10 +224,10 @@ def _inv_x_1st(cnfg,
 
     
 def _inv_x_2nd(cnfg, 
-    np.ndarray[REALS_t, ndim=1] xx_data,
+    np.ndarray[FLT64_t, ndim=1] xx_data,
     const REALS_t rh_coef, 
     np.ndarray[REALS_t, ndim=1] cd_data,
-    np.ndarray[REALS_t, ndim=1] rh_data
+    np.ndarray[FLT64_t, ndim=1] rh_data
               ):
               
     cdef INDEX_t ipos
@@ -238,9 +238,9 @@ def _inv_x_2nd(cnfg,
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t *XX_DATA = &xx_data[+0]
+    cdef FLT64_t *XX_DATA = &xx_data[+0]
     cdef REALS_t *CD_DATA = &cd_data[+0]
-    cdef REALS_t *RH_DATA = &rh_data[+0]
+    cdef FLT64_t *RH_DATA = &rh_data[+0]
     
     with nogil, parallel(num_threads=numthread):
     
@@ -258,11 +258,11 @@ def _inv_x_2nd(cnfg,
     
     
 def _sum_2_way(cnfg, 
-    np.ndarray[REALS_t, ndim=1] yy_data,
-    const REALS_t x1_coef, 
-    np.ndarray[REALS_t, ndim=1] x1_data,
-    const REALS_t x2_coef, 
-    np.ndarray[REALS_t, ndim=1] x2_data
+    np.ndarray[FLT64_t, ndim=1] yy_data,
+    const FLT64_t x1_coef, 
+    np.ndarray[FLT64_t, ndim=1] x1_data,
+    const FLT64_t x2_coef, 
+    np.ndarray[FLT64_t, ndim=1] x2_data
               ):
     
 #-- yy = sum( bi * xi ), 2-array version
@@ -274,9 +274,9 @@ def _sum_2_way(cnfg,
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t *X1_DATA = &x1_data[+0]
-    cdef REALS_t *X2_DATA = &x2_data[+0]
-    cdef REALS_t *YY_DATA = &yy_data[+0]
+    cdef FLT64_t *X1_DATA = &x1_data[+0]
+    cdef FLT64_t *X2_DATA = &x2_data[+0]
+    cdef FLT64_t *YY_DATA = &yy_data[+0]
     
     with nogil, parallel(num_threads=numthread):
     
@@ -291,13 +291,13 @@ def _sum_2_way(cnfg,
     
 
 def _sum_3_way(cnfg, 
-    np.ndarray[REALS_t, ndim=1] yy_data,
-    const REALS_t x1_coef, 
-    np.ndarray[REALS_t, ndim=1] x1_data,
-    const REALS_t x2_coef, 
-    np.ndarray[REALS_t, ndim=1] x2_data,
-    const REALS_t x3_coef, 
-    np.ndarray[REALS_t, ndim=1] x3_data
+    np.ndarray[FLT64_t, ndim=1] yy_data,
+    const FLT64_t x1_coef, 
+    np.ndarray[FLT64_t, ndim=1] x1_data,
+    const FLT64_t x2_coef, 
+    np.ndarray[FLT64_t, ndim=1] x2_data,
+    const FLT64_t x3_coef, 
+    np.ndarray[FLT64_t, ndim=1] x3_data
               ):
     
 #-- yy = sum( bi * xi ), 3-array version
@@ -309,10 +309,10 @@ def _sum_3_way(cnfg,
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t *X1_DATA = &x1_data[+0]
-    cdef REALS_t *X2_DATA = &x2_data[+0]
-    cdef REALS_t *X3_DATA = &x3_data[+0]
-    cdef REALS_t *YY_DATA = &yy_data[+0]
+    cdef FLT64_t *X1_DATA = &x1_data[+0]
+    cdef FLT64_t *X2_DATA = &x2_data[+0]
+    cdef FLT64_t *X3_DATA = &x3_data[+0]
+    cdef FLT64_t *YY_DATA = &yy_data[+0]
     
     with nogil, parallel(num_threads=numthread):
     
@@ -328,13 +328,13 @@ def _sum_3_way(cnfg,
 
     
 def _sym_3_way(cnfg, 
-    np.ndarray[REALS_t, ndim=1] yy_data,
-    const REALS_t x1_coef, 
-    np.ndarray[REALS_t, ndim=1] x1_data,
-    const REALS_t x2_coef, 
-    np.ndarray[REALS_t, ndim=1] x2_data,
-    const REALS_t x3_coef, 
-    np.ndarray[REALS_t, ndim=1] x3_data
+    np.ndarray[FLT64_t, ndim=1] yy_data,
+    const FLT64_t x1_coef, 
+    np.ndarray[FLT64_t, ndim=1] x1_data,
+    const FLT64_t x2_coef, 
+    np.ndarray[FLT64_t, ndim=1] x2_data,
+    const FLT64_t x3_coef, 
+    np.ndarray[FLT64_t, ndim=1] x3_data
               ):
     
 #-- yy = b1 * (x1 + x3) + b2 * x2, symmetric sums
@@ -346,10 +346,10 @@ def _sym_3_way(cnfg,
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t *X1_DATA = &x1_data[+0]
-    cdef REALS_t *X2_DATA = &x2_data[+0]
-    cdef REALS_t *X3_DATA = &x3_data[+0]
-    cdef REALS_t *YY_DATA = &yy_data[+0]
+    cdef FLT64_t *X1_DATA = &x1_data[+0]
+    cdef FLT64_t *X2_DATA = &x2_data[+0]
+    cdef FLT64_t *X3_DATA = &x3_data[+0]
+    cdef FLT64_t *YY_DATA = &yy_data[+0]
     
     with nogil, parallel(num_threads=numthread):
     

@@ -24,12 +24,11 @@ from msh import load_mesh, sort_mesh, \
                 load_flow, sort_flow, \
                 load_forc, sort_forc
 from ops import operators
-from mem import init_pool
+from mem import init_pool, variables
 
 from io_ import init_file, save_step
 
-from _dt import step_eqns, step_bnds, \
-                mark_time
+from _dt import step_eqns, step_bnds, mark_time
 from _dx import invariant, scalingVk
 
 def swe(cnfg):
@@ -105,15 +104,11 @@ def swe(cnfg):
     flow = sort_flow(flow, mesh, lean=True)
     flow = sort_forc(flow, mesh, lean=True)
 
-    u0_edge = flow.uu_edge
-    uu_edge = u0_edge.copy()
-    
     h0_cell = flow.hh_cell
-    hh_cell = h0_cell.copy()
-    
-    hh_cell = np.maximum(
-        cnfg.wetdry_h0, hh_cell)
-    
+    u0_edge = flow.uu_edge
+
+    h0_cell = np.maximum(cnfg.wetdry_h0, h0_cell)
+
     ttoc = time.time()
     print("*SORT done (sec):", round(ttoc - ttic, 2))
 
@@ -163,24 +158,23 @@ def swe(cnfg):
             // cnfg.stat_freq + 1), dtype=reals_t)
     en_sums = np.zeros((cnfg.iteration 
             // cnfg.stat_freq + 1), dtype=reals_t)
-    
-    # always round IC's to flt32_t
-    hh_cell = np.ascontiguousarray(
-                hh_cell, dtype=flt32_t)
-    hh_cell = np.ascontiguousarray(
-                hh_cell, dtype=reals_t)
-    hh_min_ = hh_cell.copy()
-    hh_max_ = hh_cell.copy()
-    
-    uu_edge = np.ascontiguousarray(
-                uu_edge, dtype=flt32_t)         
-    uu_edge = np.ascontiguousarray(
-                uu_edge, dtype=reals_t)
-    uu_min_ = uu_edge.copy()
-    uu_max_ = uu_edge.copy()
-    
+   
     init_pool(mesh)  # alloc. internal arrays
+
+    hh_cell = variables.hh_cell
+    hh_cell[:] = h0_cell
+    hh_min_ = variables.hh_min_
+    hh_min_[:] = h0_cell    
+    hh_max_ = variables.hh_max_
+    hh_max_[:] = h0_cell
     
+    uu_edge = variables.uu_edge
+    uu_edge[:] = u0_edge
+    uu_min_ = variables.uu_min_
+    uu_min_[:] = u0_edge    
+    uu_max_ = variables.uu_max_
+    uu_max_[:] = u0_edge    
+
     uu_edge[mesh.edge.mask] = 0.  # ensure BC
     uu_edge[mesh.edge.open] = \
             u0_edge [mesh.edge.open]
@@ -236,7 +230,8 @@ def swe(cnfg):
     cnfg.uu_visc_4 = np.sqrt(cnfg.uu_visc_4)
     cnfg.hh_diff_4 = np.sqrt(cnfg.hh_diff_4)
     
-    cu_edge = uu_edge * 0.; ch_cell = hh_cell * 0.
+    ch_cell = variables.ch_cell
+    cu_edge = variables.cu_edge
 
     flow.prev = flow.next  # if forc. time-invariant...
 
@@ -272,7 +267,7 @@ def swe(cnfg):
                                         hh_min_, hh_max_,
                                         uu_min_, uu_max_
             )
-                       
+                
        #if (np.min(hh_min_) <= 0.0): 
        #    print("-ve layer thickness:", np.min(hh_min_) )
                  

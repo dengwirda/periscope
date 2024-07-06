@@ -15,8 +15,8 @@ class base: pass
 variables = base()
 
 VERT_SIZE = 4   # number of vec's in pools
-EDGE_SIZE = 8
-CELL_SIZE = 8
+EDGE_SIZE = 4
+CELL_SIZE = 4
 vert_pool = []
 edge_pool = []
 cell_pool = []
@@ -34,10 +34,45 @@ def init_pool(mesh):
         cell_pool.append(
             np.empty(mesh.cell.size, dtype=reals_t))
     
+    variables.hh_cell = \
+            np.empty(mesh.cell.size, dtype=flt64_t)
+    variables.uu_edge = \
+            np.empty(mesh.edge.size, dtype=flt64_t)
+
+    variables.hh_min_ = \
+            np.empty(mesh.cell.size, dtype=reals_t)
+    variables.uu_min_ = \
+            np.empty(mesh.edge.size, dtype=reals_t)
+    variables.hh_max_ = \
+            np.empty(mesh.cell.size, dtype=reals_t)
+    variables.uu_max_ = \
+            np.empty(mesh.edge.size, dtype=reals_t)
+
+    variables.ch_cell = \
+            np.zeros(mesh.cell.size, dtype=flt64_t)
+    variables.cu_edge = \
+            np.zeros(mesh.edge.size, dtype=flt64_t)
+
     variables.hh_tend = \
             np.zeros(mesh.cell.size, dtype=flt64_t)
     variables.uu_tend = \
             np.zeros(mesh.edge.size, dtype=flt64_t)
+
+    variables.hb_cell = \
+            np.empty(mesh.cell.size, dtype=flt64_t)
+
+    variables.h1_cell = \
+            np.empty(mesh.cell.size, dtype=flt64_t)
+    variables.u1_edge = \
+            np.empty(mesh.edge.size, dtype=flt64_t)
+    variables.h2_cell = \
+            np.empty(mesh.cell.size, dtype=flt64_t)
+    variables.u2_edge = \
+            np.empty(mesh.edge.size, dtype=flt64_t)
+    variables.h3_cell = \
+            np.empty(mesh.cell.size, dtype=flt64_t)
+    variables.u3_edge = \
+            np.empty(mesh.edge.size, dtype=flt64_t)
 
     variables.hh_dual = \
             np.empty(mesh.vert.size, dtype=reals_t)

@@ -60,7 +60,7 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
     hh_tend = addtendVH(mesh, mats, cnfg, hh_cell, zb_cell, 
                                           gg_cell, hh_tend)
 
-    hh_tend[mesh.cell.mask] = reals_t(0.0)
+    hh_tend[mesh.cell.mask] = flt64_t(0.0)
 
     return hh_tend
 
@@ -148,7 +148,7 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
                                           h2_edge,
                                           uu_tend)
     
-    uu_tend[mesh.edge.mask] = reals_t(0.0)
+    uu_tend[mesh.edge.mask] = flt64_t(0.0)
     
     return uu_tend
 
@@ -165,7 +165,7 @@ def rhs_fst_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
     uu_tend = addtendGZ(mesh, mats, cnfg, hh_cell, zb_cell, 
                                           gg_cell, uu_tend)
     
-    uu_tend[mesh.edge.mask] = reals_t(0.0)
+    uu_tend[mesh.edge.mask] = flt64_t(0.0)
     
     return uu_tend
 
