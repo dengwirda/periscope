@@ -154,11 +154,13 @@ def swe(cnfg):
 
     ttic = time.time(); next = 0; freq = 0;
     
-    kp_sums = np.zeros((cnfg.iteration 
-        // max(1, cnfg.stat_freq+1)), dtype=reals_t)
-    en_sums = np.zeros((cnfg.iteration 
-        // max(1, cnfg.stat_freq+1)), dtype=reals_t)
+    kp_sums = np.zeros(1 + cnfg.iteration 
+        // max(+1, cnfg.stat_freq), dtype=reals_t)
+    en_sums = np.zeros(1 + cnfg.iteration 
+        // max(+1, cnfg.stat_freq), dtype=reals_t)
    
+    print(kp_sums.shape)
+
     init_pool(mesh)  # alloc. internal arrays
 
     hh_cell = variables.hh_cell
