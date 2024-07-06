@@ -158,9 +158,7 @@ def swe(cnfg):
         // max(+1, cnfg.stat_freq), dtype=reals_t)
     en_sums = np.zeros(1 + cnfg.iteration 
         // max(+1, cnfg.stat_freq), dtype=reals_t)
-   
-    print(kp_sums.shape)
-
+    
     init_pool(mesh)  # alloc. internal arrays
 
     hh_cell = variables.hh_cell
