@@ -1122,9 +1122,10 @@ def _computeGZ(mesh, mats, cnfg,
             if (cel1 < 0): cel1 = cel2
             if (cel2 < 0): cel2 = cel1
 
+        #-- don't allow gradients across partial layers
             ZB_MAX_ = max(ZB_CELL[cel1], ZB_CELL[cel2])
 
-        #-- surface pressure gradient g * G * (h + z_b)                       
+        #-- surface pressure gradient g * G * (h + z_b)
             H1_CELL = HH_CELL[cel1] + ZB_CELL[cel1]
             H1_CELL = max(ZB_MAX_, H1_CELL)
 
@@ -1135,6 +1136,68 @@ def _computeGZ(mesh, mats, cnfg,
 
             UU_TEND[edge]+= gravity * GZ_EDGE
     
+    return uu_tend
+
+
+def _computeXI(mesh, mats, cnfg, 
+    np.ndarray[REALS_t, ndim=1] Xi_prev,
+    np.ndarray[REALS_t, ndim=1] Xi_next,
+    np.ndarray[FLT64_t, ndim=1] uu_tend
+              ):
+    
+#-- forcing due to grad of ext. geo-potential
+    
+    cdef INDEX_t edge, cel1, cel2
+    
+    cdef REALS_t X1_CELL, X2_CELL, XI_GRAD
+    
+    cdef REALS_t ZERO = 0.0
+    cdef REALS_t ONE_ = 1.0
+    
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
+    
+    cdef REALS_t frc_blend = cnfg.frc_blend
+    
+    cdef INDEX_t NVRT = mesh.vert.size
+    cdef INDEX_t NEDG = mesh.edge.size
+    cdef INDEX_t NCEL = mesh.cell.size
+    
+    cdef REALS_t *XI_PREV = &Xi_prev[0]
+    cdef REALS_t *XI_NEXT = &Xi_next[0]
+    cdef FLT64_t *UU_TEND = &uu_tend[0]
+
+    cdef INDEX_t[:, ::1] mesh_edge_cell = mesh.edge.cell
+
+    cdef REALS_t[::1] mesh_edge_clen = mesh.edge.clen
+    
+    cdef REALS_t *MESH_EDGE_CLEN = &mesh_edge_clen[0]
+    
+    with nogil, parallel(num_threads=numthread):
+    
+        for edge in prange(0, NEDG, schedule="static", 
+                chunksize=chunksize):
+                
+            cel1 = mesh_edge_cell[edge, 0] - 1
+            cel2 = mesh_edge_cell[edge, 1] - 1
+            
+            if (cel1 < 0): cel1 = cel2
+            if (cel2 < 0): cel2 = cel1
+
+        #-- gradient of external geo-potential: G * xi
+            X1_CELL = (
+                (ONE_ - frc_blend) * XI_PREV[cel1]
+              + (ZERO + frc_blend) * XI_NEXT[cel1]
+                      )
+            X2_CELL = (
+                (ONE_ - frc_blend) * XI_PREV[cel2]
+              + (ZERO + frc_blend) * XI_NEXT[cel2]
+                      )
+                
+            XI_GRAD =(X2_CELL - X1_CELL) / MESH_EDGE_CLEN[edge]
+
+            UU_TEND[edge]+= XI_GRAD
+        
     return uu_tend
 
     

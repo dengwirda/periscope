@@ -18,7 +18,7 @@ from _dx import computeBC, limiterWD, \
                 computeKE, computePV, addtendUV, \
                 computeVV, addtendGZ, \
                 computeNu, addtendDU, addtendVU, \
-                addtendTU
+                addtendXI, addtendTU
 
 def rhs_slw_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
 
@@ -90,10 +90,12 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
     ff_edge = flow.ff_edge
     ff_dual = flow.ff_vert
     
+    Xi_prev = flow.prev.Xi_cell
     Tu_prev = flow.prev.Tu_edge
     hE_prev = flow.prev.hE_edge
     uE_prev = flow.prev.uE_edge
     
+    Xi_next = flow.next.Xi_cell
     Tu_next = flow.next.Tu_edge
     hE_next = flow.next.hE_edge
     uE_next = flow.next.uE_edge
@@ -143,6 +145,10 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
     uu_tend = addtendVU(mesh, mats, cnfg, uu_edge, nu_edge,
                                           uu_tend)
     
+    # external geo-pot.
+    uu_tend = addtendXI(mesh, mats, cnfg, Xi_prev, Xi_next,
+                                          uu_tend)
+
     # external stresses
     uu_tend = addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
                                           h2_edge,

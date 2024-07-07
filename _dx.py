@@ -425,7 +425,7 @@ def addtendGZ(mesh, mats, cnfg, hh_cell, zb_cell,
     tcpu.computeGZ = tcpu.computeGZ + (ttoc - ttic)
 
     return uu_tend
-    
+
     
 def computeNu(mesh, mats, cnfg, rv_dual, rv_cell):
 
@@ -500,6 +500,25 @@ def addtendVH(mesh, mats, cnfg, hh_cell, zb_cell,
     tcpu.computeVH = tcpu.computeVH + (ttoc - ttic)
 
     return hh_tend
+
+
+def addtendXI(mesh, mats, cnfg, Xi_prev, Xi_next,
+                                uu_tend):
+
+#-- get grad of ext. geo-pot.
+
+    if (Xi_prev is None): return uu_tend
+
+    ttic = time.time()
+
+    uu_tend = _computeXI(
+        mesh, mats, cnfg, 
+                 Xi_prev, Xi_next, uu_tend)
+        
+    ttoc = time.time()
+    tcpu.computeXI = tcpu.computeXI + (ttoc - ttic)
+
+    return uu_tend
     
     
 def addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
@@ -554,6 +573,7 @@ try:
     from _kx import _advect_UH
     from _kx import _advect_UV
     from _kx import _computeGZ
+    from _kx import _computeXI
     from _kx import _computeNu
     from _kx import _computeDU
     from _kx import _computeVU

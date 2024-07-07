@@ -321,6 +321,8 @@ def swe(cnfg):
     print("*computeDU (sec):", round(tcpu.computeDU, 2))
     print("*computeVU (sec):", round(tcpu.computeVU, 2))
     print("*computeVH (sec):", round(tcpu.computeVH, 2))
+    print("*computeXI (sec):", round(tcpu.computeXI, 2))
+    print("*computeTU (sec):", round(tcpu.computeTU, 2))
     print("*computeCd (sec):", round(tcpu.computeCd, 2))
 
     data = nc.Dataset(save, "a", format="NETCDF4")
