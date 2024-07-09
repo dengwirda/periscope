@@ -446,7 +446,9 @@ def computeNu(mesh, mats, cnfg, rv_dual, rv_cell):
     return nu_edge
     
 
-def addtendDU(mesh, mats, cnfg, uu_edge, uu_tend):
+def addtendDU(mesh, mats, cnfg, hh_cell, hh_edge, 
+                                hh_dual, uu_edge, 
+                                uu_tend):
 
 #-- damping div^k operators
 
@@ -455,7 +457,8 @@ def addtendDU(mesh, mats, cnfg, uu_edge, uu_tend):
     ttic = time.time()
     
     uu_tend = _computeDU(
-        mesh, mats, cnfg, uu_edge, uu_tend)
+        mesh, mats, cnfg, hh_cell, 
+            hh_edge, hh_dual, uu_edge, uu_tend)
 
     ttoc = time.time()
     tcpu.computeDU = tcpu.computeDU + (ttoc - ttic)
@@ -463,7 +466,9 @@ def addtendDU(mesh, mats, cnfg, uu_edge, uu_tend):
     return uu_tend
 
 
-def addtendVU(mesh, mats, cnfg, uu_edge, nu_edge,
+def addtendVU(mesh, mats, cnfg, hh_cell, hh_edge, 
+                                hh_dual, uu_edge,
+                                nu_edge, 
                                 uu_tend):
 
 #-- viscous del^k operators
@@ -473,8 +478,8 @@ def addtendVU(mesh, mats, cnfg, uu_edge, nu_edge,
     ttic = time.time()
             
     uu_tend = _computeVU(
-        mesh, mats, cnfg, 
-                 uu_edge, nu_edge, uu_tend)
+        mesh, mats, cnfg, hh_cell, hh_edge, 
+            hh_dual, uu_edge, nu_edge, uu_tend)
 
     ttoc = time.time()
     tcpu.computeVU = tcpu.computeVU + (ttoc - ttic)

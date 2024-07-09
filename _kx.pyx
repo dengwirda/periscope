@@ -649,11 +649,12 @@ def _computeKE(mesh, mats, cnfg,
     cdef INDEX_t cell, iptr, xidx
     cdef REALS_t xval, hFAC
 
-    cdef REALS_t KE_SUM_
+    cdef REALS_t KE_SUM_, AC_SUM_
     
     cdef REALS_t ZERO = 0.0
     cdef REALS_t HALF = 0.5
     cdef REALS_t ONE_ = 1.0
+    cdef REALS_t EPS_ = 1.0E-008
     
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
@@ -679,8 +680,10 @@ def _computeKE(mesh, mats, cnfg,
     cdef REALS_t *CELL_WING_XVAL = &cell_wing_xval[0]
 
     cdef REALS_t[::1] mesh_cell_area = mesh.cell.area
-    
+    cdef REALS_t[::1] mesh_edge_slip = mesh.edge.slip    
+
     cdef REALS_t *MESH_CELL_AREA = &mesh_cell_area[0]
+    cdef REALS_t *MESH_EDGE_SLIP = &mesh_edge_slip[0]
     
     cdef np.ndarray[REALS_t] ke_cell = variables.ke_cell
         
@@ -691,7 +694,7 @@ def _computeKE(mesh, mats, cnfg,
         for cell in prange(0, NCEL, schedule="static", 
                 chunksize=chunksize):
         #-- remap kinetic energy M_(c,e) * 1/2 * |u|^2
-            KE_SUM_ = ZERO
+            KE_SUM_ = ZERO; AC_SUM_ = ZERO
             for iptr in range(CELL_WING_XPTR[cell +0],
                               CELL_WING_XPTR[cell +1]):
                     
@@ -699,9 +702,13 @@ def _computeKE(mesh, mats, cnfg,
                 xidx = CELL_WING_XIDX[iptr]
                 
                 hFAC = (HH_CELL[cell] / HH_EDGE[xidx])
-                hFAC = hFAC * hFAC  # ** 2
+               #hFAC = hFAC * hFAC  # ** 2
                #hFAC = hFAC * hFAC  # ** 4
 
+                xval = xval * (
+                    ONE_ - MESH_EDGE_SLIP[xidx])
+
+                AC_SUM_ = AC_SUM_ + xval
                 KE_SUM_ = KE_SUM_ + \
                     HALF * xval * hFAC * ( 
                         UU_EDGE[xidx] * UU_EDGE[xidx] 
@@ -712,10 +719,17 @@ def _computeKE(mesh, mats, cnfg,
                     ONE_ * xval * hFAC * ( 
                         UU_EDGE[xidx] * UU_EDGE[xidx])
                 """
-        
+  
+            AC_SUM_ = (ONE_ - EPS_) * AC_SUM_ \
+                    +  EPS_ * MESH_CELL_AREA[cell]
+
+            KE_CELL[cell] = KE_SUM_ / AC_SUM_
+
+            """      
             KE_CELL[cell] = (
                     KE_SUM_ / MESH_CELL_AREA[cell]
             )
+            """
             
     return ke_cell
     
@@ -1359,6 +1373,9 @@ def _computeNu(mesh, mats, cnfg,
 
 
 def _computeDU(mesh, mats, cnfg, 
+    np.ndarray[FLT64_t, ndim=1] hh_cell,
+    np.ndarray[REALS_t, ndim=1] hh_edge,
+    np.ndarray[REALS_t, ndim=1] hh_dual,
     np.ndarray[FLT64_t, ndim=1] uu_edge,
     np.ndarray[FLT64_t, ndim=1] uu_tend
               ):
@@ -1379,6 +1396,9 @@ def _computeDU(mesh, mats, cnfg,
     cdef INDEX_t NEDG = mesh.edge.size
     cdef INDEX_t NCEL = mesh.cell.size
     
+    cdef FLT64_t *HH_CELL = &hh_cell[0]
+    cdef REALS_t *HH_EDGE = &hh_edge[0]
+    cdef REALS_t *HH_DUAL = &hh_dual[0]
     cdef FLT64_t *UU_EDGE = &uu_edge[0]
     cdef FLT64_t *UU_TEND = &uu_tend[0]
     
@@ -1441,8 +1461,11 @@ def _computeDU(mesh, mats, cnfg,
                 xidx = CELL_FLUX_XIDX[iptr]
                     
                 DU_SUM_ = \
-                    DU_SUM_ + xval * UU_EDGE[xidx]
+                    DU_SUM_ + xval * UU_EDGE[xidx] \
+                                   * HH_EDGE[xidx]
               
+            DU_SUM_     =  DU_SUM_ / HH_CELL[cell]
+
             DU_CELL[cell] = (
                 DU_SUM_ / MESH_CELL_AREA[cell]
                 )
@@ -1515,6 +1538,9 @@ def _computeDU(mesh, mats, cnfg,
     
 
 def _computeVU(mesh, mats, cnfg,
+    np.ndarray[FLT64_t, ndim=1] hh_cell,
+    np.ndarray[REALS_t, ndim=1] hh_edge,
+    np.ndarray[REALS_t, ndim=1] hh_dual,    
     np.ndarray[FLT64_t, ndim=1] uu_edge,
     np.ndarray[REALS_t, ndim=1] nu_edge,
     np.ndarray[FLT64_t, ndim=1] uu_tend
@@ -1524,6 +1550,8 @@ def _computeVU(mesh, mats, cnfg,
     
     cdef INDEX_t vert, edge, cell, iptr, xidx
     cdef REALS_t xval
+
+    cdef REALS_t DU_MUL_ = 2.0
 
     cdef REALS_t DU_SUM_, RV_SUM_, VU_SUM_
     
@@ -1537,6 +1565,9 @@ def _computeVU(mesh, mats, cnfg,
     cdef INDEX_t NEDG = mesh.edge.size
     cdef INDEX_t NCEL = mesh.cell.size
     
+    cdef FLT64_t *HH_CELL = &hh_cell[0]
+    cdef REALS_t *HH_EDGE = &hh_edge[0]
+    cdef REALS_t *HH_DUAL = &hh_dual[0]
     cdef FLT64_t *UU_EDGE = &uu_edge[0]
     cdef REALS_t *NU_TURB = &nu_edge[0]
     cdef FLT64_t *UU_TEND = &uu_tend[0]
@@ -1630,11 +1661,14 @@ def _computeVU(mesh, mats, cnfg,
                 xidx = CELL_FLUX_XIDX[iptr]
                     
                 DU_SUM_ = \
-                    DU_SUM_ + xval * UU_EDGE[xidx]
+                    DU_SUM_ + xval * UU_EDGE[xidx] \
+                                   * HH_EDGE[xidx]
+
+            DU_SUM_     =  DU_SUM_ / HH_CELL[cell]
             
             DU_CELL[cell] = (
                 DU_SUM_ / MESH_CELL_AREA[cell]
-                )
+                        ) * DU_MUL_
             
         for vert in prange(0, NVRT, schedule="static", 
                 chunksize=chunksize):
@@ -1649,6 +1683,8 @@ def _computeVU(mesh, mats, cnfg,
                 RV_SUM_ = \
                     RV_SUM_ + xval * UU_EDGE[xidx]
          
+            RV_SUM_     =  RV_SUM_ * HH_DUAL[vert]
+
             RV_DUAL[vert] = (
                      ONE_ - MESH_VERT_SLIP[vert]
                         ) * RV_SUM_     
@@ -1675,7 +1711,8 @@ def _computeVU(mesh, mats, cnfg,
                 xidx = GRAD_PERP_XIDX[iptr]
                     
                 VU_SUM_ = \
-                    VU_SUM_ - xval * RV_DUAL[xidx]
+                    VU_SUM_ - xval * RV_DUAL[xidx] \
+                                   / HH_EDGE[edge]
                 
             V2_EDGE[edge] = (
                 VU_SUM_ * MESH_EDGE_MASK[edge]

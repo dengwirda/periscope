@@ -42,11 +42,12 @@ def swe(cnfg):
     "# (/                       (/        \n" +
     "#"+"=========================================="*2+"\n"
          )
-    
-    cnfg.save_freq = min(
-        cnfg.iteration, cnfg.save_freq)
-    cnfg.stat_freq = min(
-        cnfg.iteration, cnfg.stat_freq)
+
+    # sanitise user config. params    
+    cnfg.save_freq = \
+        min(cnfg.iteration, cnfg.save_freq)
+    cnfg.stat_freq = \
+        min(cnfg.iteration, cnfg.stat_freq)
     
     cnfg.calc_slow = True
     cnfg.calc_fast = True
@@ -67,11 +68,14 @@ def swe(cnfg):
         cnfg.ke_upwind = "NONE"
     if ("CENTRE" in cnfg.pv_scheme): 
         cnfg.pv_upwind = "NONE"
-    
+
+    # mesh, forcing & solution i/o 
     name = cnfg.mesh_file
     forc = cnfg.forc_file
+    save = cnfg.soln_file
     path, file = os.path.split(name)
-    save = os.path.join(path, "out_" + file)
+    if (save == ""): 
+        save = os.path.join(path, "out_"+file)
 
     print("Loading input assets...")
     
@@ -397,6 +401,12 @@ if (__name__ == "__main__"):
         default="",
         required=False, 
         help="Path to user FORCING tendencies file.")
+
+    parser.add_argument(
+        "--soln-file", dest="soln_file", type=str,
+        default="",
+        required=False, 
+        help="Path to user output {OUT_+MESH-FILE}.")
 
     parser.add_argument(
         "--time-step", dest="time_step", type=float,

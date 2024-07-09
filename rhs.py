@@ -139,10 +139,14 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
     nu_edge = computeNu(mesh, mats, cnfg, r2_dual, rv_cell)
 
     # div^k dissipation
-    uu_tend = addtendDU(mesh, mats, cnfg, uu_edge, uu_tend)
+    uu_tend = addtendDU(mesh, mats, cnfg, hh_cell, hh_edge, 
+                                          hh_dual, uu_edge, 
+                                          uu_tend)
     
     # del^k dissipation
-    uu_tend = addtendVU(mesh, mats, cnfg, uu_edge, nu_edge,
+    uu_tend = addtendVU(mesh, mats, cnfg, hh_cell, hh_edge, 
+                                          hh_dual, uu_edge,
+                                          nu_edge,
                                           uu_tend)
     
     # external geo-pot.
@@ -151,7 +155,7 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
 
     # external stresses
     uu_tend = addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
-                                          h2_edge,
+                                          hh_edge,
                                           uu_tend)
     
     uu_tend[mesh.edge.mask] = flt64_t(0.0)
