@@ -111,7 +111,7 @@ def swe(cnfg):
     h0_cell = flow.hh_cell
     u0_edge = flow.uu_edge
 
-    h0_cell = np.maximum(cnfg.wetdry_h0, h0_cell)
+    h0_cell = np.maximum(cnfg.wetdry_h0 / 2, h0_cell)
 
     ttoc = time.time()
     print("*SORT done (sec):", round(ttoc - ttic, 2))
@@ -192,6 +192,11 @@ def swe(cnfg):
     mesh.vert.slip/= np.maximum(+1, 
                      mats.dual_edge_sums * \
                      mesh.edge.mask)
+
+    #!! how does the masking really work?
+    mesh.edge.wadj = np.maximum(
+         mesh.vert.slip[mesh.edge.vert[:, 0] - 1],
+         mesh.vert.slip[mesh.edge.vert[:, 1] - 1])
     
     mesh.cell.fmsk = reals_t(1.0 - mesh.cell.mask)
     mesh.edge.fmsk = reals_t(1.0 - mesh.edge.mask)
@@ -473,18 +478,6 @@ if (__name__ == "__main__"):
         help="Stride of parallel decomp. = {4096}.")
         
     parser.add_argument(
-        "--hh-min-up", dest="hh_min_up", type=float,
-        default=0.0,
-        required=False,
-        help="Upwind HH.-edge bias {BIAS = +0./ 1.}.")
-
-    parser.add_argument(
-        "--hh-max-up", dest="hh_max_up", type=float,
-        default=1.0,
-        required=False,
-        help="Upwind HH.-edge bias {BIAS = +1./ 1.}.")
-        
-    parser.add_argument(
         "--hh-scheme", dest="hh_scheme", type=str,
         default="CENTRE",
         required=False, 
@@ -498,16 +491,10 @@ if (__name__ == "__main__"):
              "{AUST-adapt}, AUST-const.")
 
     parser.add_argument(
-        "--pv-min-up", dest="pv_min_up", type=float,
-        default=1./80.,
+        "--pv-up-phi", dest="pv_up_phi", type=float,
+        default=1./ 8.,
         required=False,
-        help="Upwind PV.-flux bias {BIAS = +1./80.}.")
-
-    parser.add_argument(
-        "--pv-max-up", dest="pv_max_up", type=float,
-        default=7./ 8.,
-        required=False,
-        help="Upwind PV.-flux bias {BIAS = +7./ 8.}.")
+        help="Upwind PV.-flux bias {BIAS = +1./ 8.}.")
     
     parser.add_argument(
         "--pv-scheme", dest="pv_scheme", type=str,
@@ -523,13 +510,7 @@ if (__name__ == "__main__"):
              "{AUST-const}, AUST-adapt.")
 
     parser.add_argument(
-        "--ke-min-up", dest="ke_min_up", type=float,
-        default=1./80.,
-        required=False,
-        help="Upwind KE.-edge bias {BIAS = +1./80.}.")
-
-    parser.add_argument(
-        "--ke-max-up", dest="ke_max_up", type=float,
+        "--ke-up-phi", dest="ke_up_phi", type=float,
         default=1./ 8.,
         required=False,
         help="Upwind KE.-edge bias {BIAS = +1./ 8.}.")

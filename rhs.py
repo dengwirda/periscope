@@ -41,7 +41,7 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
     hE_next = flow.next.hE_edge
     uE_next = flow.next.uE_edge
 
-    hh_dual, hh_edge, h2_edge, hh_bias = \
+    hh_dual, hh_edge, hh_quad, hh_bias = \
               compute_H(mesh, mats, cnfg, hh_cell, uu_edge)
 
     hh_edge, uu_edge = computeBC(
@@ -50,7 +50,7 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
         hE_prev, uE_prev,
         hE_next, uE_next)
         
-    uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
+   #uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
   
     # thickness advection
     hh_tend = addtendUH(mesh, mats, cnfg, hh_edge, uu_edge, 
@@ -102,7 +102,7 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
 
     gg_cell = flow.gravity
 
-    hh_dual, hh_edge, h2_edge, hh_bias = \
+    hh_dual, hh_edge, hh_quad, hh_bias = \
               compute_H(mesh, mats, cnfg, hh_cell, uu_edge)
               
     hh_edge, uu_edge = computeBC(
@@ -111,13 +111,13 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
         hE_prev, uE_prev,
         hE_next, uE_next)
 
-    uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
+   #uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
 
     vv_edge = computeVV(mesh, mats, cnfg, uu_edge)
 
     ke_cell, ke_bias = computeKE(
         mesh, mats, cnfg, 
-        hh_cell, h2_edge, hh_dual, 
+        hh_cell, hh_quad, hh_dual, 
         uu_edge, vv_edge,
         +1. / 2. * cnfg.time_step)
 
@@ -125,7 +125,7 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
     rv_cell, pv_cell, \
     pv_edge, pv_bias = computePV(
         mesh, mats, cnfg, 
-        hh_cell, h2_edge, hh_dual, 
+        hh_cell, hh_quad, hh_dual, 
         uu_edge, vv_edge, 
         ff_dual, ff_edge, ff_cell, 
         +1. / 2. * cnfg.time_step)
@@ -145,7 +145,8 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
     
     # del^k dissipation
     uu_tend = addtendVU(mesh, mats, cnfg, hh_cell, hh_edge, 
-                                          hh_dual, uu_edge,
+                                          hh_quad, hh_dual, 
+                                          uu_edge,
                                           nu_edge,
                                           uu_tend)
     

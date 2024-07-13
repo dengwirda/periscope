@@ -110,7 +110,7 @@ def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     zb_cell = flow.zb_cell 
     gravity = flow.gravity
 
-    hh_dual, hh_edge, h2_edge, hh_bias = compute_H(
+    hh_dual, hh_edge, hh_quad, hh_bias = compute_H(
         mesh, mats, cnfg, hh_cell, uu_edge)
 
     hh_edge, uu_edge = computeBC(
@@ -127,15 +127,14 @@ def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
 
     ke_cell, ke_bias = computeKE(
         mesh, mats, cnfg, 
-        hh_cell, h2_edge, hh_dual, 
-        uu_edge, vv_edge,
+        hh_cell, hh_quad, hh_dual, uu_edge, vv_edge,
         +1. / 2. * cnfg.time_step)
 
     rv_dual, pv_dual, r2_dual, p2_dual, \
     rv_cell, pv_cell, \
     pv_edge, pv_bias = computePV(
         mesh, mats, cnfg, 
-        hh_cell, h2_edge, hh_dual, uu_edge, vv_edge,
+        hh_cell, hh_quad, hh_dual, uu_edge, vv_edge,
         ff_dual, ff_edge, ff_cell, 
         +1. / 2. * cnfg.time_step)
         
@@ -166,7 +165,7 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     zb_cell = flow.zb_cell
     gravity = flow.gravity
 
-    hh_dual, hh_edge, h2_edge, hh_bias = compute_H(
+    hh_dual, hh_edge, hh_quad, hh_bias = compute_H(
         mesh, mats, cnfg, hh_cell, uu_edge)
 
     hh_edge, uu_edge = computeBC(
@@ -196,7 +195,7 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     rv_cell, pv_cell, \
     pv_edge, pv_bias = computePV(
         mesh, mats, cnfg, 
-        hh_cell, h2_edge, hh_dual, uu_edge, vv_edge,
+        hh_cell, hh_quad, hh_dual, uu_edge, vv_edge,
         ff_dual, ff_edge, ff_cell, 
         +1. / 2. * cnfg.time_step)
 
@@ -251,7 +250,7 @@ def upwinding(mesh, mats, cnfg,
         sw_dual, ss_dual, ss_cell, uu_edge, vv_edge, 
         ss_edge, up_bias,
         delta_t, sv_tiny, uu_tiny,
-        up_kind, up_min_, up_max_):
+        up_kind, up_phi_):
 
 #-- streamline upwind eval.'s
 
@@ -262,7 +261,7 @@ def upwinding(mesh, mats, cnfg,
         sw_dual, ss_dual, ss_cell, uu_edge, vv_edge, 
         ss_edge, up_bias, 
         delta_t, sv_tiny, uu_tiny, 
-        up_kind, up_min_, up_max_)
+        up_kind, up_phi_)
     
     ttoc = time.time()
     tcpu.upwinding = tcpu.upwinding + (ttoc - ttic)
@@ -352,8 +351,7 @@ def computePV(mesh, mats, cnfg,
         p2_dual, pv_dual, pv_cell, uu_edge, vv_edge, 
         pv_edge, up_edge,
         delta_t, PV_TINY, UU_TINY, 
-        cnfg.pv_upwind, 
-        cnfg.pv_min_up, cnfg.pv_max_up)
+        cnfg.pv_upwind, cnfg.pv_up_phi)
           
     return rv_dual, pv_dual, r2_dual, p2_dual, \
            rv_cell, pv_cell, \
@@ -467,7 +465,8 @@ def addtendDU(mesh, mats, cnfg, hh_cell, hh_edge,
 
 
 def addtendVU(mesh, mats, cnfg, hh_cell, hh_edge, 
-                                hh_dual, uu_edge,
+                                hh_quad, hh_dual, 
+                                uu_edge,
                                 nu_edge, 
                                 uu_tend):
 
@@ -478,7 +477,8 @@ def addtendVU(mesh, mats, cnfg, hh_cell, hh_edge,
     ttic = time.time()
             
     uu_tend = _computeVU(
-        mesh, mats, cnfg, hh_cell, hh_edge, 
+        mesh, mats, cnfg, hh_cell, 
+            hh_edge, hh_quad,
             hh_dual, uu_edge, nu_edge, uu_tend)
 
     ttoc = time.time()

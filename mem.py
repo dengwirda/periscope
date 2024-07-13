@@ -94,7 +94,7 @@ def init_pool(mesh):
             
     variables.hh_edge = \
             np.empty(mesh.edge.size, dtype=reals_t)  
-    variables.h2_edge = \
+    variables.hh_quad = \
             np.empty(mesh.edge.size, dtype=reals_t)
     
     variables.rv_edge = \
