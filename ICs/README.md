@@ -227,3 +227,19 @@ A number of test cases are available to run out-of-the-box:
     --linlaw-cd=1.E-07 \
     --uu-visc-2=5.E+02 --ref-scale=-1 --msh-fixes=0
 
+    python3 ICs/wdg.py \
+    --mesh-file="mesh_20to38N_30km.nc" \
+    --init-file="gyre_ns_30km.nc" \
+    --radius=6371220. --wall-slip=0.
+
+    python3 swe.py \
+    --mesh-file="gyre_ns_30km.nc" \
+    --forc-file="gyre_ns_30km.nc" \
+    --soln-file="gyre_ns_30km_00to06years.nc" \
+    --numthread=4 \
+    --time-step=5400. \
+    --num-steps=34560 \
+    --save-freq=480 --stat-freq=480 \
+    --linlaw-cd=1.E-07 \
+    --uu-visc-2=5.E+02 --ref-scale=-1 --msh-fixes=0
+
