@@ -36,7 +36,7 @@ from mem import get_vec_v, get_vec_e, get_vec_c, \
 def _computeBC(mesh, mats, cnfg,
     np.ndarray[REALS_t, ndim=1] hh_edge,
     np.ndarray[FLT64_t, ndim=1] uu_edge,
-    const REALS_t gravity,
+        const REALS_t gravity,
     np.ndarray[REALS_t, ndim=1] hE_prev,
     np.ndarray[REALS_t, ndim=1] uE_prev,
     np.ndarray[REALS_t, ndim=1] hE_next,
@@ -183,9 +183,9 @@ def _upwinding(mesh, mats, cnfg,
     np.ndarray[REALS_t, ndim=1] vv_edge,
     np.ndarray[REALS_t, ndim=1] ss_edge,
     np.ndarray[REALS_t, ndim=1] up_bias, 
-    const REALS_t delta_t,
-    const REALS_t ss_tiny, 
-    const REALS_t uu_tiny,
+        const REALS_t delta_t,
+        const REALS_t ss_tiny, 
+        const REALS_t uu_tiny,
     up_kind, const REALS_t up_phi_
               ):
     

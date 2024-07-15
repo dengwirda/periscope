@@ -12,7 +12,7 @@ $$
 $$
 \frac{\partial u}{\partial t} + q (u h)^{\perp} = 
   -\nabla \Big(g(h + z_{b}) + \xi_{u}\Big) - \nabla \frac{1}{2} |u|^{2} 
-  -c_{d} u + \Big(\nu_{k}^{u} + \nu_{k}^{t}\Big) \nabla^{k} u + \frac{1}{h} \tau_{u} + S_{u}\ ,
+  -c_{d} u + \Big(\nu_{k}^{u} + \nu_{k}^{t}\Big) D^{k} u + \frac{1}{h} \tau_{u} + S_{u}\ ,
 $$
 
 $$
@@ -20,7 +20,15 @@ c_{d} = c_{1} + (c_{2} + c_{l} + c_{m}) \frac{1}{h} \|u\|\ ,
 $$
 
 $$
-c_{l} = \kappa^{2}\ \log^{-2}\Big(1+\frac{h}{2 z_{0}}\Big)\ , \quad c_{m} = n_{0}^{2} g h^{-\frac{1}{3}}\ .
+c_{l} = \kappa^{2}\ \log^{-2}\Big(1+\frac{h}{2 z_{0}}\Big)\ , \quad c_{m} = n_{0}^{2} g h^{-\frac{1}{3}}\ ,
+$$
+
+$$
+D^{2} u = \nabla \Big(h^{-1} \nabla \cdot (h u)\Big) - h^{-1} \nabla^{\perp} \Big(h \nabla \times u\Big)\ ,
+$$
+
+$$
+D^{4} u = \nabla \Big(h^{-1} \nabla \cdot (h \nabla^{2}u)\Big) - h^{-1} \nabla^{\perp} \Big(h \nabla \times \nabla^{2}u\Big)\ .
 $$
 
 - $u$ (`uu_edge`) is the horizontal velocity, staggered at edge normals.
@@ -40,8 +48,8 @@ $$
   - $c_{m}$ is a Manning's drag formulation with roughness $n_{0} =$ `--manlaw-n0`.
   - $c_{m}$ is bracketed by `--manlaw-lo` and `--manlaw-hi`.
 - $\nu_{k}^{u} \nabla^{k} u$ and $\nu_{k}^{h} \nabla g(h + z_{b})$ are dissipative operators:
-  - $\nu_{2}^{u} \nabla^{2} u$ (with $\nu_{2}^{u} =$ `--uu-visc-2`) is a Laplacian viscosity.
-  - $\nu_{4}^{u} \nabla^{4} u$ (with $\nu_{4}^{u} =$ `--uu-visc-4`) is a biharmonic viscosity.
+  - $\nu_{2}^{u} D^{2} u$ (with $\nu_{2}^{u} =$ `--uu-visc-2`) is a Laplacian dissipation.
+  - $\nu_{4}^{u} D^{4} u$ (with $\nu_{4}^{u} =$ `--uu-visc-4`) is a biharmonic dissipation.
   - $\nu_{k}^{\delta} (\nabla \nabla \cdot)^{\frac{k}{2}} u$ (with $\nu_{k}^{\delta} =$ `--du-visc-2` or `--du-visc-4`) 
     are equivalent divergence damping terms.
   - $\nu_{2}^{h} \nabla^{2} g(h + z_{b})$ (with $\nu_{2}^{u} =$ `--hh-diff-2`) is a Laplacian diffusivity.
