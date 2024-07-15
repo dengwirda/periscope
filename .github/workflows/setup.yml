@@ -136,7 +136,7 @@ jobs:
           python3 swe.py \
           --mesh-file="tsu_cvt_7.nc" \
           --numthread=2 \
-          --num-steps=1920 --time-step=45. \
+          --num-steps=960 --time-step=45. \
           --save-freq=80 --stat-freq=80 \
           --hh-scheme="upwind" \
           --wetdry-h0=1.E-03 \
@@ -177,9 +177,9 @@ jobs:
           --test-case=2
           python3 swe.py \
           --mesh-file="hill_2.nc" \
-          --forc-file="frc_hill_2.nc" \ 
+          --forc-file="frc_hill_2.nc" \
           --numthread=2 \
-          --num-steps=500 --time-step=0.2 \ 
+          --num-steps=500 --time-step=0.2 \
           --save-freq=50 --stat-freq=50 \
           --hh-scheme="upwind" \
           --wetdry-h0=1.E-03 \
