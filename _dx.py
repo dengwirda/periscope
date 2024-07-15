@@ -445,7 +445,7 @@ def computeNu(mesh, mats, cnfg, rv_dual, rv_cell):
     
 
 def addtendDU(mesh, mats, cnfg, hh_cell, hh_edge, 
-                                hh_dual, uu_edge, 
+                                uu_edge, 
                                 uu_tend):
 
 #-- damping div^k operators
@@ -454,9 +454,11 @@ def addtendDU(mesh, mats, cnfg, hh_cell, hh_edge,
 
     ttic = time.time()
     
+    hh_tiny = cnfg.wetdry_h0 * 10.0
+
     uu_tend = _computeDU(
         mesh, mats, cnfg, hh_cell, 
-            hh_edge, hh_dual, uu_edge, uu_tend)
+            hh_edge, uu_edge, hh_tiny, uu_tend)
 
     ttoc = time.time()
     tcpu.computeDU = tcpu.computeDU + (ttoc - ttic)
@@ -476,10 +478,13 @@ def addtendVU(mesh, mats, cnfg, hh_cell, hh_edge,
 
     ttic = time.time()
             
+    hh_tiny = cnfg.wetdry_h0 * 10.0
+
     uu_tend = _computeVU(
-        mesh, mats, cnfg, hh_cell, 
-            hh_edge, hh_quad,
-            hh_dual, uu_edge, nu_edge, uu_tend)
+        mesh, mats, cnfg, 
+            hh_cell, hh_edge, 
+            hh_quad, hh_dual, 
+            uu_edge, nu_edge, hh_tiny, uu_tend)
 
     ttoc = time.time()
     tcpu.computeVU = tcpu.computeVU + (ttoc - ttic)

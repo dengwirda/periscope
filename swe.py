@@ -235,8 +235,6 @@ def swe(cnfg):
     cnfg.hh_diff_4 = np.asarray(
         (cnfg.hh_diff_4 * s4_cell), dtype=reals_t)
    
-    cnfg.du_visc_4 = np.sqrt(cnfg.du_visc_4)
-    cnfg.uu_visc_4 = np.sqrt(cnfg.uu_visc_4)
     cnfg.hh_diff_4 = np.sqrt(cnfg.hh_diff_4)
     
     ch_cell = variables.ch_cell

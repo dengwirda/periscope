@@ -138,6 +138,7 @@ def _limiterWD(mesh, mats, cnfg,
     cdef REALS_t ZERO = 0.0
     cdef REALS_t ONE_ = 1.0
     cdef REALS_t TEN_ = 10.
+    cdef REALS_t EPS_ = .01
     
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
@@ -160,9 +161,12 @@ def _limiterWD(mesh, mats, cnfg,
             for edge in prange(0, NEDG, schedule="static", 
                     chunksize=chunksize):
                     
-                uu_ramp = min(
-                    ONE_, HH_EDGE[edge]/ wetdry_h0)
+                uu_ramp = \
+                    HH_EDGE[edge] / wetdry_h0 - EPS_
                     
+                uu_ramp = min(ONE_, uu_ramp)
+                uu_ramp = max(ZERO, uu_ramp)
+
                 uu_ramp = uu_ramp * uu_ramp
                 uu_ramp = uu_ramp * uu_ramp
 
@@ -1229,7 +1233,7 @@ def _computeVV(mesh, mats, cnfg,
     cdef INDEX_t edge, iptr, xidx
     cdef REALS_t xval
     
-    cdef REALS_t VV_SUM_, VV_LSQ_
+    cdef REALS_t VV_SUM_, UU_VAL_
 
     cdef REALS_t ZERO = 0.0
     
@@ -1269,9 +1273,9 @@ def _computeVV(mesh, mats, cnfg,
                 xval = EDGE_LSQR_XVAL[iptr]
                 xidx = EDGE_LSQR_XIDX[iptr]
 
-                VV_LSQ_ = xval * UU_EDGE[xidx]
-                    
-                VV_SUM_ = VV_SUM_ + VV_LSQ_
+                UU_VAL_ = UU_EDGE[xidx]
+
+                VV_SUM_ = VV_SUM_ + xval * UU_VAL_
 
             VV_EDGE[edge] = VV_SUM_
     
@@ -1349,7 +1353,7 @@ def _computeNu(mesh, mats, cnfg,
                 xidx = GRAD_NORM_XIDX[iptr]
                     
                 dN_EDGE = \
-                    dN_EDGE + (xval * RV_CELL[xidx])
+                    dN_EDGE + xval * RV_CELL[xidx]
                     
         #-- dP_edge = edge_grad_perp * rv_dual
             dP_EDGE = ZERO
@@ -1360,15 +1364,15 @@ def _computeNu(mesh, mats, cnfg,
                 xidx = GRAD_PERP_XIDX[iptr]
                     
                 dP_EDGE = \
-                    dP_EDGE + (xval * RV_DUAL[xidx])
+                    dP_EDGE + xval * RV_DUAL[xidx]
         
-            # nu_2 = (chi * len)^3 * |grad (curl u)|
+        #-- nu = (chi * len)^3 * |grad curl u|
             NU_TURB[edge] = sqrt_r(
                             dN_EDGE * dN_EDGE + 
                             dP_EDGE * dP_EDGE )
             
             NU_SCAL = (leith_chi * MESH_EDGE_SLEN[edge])
-            NU_SCAL*= TWO_  # slen is only half
+            NU_SCAL*= TWO_ # slen is only half
                     
             NU_TURB[edge]*= NU_SCAL * NU_SCAL * NU_SCAL
             
@@ -1381,17 +1385,19 @@ def _computeNu(mesh, mats, cnfg,
 def _computeDU(mesh, mats, cnfg, 
     np.ndarray[FLT64_t, ndim=1] hh_cell,
     np.ndarray[REALS_t, ndim=1] hh_edge,
-    np.ndarray[REALS_t, ndim=1] hh_dual,
     np.ndarray[FLT64_t, ndim=1] uu_edge,
+        const REALS_t hh_tiny,
     np.ndarray[FLT64_t, ndim=1] uu_tend
               ):
     
-#-- viscosity dissipation: nu_k^u * div^k
+#-- viscosity/dissipation: nu_k^u * div^k
     
     cdef INDEX_t edge, cell, iptr, xidx
     cdef REALS_t xval
     
-    cdef REALS_t DU_SUM_
+    cdef REALS_t DU_SUM_, UH_SUM_
+    cdef REALS_t D2_SUM_, V2_SUM_, V4_SUM_
+    cdef REALS_t HH_VAL_
 
     cdef REALS_t ZERO = 0.0
     
@@ -1404,7 +1410,6 @@ def _computeDU(mesh, mats, cnfg,
     
     cdef FLT64_t *HH_CELL = &hh_cell[0]
     cdef REALS_t *HH_EDGE = &hh_edge[0]
-    cdef REALS_t *HH_DUAL = &hh_dual[0]
     cdef FLT64_t *UU_EDGE = &uu_edge[0]
     cdef FLT64_t *UU_TEND = &uu_tend[0]
     
@@ -1451,84 +1456,100 @@ def _computeDU(mesh, mats, cnfg,
     cdef REALS_t *D4_EDGE = &d4_edge[0]
     
     cdef np.ndarray[REALS_t] du_cell = get_vec_c()
+    cdef np.ndarray[REALS_t] uh_cell = get_vec_c()
         
     cdef REALS_t *DU_CELL = &du_cell[0]
-        
+    cdef REALS_t *UH_CELL = &uh_cell[0]
+    
     with nogil, parallel(num_threads=numthread):
-            
+        
         for cell in prange(0, NCEL, schedule="static", 
                 chunksize=chunksize):
         #-- compute div(u.n)
-            DU_SUM_ = ZERO
+            DU_SUM_ = ZERO; UH_SUM_ = ZERO
+            HH_VAL_ = HH_CELL[cell]
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
                               CELL_FLUX_XPTR[cell +1]):
                     
                 xval = CELL_FLUX_XVAL[iptr]
                 xidx = CELL_FLUX_XIDX[iptr]
-                    
+                
                 DU_SUM_ = \
-                    DU_SUM_ + xval * UU_EDGE[xidx] \
-                                   * HH_EDGE[xidx]
-              
-            DU_SUM_     =  DU_SUM_ / HH_CELL[cell]
-
+                    DU_SUM_ + xval * UU_EDGE[xidx]
+    
+                UH_SUM_ = \
+                    UH_SUM_ + xval * UU_EDGE[xidx] \
+                                   * HH_EDGE[xidx] \
+                                   / HH_VAL_
+            
             DU_CELL[cell] = (
                 DU_SUM_ / MESH_CELL_AREA[cell]
-                )
+                        )
+
+            UH_CELL[cell] = (
+                UH_SUM_ / MESH_CELL_AREA[cell]
+                        )
             
         for edge in prange(0, NEDG, schedule="static", 
                 chunksize=chunksize):
-        #-- D^2 = vk * grad(div(u.n))
-            DU_SUM_ = ZERO
+        #-- D^2 = vk * grad(div(h*u.n)*h^-1)
+            D2_SUM_ = ZERO; V2_SUM_ = ZERO
             for iptr in range(GRAD_NORM_XPTR[edge +0], 
                               GRAD_NORM_XPTR[edge +1]):
                     
                 xval = GRAD_NORM_XVAL[iptr]
                 xidx = GRAD_NORM_XIDX[iptr]
                     
-                DU_SUM_ = \
-                    DU_SUM_ + xval * DU_CELL[xidx]
+                D2_SUM_ = \
+                    D2_SUM_ + xval * DU_CELL[xidx]
+
+                V2_SUM_ = \
+                    V2_SUM_ + xval * UH_CELL[xidx]
 
             D2_EDGE[edge] = (
-                DU_SUM_ * MESH_EDGE_MASK[edge]
+                V2_SUM_ * MESH_EDGE_MASK[edge]
                 )
                 
-            D4_EDGE[edge] = (
-                D2_EDGE[edge] * D4_VISC [edge]
+            D4_EDGE[edge] = (  # only div^2(u)
+                D2_SUM_ * MESH_EDGE_MASK[edge]
                 )
                 
         for cell in prange(0, NCEL, schedule="static", 
                 chunksize=chunksize):
         #-- compute div(D^2)
-            DU_SUM_ = ZERO
+            UH_SUM_ = ZERO
+            HH_VAL_ = HH_CELL[cell]
+            HH_VAL_ = max(HH_VAL_, hh_tiny)  # wet-dry
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
                               CELL_FLUX_XPTR[cell +1]):
                     
                 xval = CELL_FLUX_XVAL[iptr]
                 xidx = CELL_FLUX_XIDX[iptr]
                     
-                DU_SUM_ = \
-                    DU_SUM_ + xval * D4_EDGE[xidx]
+                UH_SUM_ = \
+                    UH_SUM_ + xval * UU_EDGE[xidx] \
+                                   * HH_EDGE[xidx] \
+                                   / HH_VAL_
          
-            DU_CELL[cell] = (
-                DU_SUM_ / MESH_CELL_AREA[cell]
+            UH_CELL[cell] = (
+                UH_SUM_ / MESH_CELL_AREA[cell]
                 )
 
         for edge in prange(0, NEDG, schedule="static", 
                 chunksize=chunksize):
         #-- D^4 = vk * grad(div(D^2))
-            DU_SUM_ = ZERO
+            V4_SUM_ = ZERO
             for iptr in range(GRAD_NORM_XPTR[edge +0], 
                               GRAD_NORM_XPTR[edge +1]):
                     
                 xval = GRAD_NORM_XVAL[iptr]
                 xidx = GRAD_NORM_XIDX[iptr]
                     
-                DU_SUM_ = \
-                    DU_SUM_ + xval * DU_CELL[xidx]
+                V4_SUM_ = \
+                    V4_SUM_ + xval * UH_CELL[xidx]
                 
             D4_EDGE[edge] = (
-                DU_SUM_ * MESH_EDGE_MASK[edge]
+                V4_SUM_ * MESH_EDGE_MASK[edge]
                 )
 
             UU_TEND[edge]-= (
@@ -1538,6 +1559,7 @@ def _computeDU(mesh, mats, cnfg,
             
     put_vec_e  (d4_edge)       
     put_vec_e  (d2_edge)
+    put_vec_c  (uh_cell)
     put_vec_c  (du_cell)
                      
     return uu_tend
@@ -1550,24 +1572,27 @@ def _computeVU(mesh, mats, cnfg,
     np.ndarray[REALS_t, ndim=1] hh_dual,    
     np.ndarray[FLT64_t, ndim=1] uu_edge,
     np.ndarray[REALS_t, ndim=1] nu_edge,
+        const REALS_t hh_tiny,
     np.ndarray[FLT64_t, ndim=1] uu_tend
               ):
     
-#-- viscosity dissipation: nu_k^u * del^k
+#-- viscosity/dissipation: nu_k^u * del^k
     
     cdef INDEX_t vert, edge, cell, iptr, xidx
     cdef REALS_t xval
 
     cdef REALS_t DU_MUL_ = 2.0
 
-    cdef REALS_t DU_SUM_, RV_SUM_, VU_SUM_
+    cdef REALS_t DU_SUM_, UH_SUM_, RV_SUM_
+    cdef REALS_t D2_SUM_, V2_SUM_, V4_SUM_
+    cdef REALS_t HH_VAL_
     
     cdef REALS_t ZERO = 0.0
     cdef REALS_t ONE_ = 1.0
     
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
-    
+
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
     cdef INDEX_t NCEL = mesh.cell.size
@@ -1652,30 +1677,39 @@ def _computeVU(mesh, mats, cnfg,
     
     cdef np.ndarray[REALS_t] rv_dual = get_vec_v()
     cdef np.ndarray[REALS_t] du_cell = get_vec_c()
+    cdef np.ndarray[REALS_t] uh_cell = get_vec_c()
         
     cdef REALS_t *RV_DUAL = &rv_dual[0]
     cdef REALS_t *DU_CELL = &du_cell[0]
+    cdef REALS_t *UH_CELL = &uh_cell[0]
     
     with nogil, parallel(num_threads=numthread):
         
         for cell in prange(0, NCEL, schedule="static", 
                 chunksize=chunksize):
         #-- compute div(u.n)
-            DU_SUM_ = ZERO
+            DU_SUM_ = ZERO; UH_SUM_ = ZERO
+            HH_VAL_ = HH_CELL[cell]
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
                               CELL_FLUX_XPTR[cell +1]):
                     
                 xval = CELL_FLUX_XVAL[iptr]
                 xidx = CELL_FLUX_XIDX[iptr]
-                    
+                
                 DU_SUM_ = \
-                    DU_SUM_ + xval * UU_EDGE[xidx] \
-                                   * HH_EDGE[xidx]
-
-            DU_SUM_     =  DU_SUM_ / HH_CELL[cell]
+                    DU_SUM_ + xval * UU_EDGE[xidx]
+    
+                UH_SUM_ = \
+                    UH_SUM_ + xval * UU_EDGE[xidx] \
+                                   * HH_EDGE[xidx] \
+                                   / HH_VAL_
             
             DU_CELL[cell] = (
                 DU_SUM_ / MESH_CELL_AREA[cell]
+                        ) * DU_MUL_
+
+            UH_CELL[cell] = (
+                UH_SUM_ / MESH_CELL_AREA[cell]
                         ) * DU_MUL_
             
         for vert in prange(0, NVRT, schedule="static", 
@@ -1690,8 +1724,6 @@ def _computeVU(mesh, mats, cnfg,
                     
                 RV_SUM_ = \
                     RV_SUM_ + xval * UU_EDGE[xidx]
-         
-            RV_SUM_     =  RV_SUM_ * HH_DUAL[vert]
 
             RV_DUAL[vert] = (
                      ONE_ - MESH_VERT_SLIP[vert]
@@ -1700,51 +1732,64 @@ def _computeVU(mesh, mats, cnfg,
             
         for edge in prange(0, NEDG, schedule="static", 
                 chunksize=chunksize):
-        #-- V^2 = vk * grad(div(u.n)) - 
-        #--       vk * grad(rot(u.n))
-            VU_SUM_ = ZERO
+        #-- V^2 = vk * grad(div(h*u.n) *h^-1) - 
+        #--       vk * grad(h*rot(u.n))*h^-1
+            V2_SUM_ = ZERO; D2_SUM_ = ZERO
+            HH_VAL_ = HH_QUAD[edge]
             for iptr in range(GRAD_NORM_XPTR[edge +0], 
                               GRAD_NORM_XPTR[edge +1]):
                     
                 xval = GRAD_NORM_XVAL[iptr]
                 xidx = GRAD_NORM_XIDX[iptr]
                     
-                VU_SUM_ = \
-                    VU_SUM_ + xval * DU_CELL[xidx]
+                D2_SUM_ = \
+                    D2_SUM_ + xval * DU_CELL[xidx]
+
+                V2_SUM_ = \
+                    V2_SUM_ + xval * UH_CELL[xidx]
                 
             for iptr in range(GRAD_PERP_XPTR[edge +0], 
                               GRAD_PERP_XPTR[edge +1]):
                     
                 xval = GRAD_PERP_XVAL[iptr]
                 xidx = GRAD_PERP_XIDX[iptr]
-                    
-                VU_SUM_ = \
-                    VU_SUM_ - xval * RV_DUAL[xidx] \
-                                   / HH_QUAD[edge]
+                
+                D2_SUM_ = \
+                    D2_SUM_ - xval * RV_DUAL[xidx]
+    
+                V2_SUM_ = \
+                    V2_SUM_ - xval * RV_DUAL[xidx] \
+                                   * HH_DUAL[xidx] \
+                                   / HH_VAL_
                 
             V2_EDGE[edge] = (
-                VU_SUM_ * MESH_EDGE_MASK[edge]
+                V2_SUM_ * MESH_EDGE_MASK[edge]
                 )
             
-            V4_EDGE[edge] = (
-                V2_EDGE[edge] * V4_VISC [edge]
+            V4_EDGE[edge] = (  # only del^2(u)
+                D2_SUM_ * MESH_EDGE_MASK[edge]
                 )
                 
         for cell in prange(0, NCEL, schedule="static", 
                 chunksize=chunksize):
         #-- compute div(V^2)
-            DU_SUM_ = ZERO
+            UH_SUM_ = ZERO
+            HH_VAL_ = HH_CELL[cell]
+            HH_VAL_ = max(HH_VAL_, hh_tiny)  # wet-dry
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
                               CELL_FLUX_XPTR[cell +1]):
                     
                 xval = CELL_FLUX_XVAL[iptr]
                 xidx = CELL_FLUX_XIDX[iptr]
                     
-                DU_SUM_ = \
-                    DU_SUM_ + xval * V4_EDGE[xidx]
+                UH_SUM_ = \
+                    UH_SUM_ + xval * V4_EDGE[xidx] \
+                                   * HH_EDGE[xidx] \
+                                   / HH_VAL_
          
-            DU_CELL[cell] = (
-                DU_SUM_ / MESH_CELL_AREA[cell]
+            UH_CELL[cell] = (
+                DU_MUL_ *
+                UH_SUM_ / MESH_CELL_AREA[cell]
                 )
 
         for vert in prange(0, NVRT, schedule="static", 
@@ -1766,17 +1811,19 @@ def _computeVU(mesh, mats, cnfg,
             
         for edge in prange(0, NEDG, schedule="static", 
                 chunksize=chunksize):
-        #-- V^4 = vk * grad(div(V^2)) - 
-        #--       vk * grad(rot(V^2))
-            VU_SUM_ = ZERO
+        #-- V^4 = vk * grad(div(h*V^2) *h^-1) - 
+        #--       vk * grad(h*rot(V^2))*h^-1
+            V4_SUM_ = ZERO
+            HH_VAL_ = HH_QUAD[edge]
+            HH_VAL_ = max(HH_VAL_, hh_tiny)  # wet-dry
             for iptr in range(GRAD_NORM_XPTR[edge +0], 
                               GRAD_NORM_XPTR[edge +1]):
                     
                 xval = GRAD_NORM_XVAL[iptr]
                 xidx = GRAD_NORM_XIDX[iptr]
                     
-                VU_SUM_ = \
-                    VU_SUM_ + xval * DU_CELL[xidx]
+                V4_SUM_ = \
+                    V4_SUM_ + xval * UH_CELL[xidx]
                 
             for iptr in range(GRAD_PERP_XPTR[edge +0], 
                               GRAD_PERP_XPTR[edge +1]):
@@ -1784,11 +1831,13 @@ def _computeVU(mesh, mats, cnfg,
                 xval = GRAD_PERP_XVAL[iptr]
                 xidx = GRAD_PERP_XIDX[iptr]
                     
-                VU_SUM_ = \
-                    VU_SUM_ - xval * RV_DUAL[xidx]
+                V4_SUM_ = \
+                    V4_SUM_ - xval * RV_DUAL[xidx] \
+                                   * HH_DUAL[xidx] \
+                                   / HH_VAL_
                 
             V4_EDGE[edge] = (
-                VU_SUM_ * MESH_EDGE_MASK[edge]
+                V4_SUM_ * MESH_EDGE_MASK[edge]
                 )
 
             UU_TEND[edge]-= (
@@ -1799,6 +1848,7 @@ def _computeVU(mesh, mats, cnfg,
                      
     put_vec_e  (v4_edge)       
     put_vec_e  (v2_edge)
+    put_vec_c  (uh_cell)
     put_vec_c  (du_cell)
     put_vec_v  (rv_dual)
                      
@@ -2094,9 +2144,7 @@ def _computeCd(mesh, mats, cnfg,
     
     cdef REALS_t sqrlaw_cd = cnfg.sqrlaw_cd
     cdef REALS_t linlaw_cd = cnfg.linlaw_cd
-
-    hh_tiny = min(hh_tiny, cnfg.wetdry_h0 / TEN_)
-    
+   
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
     cdef INDEX_t NCEL = mesh.cell.size
@@ -2122,8 +2170,7 @@ def _computeCd(mesh, mats, cnfg,
             if (cel1 < 0): cel1 = cel2
             if (cel2 < 0): cel2 = cel1
 
-            # geometric mean
-            hh_edge = sqrt_r (
+            hh_edge = sqrt_r (  #- geometric mean
                 HH_CELL[cel1] * HH_CELL[cel2]
                 )
                   

@@ -50,7 +50,7 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
         hE_prev, uE_prev,
         hE_next, uE_next)
         
-   #uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
+    uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
   
     # thickness advection
     hh_tend = addtendUH(mesh, mats, cnfg, hh_edge, uu_edge, 
@@ -111,7 +111,7 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
         hE_prev, uE_prev,
         hE_next, uE_next)
 
-   #uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
+    uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
 
     vv_edge = computeVV(mesh, mats, cnfg, uu_edge)
 
@@ -140,7 +140,7 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
 
     # div^k dissipation
     uu_tend = addtendDU(mesh, mats, cnfg, hh_cell, hh_edge, 
-                                          hh_dual, uu_edge, 
+                                          uu_edge, 
                                           uu_tend)
     
     # del^k dissipation
