@@ -9,14 +9,12 @@ Presently, a nonlinear rotating shallow water model is available &mdash; solved 
 spherical domains (either the full sphere or regional pieces thereof), with 
 support for various boundary conditions, drag laws and forcing types. 
 
-$$
-\frac{\partial h}{\partial t} + \nabla \cdot (u h) = D_{h} + S_{h}\ ,
-$$
-
-$$
+$$\begin{gather}
+\frac{\partial h}{\partial t} + \nabla \cdot (u h) = D_{h} + S_{h}\ , 
+\\\\\\
 \frac{\partial u}{\partial t} + (u \cdot \nabla) u + f u^{\perp} = 
     -\nabla \Big(g(h + z_{b}) + \xi_{u}\Big) - c_{d} u + D_{u} + \frac{1}{h} \tau_{u} + S_{u}\ .
-$$
+\end{gather}$$
 
 See `MODELS.md` for additional detail regarding the formulation, numerics and model 
 output.
