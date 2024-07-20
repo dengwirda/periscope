@@ -7,11 +7,11 @@ and vorticity DoF are staggered at the cells, edges and vertices (duals) of a gi
 
 $$\begin{gather}
 \frac{\partial h}{\partial t} + \nabla \cdot (u h) = 
-  \Big(\nu_{k}^{h} + \tilde{\nu}_{k}^{h}\Big)\nabla^{k}g(h + z_{b}) + S_{h}\ ,
+  \Big(\nu_{k}^{h} + \overline{\nu_{k}^{h}}\Big) \nabla^{k}g(h + z_{b}) + S_{h}\ ,
 \\\\\\
 \frac{\partial u}{\partial t} + q (u h)^{\perp} = 
   -\nabla \Big(g(h + z_{b}) + \xi_{u}\Big) - \nabla \frac{1}{2} |u|^{2} 
-  -c_{d} u + \Big(\nu_{k}^{u} + \tilde{\nu}_{k}^{u}\Big) D^{k} u + \frac{1}{h} \tau_{u} + S_{u}\ ,
+  -c_{d} u + \Big(\nu_{k}^{u} + \overline{\nu_{k}^{u}}\Big) D^{k} u + \frac{1}{h} \tau_{u} + S_{u}\ ,
 \\\\\\
 c_{d} = c_{1} + (c_{2} + c_{l} + c_{m}) \frac{1}{h} |u|\ , 
 \\\\\\
@@ -45,12 +45,14 @@ D^{4} u = \nabla \Big(h^{-1} \nabla \cdot (h \nabla^{2}u)\Big) - h^{-1} \nabla^{
     are equivalent divergence-only damping terms.
   - $\nu_{2}^{h} \nabla^{2} g(h + z_{b})$ (with $\nu_{2}^{u} =$ `--hh-diff-2`) is a Laplacian diffusivity.
   - $\nu_{4}^{h} \nabla^{4} g(h + z_{b})$ (with $\nu_{4}^{u} =$ `--hh-diff-4`) is a biharmonic diffusivity.
-  - $\tilde{\nu}_{2}^{u} D^{2} u$ is an eddy viscosity closure, with $\tilde{\nu}_{2}^{u}$ determined by a sub-grid model. Presently 
-    the Leith closure is supported, where $\tilde{\nu}_{2}^{u} = \big(\chi^{u} \delta_{l}\big)^{3} |\nabla \nabla \times u|$
-    with $\chi^{u} =$ `--leith-chi` and $\tilde{\nu}_{2}^{u}$ bounded below `--leith-max`. $\delta_{l}$ is a measure of the 
+  - $\overline{\nu_{2}^{u}} D^{2} u$ is an eddy viscosity closure, with $\overline{\nu_{2}^{u}}$ determined by a sub-grid model. Presently 
+    the Leith closure is supported, where $\overline{\nu_{2}^{u}} = \big(\chi^{u} \delta_{l}\big)^{3} |\nabla \nabla \times u|$
+    with $\chi^{u} =$ `--leith-chi` and $\overline{\nu_{2}^{u}}$ bounded below `--leith-max`. $\delta_{l}$ is a measure of the 
     local mesh spacing.
-  - $\tilde{\nu}_{2}^{h}\nabla^{k}g(h + z_{b})$ is a shock-capturing sub-grid dissipation term. Presently a JST-type formulation is supported, where $\tilde{\nu}_{2}^{h} = \chi^{h} \phi^{h} |c|$ with $\chi^{h} =$ `--shock-chi` and $\tilde{\nu}_{2}^{h}$ bounded below `--shock-max`. $|c| = |u| + (g h)^{\frac{1}{2}}$ is a characteristic speed and $\phi^{h}$ is a JST-type shock sensor
-    $$\phi^{h} = \Bigg|\frac{\nabla \cdot \nabla (h + z_{b})}{\nabla \cdot h}\Bigg|$$
+  - $\overline{\nu_{2}^{h}} \nabla^{k}g(h + z_{b})$ is a shock-capturing sub-grid dissipation term. Presently a JST-type formulation is supported, where
+    $\overline{\nu_{2}^{h}} = \chi^{h} \phi^{h} |c|$ with $\chi^{h} =$ `--shock-chi` and $\overline{\nu_{2}^{h}}$ bounded below `--shock-max`.
+    The characteristic speed $|c| = |u| + (g h)^{\frac{1}{2}}$ for the shallow water system and $\phi^{h}$ is a JST-type shock sensor
+    $\phi^{h} = \big|\nabla \cdot \nabla (h + z_{b})\big| (\nabla \cdot h)^{-1}$.
   - Dissipation coefficients are scaled with the mesh, such that 
     $\nu_{2} = \big(\frac{\delta}{\Delta}\big)^{1} \nu_{2}$ and
     $\nu_{4} = \big(\frac{\delta}{\Delta}\big)^{3} \nu_{4}$.
@@ -74,5 +76,5 @@ comma-delimited list that can include:
 - `rv_dual`, `pv_dual`: dual-centred vorticity $\nabla \times u$ and $h^{-1}(\zeta + f)$.
 - `rv_cell`, `pv_cell`: cell-remapped vorticity $\nabla \times u$ and $h^{-1}(\zeta + f)$.
 - `pv_bias`, `ke_bias`, `hh_bias`: upwind bias in advection scheme, if appropriate upwind scheme is selected.
-- `nu_turb`, `nu_shoc`: time varying turbulent eddy viscosity and shock dissipation $\tilde{\nu}_{2}^{u}$ and $\tilde{\nu}_{2}^{h}$.
+- `nu_turb`, `nu_shoc`: time varying turbulent eddy viscosity and shock dissipation $\overline{\nu_{2}^{u}}$ and $\overline{\nu_{2}^{h}}$.
 
