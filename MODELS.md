@@ -6,13 +6,14 @@ vector-invariant form using an unstructured C-grid discretisation. Thickness, ve
 and vorticity DoF are staggered at the cells, edges and vertices (duals) of a given (orthogonal) mesh.
 
 $$\begin{gather}
-\frac{\partial h}{\partial t} + \nabla \cdot (u h) = \nu_{k}^{h}\nabla^{k}g(h + z_{b}) + S_{h}\ ,
+\frac{\partial h}{\partial t} + \nabla \cdot (u h) = 
+  \Big(\nu_{k}^{h} + \tilde{\nu}_{k}^{h}\Big)\nabla^{k}g(h + z_{b}) + S_{h}\ ,
 \\\\\\
 \frac{\partial u}{\partial t} + q (u h)^{\perp} = 
   -\nabla \Big(g(h + z_{b}) + \xi_{u}\Big) - \nabla \frac{1}{2} |u|^{2} 
-  -c_{d} u + \Big(\nu_{k}^{u} + \nu_{k}^{t}\Big) D^{k} u + \frac{1}{h} \tau_{u} + S_{u}\ ,
+  -c_{d} u + \Big(\nu_{k}^{u} + \tilde{\nu}_{k}^{u}\Big) D^{k} u + \frac{1}{h} \tau_{u} + S_{u}\ ,
 \\\\\\
-c_{d} = c_{1} + (c_{2} + c_{l} + c_{m}) \frac{1}{h} \|u\|\ , 
+c_{d} = c_{1} + (c_{2} + c_{l} + c_{m}) \frac{1}{h} |u|\ , 
 \\\\\\
 c_{l} = \kappa^{2}\ \log^{-2}\Big(1+\frac{h}{2 z_{0}}\Big)\ , \quad c_{m} = n_{0}^{2} g h^{-\frac{1}{3}}\ ,
 \\\\\\
@@ -41,13 +42,15 @@ D^{4} u = \nabla \Big(h^{-1} \nabla \cdot (h \nabla^{2}u)\Big) - h^{-1} \nabla^{
   - $\nu_{2}^{u} D^{2} u$ (with $\nu_{2}^{u} =$ `--uu-visc-2`) is a Laplacian dissipation.
   - $\nu_{4}^{u} D^{4} u$ (with $\nu_{4}^{u} =$ `--uu-visc-4`) is a biharmonic dissipation.
   - $\nu_{k}^{\delta} (\nabla \nabla \cdot)^{\frac{k}{2}} u$ (with $\nu_{k}^{\delta} =$ `--du-visc-2` or `--du-visc-4`) 
-    are equivalent divergence damping terms.
+    are equivalent divergence-only damping terms.
   - $\nu_{2}^{h} \nabla^{2} g(h + z_{b})$ (with $\nu_{2}^{u} =$ `--hh-diff-2`) is a Laplacian diffusivity.
   - $\nu_{4}^{h} \nabla^{4} g(h + z_{b})$ (with $\nu_{4}^{u} =$ `--hh-diff-4`) is a biharmonic diffusivity.
-  - $\nu_{2}^{t} D^{2} u$ is an eddy viscosity closure, with $\nu_{2}^{t}$ determined by a sub-grid model. Presently 
-    the Leith closure is supported, where $\nu_{2}^{t} = \big(\chi_{l} \delta_{l}\big)^{3} |\nabla \nabla \times u|$
-    with $\chi_{l} =$ `--leith-chi` and $\nu_{2}^{t}$ bounded below `--leith-max`. $\delta_{l}$ is a measure of the 
+  - $\tilde{\nu}_{2}^{u} D^{2} u$ is an eddy viscosity closure, with $\tilde{\nu}_{2}^{u}$ determined by a sub-grid model. Presently 
+    the Leith closure is supported, where $\tilde{\nu}_{2}^{u} = \big(\chi^{u} \delta_{l}\big)^{3} |\nabla \nabla \times u|$
+    with $\chi^{u} =$ `--leith-chi` and $\tilde{\nu}_{2}^{u}$ bounded below `--leith-max`. $\delta_{l}$ is a measure of the 
     local mesh spacing.
+  - $\tilde{\nu}_{2}^{h}\nabla^{k}g(h + z_{b})$ is a shock-capturing sub-grid dissipation term. Presently a JST-type formulation is supported, where $\tilde{\nu}_{2}^{h} = \chi^{h} \phi^{h} |c|$ with $\chi^{h} =$ `--shock-chi` and $\tilde{\nu}_{2}^{h}$ bounded below `--shock-max`. $|c| = |u| + (g h)^{\frac{1}{2}}$ is a characteristic speed and $\phi^{h}$ is a JST-type shock sensor
+    $$\phi^{h} = \Bigg|\frac{\nabla \cdot \nabla (h + z_{b})}{\nabla \cdot h}\Bigg|$$
   - Dissipation coefficients are scaled with the mesh, such that 
     $\nu_{2} = \big(\frac{\delta}{\Delta}\big)^{1} \nu_{2}$ and
     $\nu_{4} = \big(\frac{\delta}{\Delta}\big)^{3} \nu_{4}$.
@@ -71,5 +74,5 @@ comma-delimited list that can include:
 - `rv_dual`, `pv_dual`: dual-centred vorticity $\nabla \times u$ and $h^{-1}(\zeta + f)$.
 - `rv_cell`, `pv_cell`: cell-remapped vorticity $\nabla \times u$ and $h^{-1}(\zeta + f)$.
 - `pv_bias`, `ke_bias`, `hh_bias`: upwind bias in advection scheme, if appropriate upwind scheme is selected.
-- `nu_turb`: time varying turbulent eddy viscosity $\nu_{2}^{t}$.
+- `nu_turb`, `nu_shoc`: time varying turbulent eddy viscosity and shock dissipation $\tilde{\nu}_{2}^{u}$ and $\tilde{\nu}_{2}^{h}$.
 
