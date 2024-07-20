@@ -164,7 +164,7 @@ jobs:
           --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
           --uu-visc-4=1.E+11 --hh-diff-4=1.E+11 \
           --leith-chi=0.3875 --leith-max=1.E+03 \
-          --shock-chi=0.5000 --shock-max=1.E+06 \
+          --shock-chi=0.5000 --shock-max=1.E+06
           python3 chk.py \
           --soln-file="out_wake_2.nc"
 
