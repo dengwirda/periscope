@@ -39,15 +39,14 @@ out_.ux_cell = False
 out_.uy_cell = False
 out_.uz_cell = False
 out_.nu_turb = False
+out_.nu_shoc = False
 
 def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
 
     hh_edge, hh_dual, hh_bias, \
     ke_cell, ke_bias, \
-    rv_cell, pv_cell, \
-    rv_dual, pv_dual, \
-    pv_edge, pv_bias, \
-    vv_edge, nu_edge = diag_vars (
+    rv_cell, pv_cell, rv_dual, pv_dual, pv_edge, pv_bias, \
+    vv_edge, nu_edge, hs_edge = diag_vars (
         mesh, mats, flow, cnfg, hh_cell, uu_edge
         )
 
@@ -173,6 +172,14 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
         xt_dual/= mesh.vert.area
     
         data.variables["nu_turb"][step, :, :] = \
+            np.reshape(xt_dual[
+                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+
+    if (out_.nu_shoc):
+        xt_dual = mats.dual_tail_sums * hs_edge
+        xt_dual/= mesh.vert.area
+    
+        data.variables["nu_shoc"][step, :, :] = \
             np.reshape(xt_dual[
                 mesh.vert.irev - 1], (1, mesh.vert.size, 1))
 
@@ -485,6 +492,13 @@ def init_file(name, cnfg, save, mesh, flow):
         data["nu_turb"].long_name = \
             "Turbulent eddy viscosity, remapped to duals"
         out_.nu_turb = True
+
+    if ("nu_shoc" in cnfg.save_vars):
+        data.createVariable(
+            "nu_shoc", "f4", ("Time", "nVertices", "nVertLevels"))
+        data["nu_shoc"].long_name = \
+            "Artificial diffusivity, remapped to duals"
+        out_.nu_shoc = True
 
     data.close()
     

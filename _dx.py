@@ -59,24 +59,6 @@ def scalingVk(mesh, mats, cnfg):
     sf_edge/= mesh.edge.area
     sf_cell = mats.cell_wing_sums * sf_edge
     sf_cell/= mesh.cell.area
-    
-    if (cnfg.ref_scale > 0.0):
-        s2_cell = (dx_cell / cnfg.ref_scale) ** 1
-        s4_cell = (dx_cell / cnfg.ref_scale) ** 3
-    else:
-        s2_cell = np.ones(
-            (mesh.cell.size), dtype=reals_t)
-        s4_cell = np.ones(
-            (mesh.cell.size), dtype=reals_t)
-    
-    s2_cell*= (1. + sf_cell)
-    s4_cell*= (1. + sf_cell)
-
-    dx_edge = mats.edge_wing_sums * dx_cell
-    dx_edge/= mesh.edge.area
-
-    sf_edge = mats.edge_wing_sums * sf_cell
-    sf_edge/= mesh.edge.area
 
     if (cnfg.ref_scale > 0.0):
         s2_edge = (dx_edge / cnfg.ref_scale) ** 1
@@ -90,7 +72,7 @@ def scalingVk(mesh, mats, cnfg):
     s2_edge*= (1. + sf_edge)
     s4_edge*= (1. + sf_edge)
 
-    return s2_edge, s4_edge, s2_cell, s4_cell
+    return s2_edge, s4_edge
 
  
 def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
@@ -141,11 +123,15 @@ def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     nu_edge = computeNu(
         mesh, mats, cnfg, r2_dual, rv_cell)
 
+    hs_edge = computeHs(
+        mesh, mats, cnfg, hh_cell, zb_cell, gravity, 
+                                   uu_edge)
+
     return hh_edge, hh_dual, hh_bias, \
            ke_cell, ke_bias, \
            rv_cell, pv_cell, \
            rv_dual, pv_dual, pv_edge, pv_bias, \
-           vv_edge, nu_edge
+           vv_edge, nu_edge, hs_edge
 
 
 def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
@@ -442,6 +428,30 @@ def computeNu(mesh, mats, cnfg, rv_dual, rv_cell):
     tcpu.computeNu = tcpu.computeNu + (ttoc - ttic)
 
     return nu_edge
+
+
+def computeHs(mesh, mats, cnfg, hh_cell, zb_cell,
+                                gravity,
+                                uu_edge):
+
+#-- compute shock dissipation
+
+    hs_edge = variables.hs_edge
+
+    if (cnfg.shock_chi == 0): return hs_edge
+
+    ttic = time.time()
+
+    hh_tiny = cnfg.wetdry_h0 * 10.0
+
+    hs_cell = _computeHs(
+        mesh, mats, cnfg, hh_cell, 
+            zb_cell, gravity, hh_tiny, uu_edge)
+    
+    ttoc = time.time()
+    tcpu.computeHs = tcpu.computeHs + (ttoc - ttic)
+
+    return hs_cell
     
 
 def addtendDU(mesh, mats, cnfg, hh_cell, hh_edge, 
@@ -493,7 +503,8 @@ def addtendVU(mesh, mats, cnfg, hh_cell, hh_edge,
     
     
 def addtendVH(mesh, mats, cnfg, hh_cell, zb_cell, 
-                                gravity, 
+                                gravity,
+                                hs_edge, 
                                 hh_tend):
 
 #-- diffusive del^k operators
@@ -502,9 +513,12 @@ def addtendVH(mesh, mats, cnfg, hh_cell, zb_cell,
 
     ttic = time.time()
 
+    hh_tiny = cnfg.wetdry_h0 * 10.0
+
     hh_tend = _computeVH(
-        mesh, mats, cnfg, hh_cell, 
-            zb_cell, gravity, HH_TINY, hh_tend)
+        mesh, mats, cnfg, 
+            hh_cell, zb_cell, 
+            gravity, hs_edge, hh_tiny, hh_tend)
     
     ttoc = time.time()
     tcpu.computeVH = tcpu.computeVH + (ttoc - ttic)
@@ -585,6 +599,7 @@ try:
     from _kx import _computeGZ
     from _kx import _computeXI
     from _kx import _computeNu
+    from _kx import _computeHs
     from _kx import _computeDU
     from _kx import _computeVU
     from _kx import _computeVH

@@ -36,7 +36,6 @@ def init(name, save, rsph=0.E+0):
 
     mats = operators(mesh)
 
-
     grav = 9.81                 # gravity
     erot = 7.292E-05            # Earth's omega
     u0 = 2.0                    # velocity

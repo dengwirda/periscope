@@ -14,7 +14,8 @@ from _fp import reals_t, index_t
 from log import tcpu
 
 from _dx import computeBC, limiterWD, \
-                compute_H, addtendUH, addtendVH, \
+                compute_H, addtendUH, \
+                computeHs, addtendVH, \
                 computeKE, computePV, addtendUV, \
                 computeVV, addtendGZ, \
                 computeNu, addtendDU, addtendVU, \
@@ -33,7 +34,7 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
 
     if cnfg.no_h_tend: return hh_tend
 
-    zb_cell = flow.zb_cell; gg_cell = flow.gravity
+    zb_cell = flow.zb_cell; gravity = flow.gravity
     
     hE_prev = flow.prev.hE_edge
     uE_prev = flow.prev.uE_edge
@@ -46,7 +47,7 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
 
     hh_edge, uu_edge = computeBC(
         mesh, mats, cnfg, 
-        hh_edge, uu_edge, gg_cell, 
+        hh_edge, uu_edge, gravity, 
         hE_prev, uE_prev,
         hE_next, uE_next)
         
@@ -56,9 +57,16 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
     hh_tend = addtendUH(mesh, mats, cnfg, hh_edge, uu_edge, 
                                           hh_tend)
     
+    # shock sub-grid
+    hs_edge = computeHs(mesh, mats, cnfg, hh_cell, zb_cell,
+                                          gravity,
+                                          uu_edge)
+
     # del^k dissipation
     hh_tend = addtendVH(mesh, mats, cnfg, hh_cell, zb_cell, 
-                                          gg_cell, hh_tend)
+                                          gravity,
+                                          hs_edge, 
+                                          hh_tend)
 
     hh_tend[mesh.cell.mask] = flt64_t(0.0)
 
@@ -100,14 +108,14 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
     hE_next = flow.next.hE_edge
     uE_next = flow.next.uE_edge
 
-    gg_cell = flow.gravity
+    gravity = flow.gravity
 
     hh_dual, hh_edge, hh_quad, hh_bias = \
               compute_H(mesh, mats, cnfg, hh_cell, uu_edge)
               
     hh_edge, uu_edge = computeBC(
         mesh, mats, cnfg, 
-        hh_edge, uu_edge, gg_cell, 
+        hh_edge, uu_edge, gravity, 
         hE_prev, uE_prev,
         hE_next, uE_next)
 
@@ -170,11 +178,12 @@ def rhs_fst_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
 
     if cnfg.no_u_tend: return uu_tend
 
-    zb_cell = flow.zb_cell; gg_cell = flow.gravity
+    zb_cell = flow.zb_cell; gravity = flow.gravity
 
     # pressure gradient
     uu_tend = addtendGZ(mesh, mats, cnfg, hh_cell, zb_cell, 
-                                          gg_cell, uu_tend)
+                                          gravity, 
+                                          uu_tend)
     
     uu_tend[mesh.edge.mask] = flt64_t(0.0)
     

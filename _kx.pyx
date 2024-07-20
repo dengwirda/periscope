@@ -1382,6 +1382,168 @@ def _computeNu(mesh, mats, cnfg,
     return nu_edge
 
 
+def _computeHs(mesh, mats, cnfg,
+    np.ndarray[FLT64_t, ndim=1] hh_cell,
+    np.ndarray[FLT32_t, ndim=1] zb_cell,
+        const FLT32_t gravity,
+        const FLT32_t hh_tiny,
+    np.ndarray[FLT64_t, ndim=1] uu_edge
+              ):
+          
+#-- Jameson-type "shock" diffusion nu_2^h
+    
+    cdef INDEX_t edge, cell, iptr, xidx
+    cdef INDEX_t cel1, cel2
+    cdef REALS_t xval
+    
+    cdef REALS_t Z1_CELL, Z2_CELL, ZB_MAX_
+    cdef REALS_t H1_CELL, H2_CELL
+    cdef REALS_t HS_NUM_, HS_DEN_
+    cdef REALS_t HH_SENS, HH_WAVE, CC_WAVE
+
+    cdef REALS_t ZERO = 0.0
+    cdef REALS_t HALF = 0.5
+    cdef REALS_t ONE_ = 1.0
+    
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t chunksize = cnfg.chunksize
+    cdef REALS_t shock_chi = cnfg.shock_chi * HALF
+    
+    cdef INDEX_t NVRT = mesh.vert.size
+    cdef INDEX_t NEDG = mesh.edge.size
+    cdef INDEX_t NCEL = mesh.cell.size
+    
+    cdef FLT64_t *HH_CELL = &hh_cell[0]
+    cdef FLT32_t *ZB_CELL = &zb_cell[0]
+    cdef FLT64_t *UU_EDGE = &uu_edge[0]
+
+    cdef REALS_t[::1] hs_max_ = cnfg.shock_max
+    cdef REALS_t *HS_MAX_ = &hs_max_[0]
+
+    cdef INDEX_t[::1] cell_flux_xptr = \
+        mats.cell_flux_sums.indptr
+    cdef INDEX_t[::1] cell_flux_xidx = \
+        mats.cell_flux_sums.indices
+    cdef REALS_t[::1] cell_flux_xval = \
+        mats.cell_flux_sums.data
+    
+    cdef INDEX_t *CELL_FLUX_XPTR = &cell_flux_xptr[0]
+    cdef INDEX_t *CELL_FLUX_XIDX = &cell_flux_xidx[0]
+    cdef REALS_t *CELL_FLUX_XVAL = &cell_flux_xval[0]
+
+    cdef REALS_t[::1] mesh_edge_clen = mesh.edge.clen
+    cdef REALS_t[::1] mesh_edge_area = mesh.edge.area
+
+    cdef REALS_t *MESH_EDGE_CLEN = &mesh_edge_clen[0]
+    cdef REALS_t *MESH_EDGE_AREA = &mesh_edge_area[0]
+    
+    cdef np.ndarray[REALS_t] hs_edge = variables.hs_edge
+    cdef np.ndarray[REALS_t] hs_cell = variables.hs_cell
+    
+    cdef REALS_t *HS_EDGE = &hs_edge[0]
+    cdef REALS_t *HS_CELL = &hs_cell[0]
+
+    cdef np.ndarray[REALS_t] zt_grad = get_vec_e()
+    cdef np.ndarray[REALS_t] hh_sums = get_vec_e()
+        
+    cdef REALS_t *ZT_GRAD = &zt_grad[0]
+    cdef REALS_t *HH_SUMS = &hh_sums[0]
+
+    cdef INDEX_t[:, ::1] mesh_edge_cell = mesh.edge.cell
+
+    with nogil, parallel(num_threads=numthread):
+  
+        for edge in prange(0, NEDG, schedule="static", 
+                chunksize=chunksize):
+            
+            cel1 = mesh_edge_cell[edge, 0] - 1
+            cel2 = mesh_edge_cell[edge, 1] - 1
+            
+            if (cel1 < 0): cel1 = cel2
+            if (cel2 < 0): cel2 = cel1
+
+        #-- don't allow gradients across partial layers
+            ZB_MAX_ = max (ZB_CELL[cel1], ZB_CELL[cel2])
+
+        #-- surface pressure gradient g * G * (h + z_b)
+            H1_CELL = HH_CELL[cel1]
+            Z1_CELL = HH_CELL[cel1] + ZB_CELL[cel1]
+            Z1_CELL = max (ZB_MAX_, Z1_CELL)
+
+            H2_CELL = HH_CELL[cel2]
+            Z2_CELL = HH_CELL[cel2] + ZB_CELL[cel2]
+            Z2_CELL = max (ZB_MAX_, Z2_CELL)
+
+            ZT_GRAD[edge] = (
+               Z2_CELL - Z1_CELL) / MESH_EDGE_CLEN[edge]
+
+            H1_CELL = max (H1_CELL, hh_tiny)
+            H2_CELL = max (H2_CELL, hh_tiny)
+
+            HH_SUMS[edge] = (
+               H1_CELL + H2_CELL) / MESH_EDGE_CLEN[edge]
+
+        for cell in prange(0, NCEL, schedule="static", 
+                chunksize=chunksize):
+        #-- build a Jameson-style shock sensor
+            HS_NUM_ = ZERO; HS_DEN_ = ZERO
+            for iptr in range(CELL_FLUX_XPTR[cell +0],
+                              CELL_FLUX_XPTR[cell +1]):
+                    
+                xval = CELL_FLUX_XVAL[iptr]
+                xidx = CELL_FLUX_XIDX[iptr]
+
+                HS_NUM_ = \
+                    HS_NUM_ + xval * ZT_GRAD[xidx]
+
+                xval = fabs_r(xval)
+
+                HS_DEN_ = \
+                    HS_DEN_ + xval * HH_SUMS[xidx]
+
+            HS_CELL[cell] = (
+                min(ONE_, fabs_r (HS_NUM_) / HS_DEN_)
+                )
+
+        for edge in prange(0, NEDG, schedule="static", 
+                chunksize=chunksize):
+            
+            cel1 = mesh_edge_cell[edge, 0] - 1
+            cel2 = mesh_edge_cell[edge, 1] - 1
+            
+            if (cel1 < 0): cel1 = cel2
+            if (cel2 < 0): cel2 = cel1
+
+        #-- diffusivity = 1/2 * h_chi * sensor * |u_wave|
+            H1_CELL = HS_CELL[cel1]
+            H2_CELL = HS_CELL[cel2]
+            HH_SENS = sqrt_r(HALF * (
+                H1_CELL * H1_CELL + H2_CELL * H2_CELL
+                ) )
+
+            H1_CELL = HH_CELL[cel1]
+            H2_CELL = HH_CELL[cel2]
+            HH_WAVE = sqrt_r(HALF * (
+                H1_CELL * H1_CELL + H2_CELL * H2_CELL
+                ) )
+
+            HH_WAVE = max(HH_WAVE , hh_tiny)
+            CC_WAVE = fabs_r (
+                UU_EDGE[edge]) + sqrt_r(gravity * HH_WAVE
+                )
+
+            HS_EDGE[edge] = shock_chi * HH_SENS * CC_WAVE
+            HS_EDGE[edge]*= MESH_EDGE_AREA[edge]
+            HS_EDGE[edge] = \
+                min(HS_EDGE[edge], HS_MAX_[edge]
+                )
+            
+    put_vec_e  (zt_grad)       
+    put_vec_e  (hh_sums)
+
+    return hs_edge
+    
+
 def _computeDU(mesh, mats, cnfg, 
     np.ndarray[FLT64_t, ndim=1] hh_cell,
     np.ndarray[REALS_t, ndim=1] hh_edge,
@@ -1859,6 +2021,7 @@ def _computeVH(mesh, mats, cnfg,
     np.ndarray[FLT64_t, ndim=1] hh_cell,
     np.ndarray[FLT32_t, ndim=1] zb_cell,
         const REALS_t gravity,
+    np.ndarray[REALS_t, ndim=1] hs_edge,
         const REALS_t hh_tiny,
     np.ndarray[FLT64_t, ndim=1] hh_tend
               ):
@@ -1869,8 +2032,8 @@ def _computeVH(mesh, mats, cnfg,
     cdef INDEX_t cel1, cel2
     cdef REALS_t xval
     
-    cdef REALS_t HZ_DIFF
-    cdef REALS_t VH_SUM_, DH_SUM_, OK_SUM_
+    cdef REALS_t HZ_DIFF, DH_SUM_, OK_SUM_
+    cdef REALS_t V2_SUM_, V4_SUM_
     
     cdef REALS_t ZERO = 0.0
     cdef REALS_t ONE_ = 1.0
@@ -1885,6 +2048,7 @@ def _computeVH(mesh, mats, cnfg,
     
     cdef FLT64_t *HH_CELL = &hh_cell[0]
     cdef FLT32_t *ZB_CELL = &zb_cell[0]
+    cdef REALS_t *HS_DIFF = &hs_edge[0]
     cdef FLT64_t *HH_TEND = &hh_tend[0]
     
     cdef REALS_t[::1] v2_diff = cnfg.hh_diff_2
@@ -1927,19 +2091,20 @@ def _computeVH(mesh, mats, cnfg,
     cdef REALS_t *V2_CELL = &v2_cell[0]
     cdef REALS_t *V4_CELL = &v4_cell[0]
     
-    cdef np.ndarray[REALS_t] hz_edge = get_vec_e()
+    cdef np.ndarray[REALS_t] h2_edge = get_vec_e()
+    cdef np.ndarray[REALS_t] h4_edge = get_vec_e()
+    
+    cdef REALS_t *H2_EDGE = &h2_edge[0]
+    cdef REALS_t *H4_EDGE = &h4_edge[0]
+
     cdef np.ndarray[REALS_t] ok_edge = get_vec_e()
     cdef np.ndarray[REALS_t] ok_cell = get_vec_c()
-        
-    cdef REALS_t *HZ_EDGE = &hz_edge[0]
+    
     cdef REALS_t *OK_EDGE = &ok_edge[0]
     cdef REALS_t *OK_CELL = &ok_cell[0]
     
-    cdef np.ndarray[INDEX_t, ndim=2] \
-        mesh_edge_cell = mesh.edge.cell
-    
-    hh_tiny = max(hh_tiny, cnfg.wetdry_h0)
-    
+    cdef INDEX_t[:, ::1] mesh_edge_cell = mesh.edge.cell
+
     with nogil, parallel(num_threads=numthread):
         
         for edge in prange(0, NEDG, schedule="static", 
@@ -1959,30 +2124,36 @@ def _computeVH(mesh, mats, cnfg,
                 xval = GRAD_NORM_XVAL[iptr]
                 xidx = GRAD_NORM_XIDX[iptr]
                     
-                DH_SUM_ = DH_SUM_ + \
-                    xval * gravity * (
-                        HH_CELL[xidx] + ZB_CELL[xidx])
+                DH_SUM_ = DH_SUM_ + xval * (
+                    HH_CELL[xidx] + ZB_CELL[xidx])
          
         #-- flux-limiter: don't diffuse to topography!
             OK_EDGE[edge] = MESH_EDGE_MASK[edge]
             
             HZ_DIFF = fabs_r(
-                    ZB_CELL[cel1]+ HH_CELL[cel1] - 
-                    ZB_CELL[cel2]- HH_CELL[cel2])
+                    ZB_CELL[cel1] + HH_CELL[cel1] - 
+                    ZB_CELL[cel2] - HH_CELL[cel2])
             
             OK_EDGE[edge]*=(
-                min(ZB_CELL[cel1]+ HH_CELL[cel1],
-                    ZB_CELL[cel2]+ HH_CELL[cel2])
+                min(ZB_CELL[cel1] + HH_CELL[cel1],
+                    ZB_CELL[cel2] + HH_CELL[cel2])
                   - HZ_DIFF
-              > max(ZB_CELL[cel1], ZB_CELL[cel2]) 
+              > max(ZB_CELL[cel1] , ZB_CELL[cel2]) 
                   + hh_tiny)
                         
-            HZ_EDGE[edge] =DH_SUM_*OK_EDGE[edge]
+            H2_EDGE[edge] = OK_EDGE[edge] *DH_SUM_
+            H4_EDGE[edge] = OK_EDGE[edge] *DH_SUM_
+
+        #-- edge-centred diffusivity, for conservation
+            H4_EDGE[edge]*= V4_DIFF[edge] * gravity
+
+            H2_EDGE[edge]*=(V2_DIFF[edge] * gravity +
+                            HS_DIFF[edge] )
             
         for cell in prange(0, NCEL, schedule="static", 
                 chunksize=chunksize):
-        #-- compute div(H.n)
-            VH_SUM_ = ZERO
+        #-- compute div(nu * grad(*))
+            V2_SUM_ = ZERO; V4_SUM_ = ZERO
             OK_SUM_ = ZERO
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
                               CELL_FLUX_XPTR[cell +1]):
@@ -1990,8 +2161,11 @@ def _computeVH(mesh, mats, cnfg,
                 xval = CELL_FLUX_XVAL[iptr]
                 xidx = CELL_FLUX_XIDX[iptr]
                     
-                VH_SUM_ = \
-                    VH_SUM_ + xval * HZ_EDGE[xidx]
+                V2_SUM_ = \
+                    V2_SUM_ + xval * H2_EDGE[xidx]
+
+                V4_SUM_ = \
+                    V4_SUM_ + xval * H4_EDGE[xidx]
                 
                 # -ve if any edge limits
                 OK_SUM_ = \
@@ -1999,13 +2173,17 @@ def _computeVH(mesh, mats, cnfg,
          
             OK_CELL[cell] = OK_SUM_
             V2_CELL[cell] = (
-                VH_SUM_ / MESH_CELL_AREA[cell]
+                V2_SUM_ / MESH_CELL_AREA[cell]
+                )
+
+            V4_CELL[cell] = (
+                V4_SUM_ / MESH_CELL_AREA[cell]
                 )
             
         for edge in prange(0, NEDG, schedule="static", 
                 chunksize=chunksize):
         #-- pressure gradient tend.: g * G * (hh + zb)
-            HZ_DIFF = HZ_EDGE[edge]
+            HZ_DIFF = H2_EDGE[edge]
             DH_SUM_ = ZERO
             OK_SUM_ = OK_EDGE[edge]
             for iptr in range(GRAD_NORM_XPTR[edge +0], 
@@ -2014,48 +2192,50 @@ def _computeVH(mesh, mats, cnfg,
                 xval = GRAD_NORM_XVAL[iptr]
                 xidx = GRAD_NORM_XIDX[iptr]
                     
-                DH_SUM_ = DH_SUM_ + \
-                    xval * gravity * (
-                        V2_CELL[xidx] * V4_DIFF[xidx])
+                DH_SUM_ = \
+                    DH_SUM_ + xval * V4_CELL[xidx]
                 
                 # if incident cells okay        
                 OK_SUM_ = \
                 OK_SUM_ *(OK_CELL[xidx] >= ZERO)
                         
-            HZ_EDGE[edge] = DH_SUM_ * OK_SUM_
+            H4_EDGE[edge] = DH_SUM_ * OK_SUM_
             
         #-- flux limiter: don't allow up-gradient flux
         #-- see M. Xue (2000): MWR.
-            HZ_EDGE[edge]*= (
-                HZ_EDGE[edge] * HZ_DIFF <= ZERO)
+            H4_EDGE[edge]*= (
+                H4_EDGE[edge] * HZ_DIFF <= ZERO)
+
+        #-- edge-centred diffusivity, for conservation
+            H4_EDGE[edge]*= V4_DIFF[edge] * gravity
             
         for cell in prange(0, NCEL, schedule="static", 
                 chunksize=chunksize):
-        #-- compute div(H^2)
-            DH_SUM_ = ZERO
+        #-- compute div(nu * grad(*))
+            V4_SUM_ = ZERO
             for iptr in range(CELL_FLUX_XPTR[cell +0], 
                               CELL_FLUX_XPTR[cell +1]):
                     
                 xval = CELL_FLUX_XVAL[iptr]
                 xidx = CELL_FLUX_XIDX[iptr]
                     
-                DH_SUM_ = \
-                    DH_SUM_ + xval * HZ_EDGE[xidx]
+                V4_SUM_ = \
+                    V4_SUM_ + xval * H4_EDGE[xidx]
          
             V4_CELL[cell] = (
-                DH_SUM_ / MESH_CELL_AREA[cell]
+                V4_SUM_ / MESH_CELL_AREA[cell]
                 )
             
             HH_TEND[cell]-= (
-                V2_DIFF[cell] * V2_CELL [cell]
-              - V4_DIFF[cell] * V4_CELL [cell]
+               + V2_CELL[cell] - V4_CELL[cell]
                 )
     
     put_vec_c  (ok_cell)
     put_vec_e  (ok_edge)
-    put_vec_c  (v4_cell)       
+    put_vec_c  (v4_cell)
     put_vec_c  (v2_cell)
-    put_vec_e  (hz_edge)
+    put_vec_e  (h2_edge)
+    put_vec_e  (h4_edge)
     
     return hh_tend
     

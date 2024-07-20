@@ -209,34 +209,41 @@ def swe(cnfg):
 
     cnfg.du_visc_k = \
         max (cnfg.du_visc_2, cnfg.du_visc_4)
+    
     cnfg.uu_visc_k = \
         max (cnfg.uu_visc_2, cnfg.uu_visc_4)
     cnfg.uu_visc_k = \
         max (cnfg.uu_visc_k, cnfg.leith_chi)
+
     cnfg.hh_diff_k = \
         max (cnfg.hh_diff_2, cnfg.hh_diff_4)
+    cnfg.hh_diff_k = \
+        max (cnfg.hh_diff_k, cnfg.shock_chi)
     
-    s2_edge, s4_edge,\
-    s2_cell, s4_cell = scalingVk(mesh, mats, cnfg)
-    
-    cnfg.leith_max = np.asarray(
-        (cnfg.leith_max * s2_edge), dtype=reals_t)
+    s2_edge, s4_edge = scalingVk(mesh, mats, cnfg)
     
     cnfg.du_visc_2 = np.asarray(
         (cnfg.du_visc_2 * s2_edge), dtype=reals_t)
     cnfg.du_visc_4 = np.asarray(
         (cnfg.du_visc_4 * s4_edge), dtype=reals_t)
+
     cnfg.uu_visc_2 = np.asarray(
         (cnfg.uu_visc_2 * s2_edge), dtype=reals_t)
     cnfg.uu_visc_4 = np.asarray(
         (cnfg.uu_visc_4 * s4_edge), dtype=reals_t)
+
     cnfg.hh_diff_2 = np.asarray(
-        (cnfg.hh_diff_2 * s2_cell), dtype=reals_t)
+        (cnfg.hh_diff_2 * s2_edge), dtype=reals_t)
     cnfg.hh_diff_4 = np.asarray(
-        (cnfg.hh_diff_4 * s4_cell), dtype=reals_t)
+        (cnfg.hh_diff_4 * s4_edge), dtype=reals_t)
    
     cnfg.hh_diff_4 = np.sqrt(cnfg.hh_diff_4)
     
+    cnfg.leith_max = np.asarray(
+        (cnfg.leith_max * s2_edge), dtype=reals_t)
+    cnfg.shock_max = np.asarray(
+        (cnfg.shock_max * s2_edge), dtype=reals_t)
+
     ch_cell = variables.ch_cell
     cu_edge = variables.cu_edge
 
@@ -316,10 +323,10 @@ def swe(cnfg):
     print("*momentum_ (sec):", round(tcpu.momentum_, 2))
     print("*computeBC (sec):", round(tcpu.computeBC, 2))
     print("*limiterWD (sec):", round(tcpu.limiterWD, 2))
-    print("*upwinding (sec):", round(tcpu.upwinding, 2)) 
+    print("*upwinding (sec):", round(tcpu.upwinding, 2))
     print("*compute_H (sec):", round(tcpu.compute_H, 2))
     print("*advect_UH (sec):", round(tcpu.advect_UH, 2))
-    print("*computeKE (sec):", round(tcpu.computeKE, 2))    
+    print("*computeKE (sec):", round(tcpu.computeKE, 2))
     print("*computePV (sec):", round(tcpu.computePV, 2))
     print("*advect_UV (sec):", round(tcpu.advect_UV, 2))
     print("*computeGZ (sec):", round(tcpu.computeGZ, 2))
@@ -327,6 +334,7 @@ def swe(cnfg):
     print("*computeNu (sec):", round(tcpu.computeNu, 2))
     print("*computeDU (sec):", round(tcpu.computeDU, 2))
     print("*computeVU (sec):", round(tcpu.computeVU, 2))
+    print("*computeHs (sec):", round(tcpu.computeHs, 2))
     print("*computeVH (sec):", round(tcpu.computeVH, 2))
     print("*computeXI (sec):", round(tcpu.computeXI, 2))
     print("*computeTU (sec):", round(tcpu.computeTU, 2))
@@ -578,6 +586,18 @@ if (__name__ == "__main__"):
         default=0.E+00,
         required=False,
         help="Leith model max damping {VISC = +0.E+00}.")
+
+    parser.add_argument(
+        "--shock-chi", dest="shock_chi", type=float,
+        default=0.E+00,
+        required=False,
+        help="Shock model coefficient {SCAL = +0.E+00}.")
+
+    parser.add_argument(
+        "--shock-max", dest="shock_max", type=float,
+        default=0.E+00,
+        required=False,
+        help="Shock model max damping {DIFF = +0.E+00}.")
 
     parser.add_argument(
         "--linlaw-cd", dest="linlaw_cd", type=float,

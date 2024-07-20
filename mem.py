@@ -111,6 +111,11 @@ def init_pool(mesh):
     
     variables.nu_edge = \
             np.zeros(mesh.edge.size, dtype=reals_t)
+
+    variables.hs_edge = \
+            np.zeros(mesh.edge.size, dtype=reals_t)
+    variables.hs_cell = \
+            np.empty(mesh.cell.size, dtype=reals_t)
         
     variables.cd_edge = \
             np.empty(mesh.edge.size, dtype=reals_t)
