@@ -404,8 +404,9 @@ def _upwinding(mesh, mats, cnfg,
                 
                 UP_BIAS[edge] = UP_SUM_ / DS_EDGE
 
-            #-- van-leer style polynomial limiting
-                UP_BIAS[edge]/= ONE_ + UP_BIAS[edge]
+            #-- up^k/(up^k+1.) polynomial limiting
+                UP_BIAS[edge]*= UP_BIAS[edge]
+                UP_BIAS[edge]/= UP_BIAS[edge] + ONE_
 
             #-- upwind APVM, scale w. grid spacing
                 UM_EDGE = uu_tiny + sqrt_r (
