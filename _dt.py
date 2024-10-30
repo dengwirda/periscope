@@ -157,7 +157,7 @@ def step_RK22(mesh, mats, flow, cnfg,
         cd_edge = computeCd(
             mesh, mats, cnfg, gravity, h1_cell, u1_edge)
 
-    #-- euler scheme: implicit solve
+    #-- euler scheme implicit solve
         u1_edge = inv_x_1st(
             cnfg, u1_edge, 1. * k1_step, cd_edge, uu_edge)
 
@@ -208,10 +208,11 @@ def step_RK22(mesh, mats, flow, cnfg,
         cnfg, uu_edge, k2_step, ru_edge, cu_edge, u2_edge)
     
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
+    #-- KE evaluated at t+1/2 above
         cd_edge = computeCd(
             mesh, mats, cnfg, gravity, hb_cell, um_edge)
 
-    #-- theta scheme: implicit solve
+    #-- theta scheme implicit solve
         u2_edge = inv_x_2nd(
             cnfg, u2_edge, .5 * k2_step, cd_edge, uu_edge)
             
@@ -305,7 +306,7 @@ def step_RK32(mesh, mats, flow, cnfg,
         cd_edge = computeCd(
             mesh, mats, cnfg, gravity, h1_cell, u1_edge)
 
-    #-- euler scheme: implicit solve
+    #-- euler scheme implicit solve
         u1_edge = inv_x_1st(
             cnfg, u1_edge, 1. * k1_step, cd_edge, uu_edge)
 
@@ -356,7 +357,7 @@ def step_RK32(mesh, mats, flow, cnfg,
         cd_edge = computeCd(
             mesh, mats, cnfg, gravity, h2_cell, u2_edge)
 
-    #-- euler scheme: implicit solve
+    #-- euler scheme implicit solve
         u2_edge = inv_x_1st(
             cnfg, u2_edge, 1. * k2_step, cd_edge, uu_edge)
 
@@ -400,13 +401,15 @@ def step_RK32(mesh, mats, flow, cnfg,
         cnfg, uu_edge, k3_step, ru_edge, cu_edge, u3_edge)
    
     if (cnfg.calc_drag and cnfg.anylaw_cd > 0.):
+    #-- KE evaluated at t+1/2 above
         cd_edge = computeCd(
             mesh, mats, cnfg, gravity, hb_cell, u2_edge)
 
-    #-- theta scheme: explicit tend.
+    #-- theta scheme explicit tend.
         u3_edge = inv_x_2nd(
             cnfg, u3_edge, .5 * k3_step, cd_edge, uu_edge)
             
+    #-- theta scheme implicit solve
         cu_edge = inv_x_1st(
             cnfg, cu_edge, 1. * k3_step, cd_edge, cu_edge)
 

@@ -46,7 +46,7 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
     hh_edge, hh_dual, hh_bias, \
     ke_cell, ke_bias, \
     rv_cell, pv_cell, rv_dual, pv_dual, pv_edge, pv_bias, \
-    vv_edge, nu_edge, hs_edge = diag_vars (
+    vv_edge, nu_turb, nu_shoc = diag_vars (
         mesh, mats, flow, cnfg, hh_cell, uu_edge
         )
 
@@ -168,7 +168,7 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))   
                 
     if (out_.nu_turb):
-        xt_dual = mats.dual_tail_sums * nu_edge
+        xt_dual = mats.dual_tail_sums * nu_turb
         xt_dual/= mesh.vert.area
     
         data.variables["nu_turb"][step, :, :] = \
@@ -176,7 +176,7 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
                 mesh.vert.irev - 1], (1, mesh.vert.size, 1))
 
     if (out_.nu_shoc):
-        xt_dual = mats.dual_tail_sums * hs_edge
+        xt_dual = mats.dual_tail_sums * nu_shoc
         xt_dual/= mesh.vert.area
     
         data.variables["nu_shoc"][step, :, :] = \
@@ -375,6 +375,12 @@ def init_file(name, cnfg, save, mesh, flow):
             "uu_edge", "f4", ("Time", "nEdges", "nVertLevels"))
         data["uu_edge"].long_name = "Normal velocity on edges" 
         out_.uu_edge = True
+
+    if ("vv_edge" in cnfg.save_vars):
+        data.createVariable(
+            "vv_edge", "f4", ("Time", "nEdges", "nVertLevels"))
+        data["vv_edge"].long_name = "Tangential velocity on edges" 
+        out_.vv_edge = True
     
     if ("hh_cell" in cnfg.save_vars):   
         data.createVariable(

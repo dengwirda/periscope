@@ -1083,6 +1083,9 @@ def edge_lsqr_fxyz(mesh):
 
     Rinv, Rdet, matR, \
     Sinv, Sdet, matS = edge_lsqr_mats(mesh)
+
+    Rdet[Rdet<=0.] = 1.  # chase down div-by-zero
+    Sdet[Sdet<=0.] = 1.
     
     xnrm = []; ynrm = []; znrm = []
     xprp = []; yprp = []; zprp = []

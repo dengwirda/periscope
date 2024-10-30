@@ -29,11 +29,12 @@ def load_mesh(name, rsph=None):
     if (str(data.on_a_sphere).upper() == "NO"):
     #-- deal with planar domain silliness
         mesh.rsph = None
-        mesh.wrap[0] = flt64_t(data.x_period)
-        if mesh.wrap[0] <= 0.: mesh.wrap[0] = None
-        
-        mesh.wrap[1] = flt64_t(data.y_period)
-        if mesh.wrap[1] <= 0.: mesh.wrap[1] = None
+        if (str(data.is_periodic).upper() == "YES"):
+            mesh.wrap[0] = flt64_t(data.x_period)
+            if mesh.wrap[0] <= 0.: mesh.wrap[0] = None
+            
+            mesh.wrap[1] = flt64_t(data.y_period)
+            if mesh.wrap[1] <= 0.: mesh.wrap[1] = None
 
     if (rsph is not None and mesh.rsph is not None):
     #-- if the size of sphere is changing
