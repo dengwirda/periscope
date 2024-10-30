@@ -134,7 +134,8 @@ A number of test cases are available to run out-of-the-box:
     python3 ICs/vtx.py \
     --mesh-file="mesh_disk_3.nc" \
     --init-file="merger_3.nc" \
-    --test-case=1
+    --test-case=1 \
+    --wall-slip=1.
 
     python3 swe.py \
     --mesh-file="merger_3.nc" \
@@ -147,8 +148,9 @@ A number of test cases are available to run out-of-the-box:
 
     python3 ICs/vtx.py \
     --mesh-file="mesh_disk_3.nc" \
-    --init-file="dipole_3.nc" \
-    --test-case=2
+    --init-file="dipole_3_fs.nc" \
+    --test-case=2 \
+    --wall-slip=1.
 
     python3 swe.py \
     --mesh-file="dipole_3.nc" \
@@ -157,6 +159,12 @@ A number of test cases are available to run out-of-the-box:
     --save-freq=250 --stat-freq=250 \
     --numthread=cores
     
+    python3 ICs/vtx.py \
+    --mesh-file="mesh_disk_3.nc" \
+    --init-file="dipole_3_ns.nc" \
+    --test-case=2 \
+    --wall-slip=0.
+
     python3 swe.py \
     --mesh-file="dipole_3.nc" \
     --num-steps=10000 \
