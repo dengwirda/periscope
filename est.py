@@ -113,7 +113,7 @@ if (__name__ == "__main__"):
 
     opts = parser.parse_args()
 
-    mesh = nc.Dataset(opts.mpas_file, "r+")
+    mesh = nc.Dataset(opts.mesh_file, "r+")
 
     step = est(opts, mesh)
 
@@ -121,7 +121,10 @@ if (__name__ == "__main__"):
         mesh.createVariable("dt_btr_est", "f4", ("nCells"))
 
     mesh["dt_btr_est"][:] = step
-    
+
+    # list a few of the smallest dt estimates
+    print("dt-BTR:", np.sort(step)[0:4])
+
     mesh.close()
 
 
