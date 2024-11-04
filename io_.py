@@ -321,10 +321,12 @@ def init_file(name, cnfg, save, mesh, flow):
     data["ff_vert"].long_name = "Coriolis parameter on duals"
     data["ff_vert"][:] = flow.ff_vert
 
-    data.createVariable("h2_diff", "f4", ("nCells"))
-    data["h2_diff"].long_name = "DEL^2(H) diffusion coefficient"
-    data.createVariable("h4_diff", "f4", ("nCells"))
-    data["h4_diff"].long_name = "DEL^4(H) diffusion coefficient"
+    data.createVariable("h2_diff", "f4", ("nVertices"))
+    data["h2_diff"].long_name = \
+        "DEL^2(H) diffusion coefficient, remapped to duals"
+    data.createVariable("h4_diff", "f4", ("nVertices"))
+    data["h4_diff"].long_name = \
+        "DEL^4(H) diffusion coefficient, remapped to duals"
     
     data.createVariable("d2_visc", "f4", ("nVertices"))
     data["d2_visc"].long_name = \

@@ -459,10 +459,17 @@ def swe(cnfg):
     data.variables["u4_visc"][:] = \
                xt_dual[mesh.vert.irev - 1] ** 2
     
+    xt_dual = mats.dual_tail_sums * cnfg.hh_diff_2
+    xt_dual/= mesh.vert.area
+
     data.variables["h2_diff"][:] = \
-        cnfg.hh_diff_2[mesh.cell.irev - 1]
+               xt_dual[mesh.vert.irev - 1]
+
+    xt_dual = mats.dual_tail_sums * cnfg.hh_diff_4
+    xt_dual/= mesh.vert.area
+
     data.variables["h4_diff"][:] = \
-        cnfg.hh_diff_4[mesh.cell.irev - 1] ** 2
+               xt_dual[mesh.vert.irev - 1] ** 2
     
     data.close()
 

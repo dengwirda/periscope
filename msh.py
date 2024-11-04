@@ -822,14 +822,22 @@ def circ_sine(mesh):
     xtwo = xnew - mesh.edge.xpos[mask]
     ytwo = ynew - mesh.edge.ypos[mask]
     ztwo = znew - mesh.edge.zpos[mask]
- 
-    len1 = np.sqrt(xone ** 2 + yone ** 2 + zone ** 2)
-    len2 = np.sqrt(xtwo ** 2 + ytwo ** 2 + ztwo ** 2)
- 
-    beta[mask] = np.arccos(
-        (xone * xtwo + 
-         yone * ytwo + zone * ztwo) / len1 / len2)
- 
+
+    xnrm = mesh.edge.xpos[mask]/ mesh.rsph
+    ynrm = mesh.edge.ypos[mask]/ mesh.rsph
+    znrm = mesh.edge.zpos[mask]/ mesh.rsph
+
+    vone = np.vstack((xone, yone, zone)).T
+    vtwo = np.vstack((xtwo, ytwo, ztwo)).T
+    vnrm = np.vstack((xnrm, ynrm, znrm)).T
+
+#-- https://stackoverflow.com/questions/5188561/
+#-- signed-angle-between-
+#-- two-3d-vectors-with-same-origin-within-the-same-plane
+    v1x2 = np.cross(vtwo, vone)
+    beta[mask] = np.arctan2(np.sum(v1x2 * vnrm, axis=1), 
+                            np.sum(vone * vtwo, axis=1))
+
     mask = mesh.edge.ylat <  0.
 
     xnew = mesh.rsph * np.cos(mesh.edge.xlon[mask]) * \
@@ -851,13 +859,18 @@ def circ_sine(mesh):
     xtwo = xnew - mesh.edge.xpos[mask]
     ytwo = ynew - mesh.edge.ypos[mask]
     ztwo = znew - mesh.edge.zpos[mask]
+
+    xnrm = mesh.edge.xpos[mask]/ mesh.rsph
+    ynrm = mesh.edge.ypos[mask]/ mesh.rsph
+    znrm = mesh.edge.zpos[mask]/ mesh.rsph
  
-    len1 = np.sqrt(xone ** 2 + yone ** 2 + zone ** 2)
-    len2 = np.sqrt(xtwo ** 2 + ytwo ** 2 + ztwo ** 2)
- 
-    beta[mask] = np.arccos(
-        (xone * xtwo + 
-         yone * ytwo + zone * ztwo) / len1 / len2)
+    vone = np.vstack((xone, yone, zone)).T
+    vtwo = np.vstack((xtwo, ytwo, ztwo)).T
+    vnrm = np.vstack((xnrm, ynrm, znrm)).T    
+
+    v1x2 = np.cross(vtwo, vone)
+    beta[mask] = np.arctan2(np.sum(v1x2 * vnrm, axis=1), 
+                            np.sum(vone * vtwo, axis=1))
 
     sin_ = np.asarray(np.sin(beta), dtype=reals_t)
     cos_ = np.asarray(np.cos(beta), dtype=reals_t)
@@ -1259,6 +1272,7 @@ def load_forc(name, flow=None, lean=False, step=+0):
     if (step >= 0): flow.next.uE_edge = None
     if (step >= 0): flow.next.hE_edge = None
     if (step >= 0): flow.next.Tu_edge = None
+    if (step >= 0): flow.next.uW_edge = None
     if (step >= 0): flow.next.Xi_cell = None
     
     flow.step = step
@@ -1286,6 +1300,11 @@ def load_forc(name, flow=None, lean=False, step=+0):
         flow.next.Tu_edge = np.asarray(
             data.variables[
                 "Tu_edge"][step, :, +0 ], dtype=reals_t)
+
+    if ("uW_edge" in data.variables.keys()):
+        flow.next.uW_edge = np.asarray(
+            data.variables[
+                "uW_edge"][step, :, +0 ], dtype=reals_t)
                 
     if ("Xi_cell" in data.variables.keys()):
         flow.next.Xi_cell = np.asarray(
@@ -1310,6 +1329,10 @@ def sort_forc(flow, mesh=None, lean=False):
     if (flow.next.Tu_edge is not None):
         flow.next.Tu_edge = \
             flow.next.Tu_edge[mesh.edge.ifwd - 1]
+
+    if (flow.next.uW_edge is not None):
+        flow.next.uW_edge = \
+            flow.next.uW_edge[mesh.edge.ifwd - 1]
             
     if (flow.next.Xi_cell is not None):
         flow.next.Xi_cell = \
