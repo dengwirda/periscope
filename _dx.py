@@ -515,7 +515,8 @@ def addtendXI(mesh, mats, cnfg, Xi_prev, Xi_next,
 
 #-- get grad of ext. geo-pot.
 
-    if (Xi_prev is None): return uu_tend
+    if (Xi_prev is None or
+            cnfg.no_geopot): return uu_tend
 
     ttic = time.time()
 
@@ -535,7 +536,8 @@ def addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
 
 #-- forcing from external tau
 
-    if (Tu_prev is None): return uu_tend
+    if (Tu_prev is None or
+            cnfg.no_stress): return uu_tend
 
     ttic = time.time()
 

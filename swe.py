@@ -523,7 +523,7 @@ if (__name__ == "__main__"):
         default="RK32-FB",
         required=False, 
         help="Time integration scheme = {RK32-FB}, " +
-                                        "RK22-FB, ")
+                                        "RK22-FB. ")
     """
     parser.add_argument(
         "--sub-steps", dest="sub_steps", type=int,
@@ -773,7 +773,19 @@ if (__name__ == "__main__"):
         type=lambda x: bool(strtobool(str(x.strip()))),
         required=False, 
         default=False, help="Disable coriolis terms.")
+
+    parser.add_argument(
+        "--no-geopot", dest="no_geopot", 
+        type=lambda x: bool(strtobool(str(x.strip()))),
+        required=False, 
+        default=False, help="Disable geopot forcing.")
     
+    parser.add_argument(
+        "--no-stress", dest="no_stress", 
+        type=lambda x: bool(strtobool(str(x.strip()))),
+        required=False, 
+        default=False, help="Disable stress forcing.")
+
     parser.add_argument(
         "--FB-weight", dest="fb_weight", type=float,
         required=False,
