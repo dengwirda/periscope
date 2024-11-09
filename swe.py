@@ -145,6 +145,12 @@ def swe(cnfg):
     # set sparse spatial operators
     mats = operators(mesh)
 
+    # const. scaling on drag param
+    flow.c1_edge*= cnfg.linlaw_cd
+    flow.c2_edge*= cnfg.sqrlaw_cd
+    flow.z0_edge*= cnfg.loglaw_z0
+    flow.n0_edge*= cnfg.manlaw_n0
+
     # remap fe,fc is more accurate?
     flow.ff_edge = mats.edge_tail_sums*flow.ff_vert
     flow.ff_edge/= mesh.edge.area

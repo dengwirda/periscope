@@ -1108,6 +1108,11 @@ def load_flow(name, mesh=None, lean=False, step=-1):
     flow.ff_edge = np.zeros((nedg), dtype=flt32_t)
     flow.ff_vert = np.zeros((nvrt), dtype=flt32_t)
 
+    flow.c1_edge = np.ones ((nedg), dtype=flt32_t)
+    flow.c2_edge = np.ones ((nedg), dtype=flt32_t)
+    flow.z0_edge = np.ones ((nedg), dtype=flt32_t)
+    flow.n0_edge = np.ones ((nedg), dtype=flt32_t)
+
     if ("uu_edge" in data.variables.keys()):
         flow.uu_edge = np.asarray(
             data.variables[
@@ -1177,7 +1182,20 @@ def load_flow(name, mesh=None, lean=False, step=-1):
     if ("fVertex" in data.variables.keys()):
         flow.ff_vert = np.asarray(
             data.variables["fVertex"][:], dtype=flt32_t)
-    
+
+    if ("c1_edge" in data.variables.keys()):
+        flow.c1_edge = np.asarray(
+            data.variables["c1_edge"][:], dtype=flt32_t)
+    if ("c2_edge" in data.variables.keys()):
+        flow.c2_edge = np.asarray(
+            data.variables["c2_edge"][:], dtype=flt32_t)
+    if ("z0_edge" in data.variables.keys()):
+        flow.z0_edge = np.asarray(
+            data.variables["z0_edge"][:], dtype=flt32_t)    
+    if ("n0_edge" in data.variables.keys()):
+        flow.n0_edge = np.asarray(
+            data.variables["n0_edge"][:], dtype=flt32_t)
+
     if (lean is True): return flow
       
     flow.vv_edge = np.zeros((nedg), dtype=flt32_t)
@@ -1227,6 +1245,11 @@ def sort_flow(flow, mesh=None, lean=False):
     flow.ff_edge = flow.ff_edge[mesh.edge.ifwd - 1]
     flow.ff_cell = flow.ff_cell[mesh.cell.ifwd - 1]
     
+    flow.c1_edge = flow.c1_edge[mesh.edge.ifwd - 1]
+    flow.c2_edge = flow.c2_edge[mesh.edge.ifwd - 1]
+    flow.z0_edge = flow.z0_edge[mesh.edge.ifwd - 1]
+    flow.n0_edge = flow.n0_edge[mesh.edge.ifwd - 1]
+
     if (flow.hh_cell is not None):
         flow.hh_cell = \
             flow.hh_cell[mesh.cell.ifwd - 1]

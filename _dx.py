@@ -551,20 +551,26 @@ def addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
     return uu_tend
 
 
-def computeCd(mesh, mats, cnfg, gravity, hh_cell, 
-                                uu_edge):
+def computeCd(mesh, mats, cnfg, gravity, uu_edge,
+                                c1_edge, c2_edge,
+                                z0_edge, 
+                                n0_edge):
 
 #-- composite bottom drag c_d
 
     ttic = time.time()
     
     ke_cell = variables.ke_cell  # from prev. eval.
+
+    hh_edge = variables.hh_edge
     vv_edge = variables.vv_edge
     
     cd_edge = _computeCd(
         mesh, mats, cnfg, 
-        HH_TINY, gravity, 
-            hh_cell, ke_cell, uu_edge, vv_edge)
+            HH_TINY, gravity, 
+            hh_edge, ke_cell, uu_edge, vv_edge,
+            c1_edge, c2_edge, 
+            z0_edge, n0_edge)
             
     ttoc = time.time()
     tcpu.computeCd = tcpu.computeCd + (ttoc - ttic)

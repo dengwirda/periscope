@@ -2400,10 +2400,14 @@ def _computeTU(mesh, mats, cnfg,
 def _computeCd(mesh, mats, cnfg, 
         const REALS_t hh_tiny,
         const REALS_t gravity,
-    np.ndarray[FLT64_t, ndim=1] hh_cell,
+    np.ndarray[REALS_t, ndim=1] hh_edge,
     np.ndarray[REALS_t, ndim=1] ke_cell,
     np.ndarray[FLT64_t, ndim=1] uu_edge,
-    np.ndarray[REALS_t, ndim=1] vv_edge
+    np.ndarray[REALS_t, ndim=1] vv_edge,
+    np.ndarray[REALS_t, ndim=1] c1_edge,
+    np.ndarray[REALS_t, ndim=1] c2_edge,
+    np.ndarray[REALS_t, ndim=1] z0_edge,
+    np.ndarray[REALS_t, ndim=1] n0_edge
               ):
     
 #-- cd = cd_lin + (cd_sqr + cd_log + cd_man) * |u| / h
@@ -2423,29 +2427,30 @@ def _computeCd(mesh, mats, cnfg,
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t chunksize = cnfg.chunksize
     
-    cdef REALS_t hh_edge, ke_edge, cd_temp
+    cdef REALS_t hu_edge, ke_edge, cd_temp
     
-    cdef REALS_t loglaw_z0 = cnfg.loglaw_z0
+    cdef REALS_t loglaw_z0
     cdef REALS_t loglaw_hi = cnfg.loglaw_hi
     cdef REALS_t loglaw_lo = cnfg.loglaw_lo
     
-    cdef REALS_t manlaw_n2 = cnfg.manlaw_n0 \
-                           * cnfg.manlaw_n0
+    cdef REALS_t manlaw_n2
     cdef REALS_t manlaw_hi = cnfg.manlaw_hi
     cdef REALS_t manlaw_lo = cnfg.manlaw_lo
-    
-    cdef REALS_t sqrlaw_cd = cnfg.sqrlaw_cd
-    cdef REALS_t linlaw_cd = cnfg.linlaw_cd
    
     cdef INDEX_t NVRT = mesh.vert.size
     cdef INDEX_t NEDG = mesh.edge.size
     cdef INDEX_t NCEL = mesh.cell.size
     
-    cdef FLT64_t *HH_CELL = &hh_cell[0]
+    cdef REALS_t *HH_EDGE = &hh_edge[0]
     cdef REALS_t *KE_CELL = &ke_cell[0]
     cdef FLT64_t *UU_EDGE = &uu_edge[0]
     cdef REALS_t *VV_EDGE = &vv_edge[0]
-    
+
+    cdef REALS_t *C1_EDGE = &c1_edge[0]
+    cdef REALS_t *C2_EDGE = &c2_edge[0]    
+    cdef REALS_t *Z0_EDGE = &z0_edge[0]
+    cdef REALS_t *N0_EDGE = &n0_edge[0]
+
     cdef np.ndarray[REALS_t] cd_edge = variables.cd_edge
 
     cdef REALS_t *CD_EDGE = &cd_edge[0]
@@ -2463,22 +2468,20 @@ def _computeCd(mesh, mats, cnfg,
             if (cel1 < 0): cel1 = cel2
             if (cel2 < 0): cel2 = cel1
 
-            hh_edge = sqrt_r (  #- geometric mean
-                HH_CELL[cel1] * HH_CELL[cel2]
-                )
-            
             ke_edge = HALF * (
                 KE_CELL[cel1] + KE_CELL[cel2]
                 )
    
-            hh_edge = max(hh_tiny, hh_edge)
+            hu_edge = max(hh_tiny, HH_EDGE[edge])
             
             CD_EDGE[edge] = ZERO
        
+            loglaw_z0 = Z0_EDGE[edge]
+
             if (loglaw_z0 > ZERO):
                 # NB. log(1+z/z0) "fix" to loglaw
                 cd_temp = (VONK / log_r (
-                    ONE_ + HALF * hh_edge / loglaw_z0)
+                    ONE_ + HALF * hu_edge / loglaw_z0)
                     )
                     
                 cd_temp = cd_temp * cd_temp
@@ -2487,10 +2490,13 @@ def _computeCd(mesh, mats, cnfg,
                 cd_temp = max(cd_temp, loglaw_lo)
                 
                 CD_EDGE[edge]+= cd_temp
-                    
+            
+            manlaw_n2 = N0_EDGE[edge] * \
+                        N0_EDGE[edge]
+    
             if (manlaw_n2 > ZERO):
                 cd_temp = ( 
-                gravity * manlaw_n2 / cbrt_r (hh_edge)
+                gravity * manlaw_n2 / cbrt_r (hu_edge)
                     )
                     
                 cd_temp = min(cd_temp, manlaw_hi)
@@ -2498,11 +2504,11 @@ def _computeCd(mesh, mats, cnfg,
 
                 CD_EDGE[edge]+= cd_temp
             
-            CD_EDGE[edge]+= sqrlaw_cd
+            CD_EDGE[edge]+= C2_EDGE[edge]
             
-            CD_EDGE[edge]*= sqrt_r(TWO_ * ke_edge) / hh_edge
+            CD_EDGE[edge]*= sqrt_r(TWO_ * ke_edge) / hu_edge
             
-            CD_EDGE[edge]+= linlaw_cd
+            CD_EDGE[edge]+= C1_EDGE[edge]
     
     return cd_edge
 

@@ -321,6 +321,20 @@ def init_file(name, cnfg, save, mesh, flow):
     data["ff_vert"].long_name = "Coriolis parameter on duals"
     data["ff_vert"][:] = flow.ff_vert
 
+    data.createVariable("c1_edge", "f4", ("nEdges"))
+    data["c1_edge"].long_name = "Drag coefficient (linlaw) on edges"
+    data["c1_edge"][:] = flow.c1_edge
+    data.createVariable("c2_edge", "f4", ("nEdges"))
+    data["c2_edge"].long_name = "Drag coefficient (sqrlaw) on edges"
+    data["c2_edge"][:] = flow.c2_edge
+
+    data.createVariable("z0_edge", "f4", ("nEdges"))
+    data["z0_edge"].long_name = "Drag roughness (loglaw) on edges"
+    data["z0_edge"][:] = flow.z0_edge
+    data.createVariable("n0_edge", "f4", ("nEdges"))
+    data["n0_edge"].long_name = "Manning coeff. (manlaw) on edges"
+    data["n0_edge"][:] = flow.n0_edge
+
     data.createVariable("h2_diff", "f4", ("nVertices"))
     data["h2_diff"].long_name = \
         "DEL^2(H) diffusion coefficient, remapped to duals"
