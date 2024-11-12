@@ -3,7 +3,7 @@ import numpy as np
 import netCDF4 as nc
 import argparse
 
-""" Checking and validation on a simulation output file  
+""" Simple checks and validation on simulation output 
 """
 #-- Part of the PERISCOPE solver
 #-- Darren Engwirda

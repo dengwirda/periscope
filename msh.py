@@ -29,11 +29,12 @@ def load_mesh(name, rsph=None):
     if (str(data.on_a_sphere).upper() == "NO"):
     #-- deal with planar domain silliness
         mesh.rsph = None
-        mesh.wrap[0] = flt64_t(data.x_period)
-        if mesh.wrap[0] <= 0.: mesh.wrap[0] = None
-        
-        mesh.wrap[1] = flt64_t(data.y_period)
-        if mesh.wrap[1] <= 0.: mesh.wrap[1] = None
+        if (str(data.is_periodic).upper() == "YES"):
+            mesh.wrap[0] = flt64_t(data.x_period)
+            if mesh.wrap[0] <= 0.: mesh.wrap[0] = None
+            
+            mesh.wrap[1] = flt64_t(data.y_period)
+            if mesh.wrap[1] <= 0.: mesh.wrap[1] = None
 
     if (rsph is not None and mesh.rsph is not None):
     #-- if the size of sphere is changing
@@ -821,14 +822,22 @@ def circ_sine(mesh):
     xtwo = xnew - mesh.edge.xpos[mask]
     ytwo = ynew - mesh.edge.ypos[mask]
     ztwo = znew - mesh.edge.zpos[mask]
- 
-    len1 = np.sqrt(xone ** 2 + yone ** 2 + zone ** 2)
-    len2 = np.sqrt(xtwo ** 2 + ytwo ** 2 + ztwo ** 2)
- 
-    beta[mask] = np.arccos(
-        (xone * xtwo + 
-         yone * ytwo + zone * ztwo) / len1 / len2)
- 
+
+    xnrm = mesh.edge.xpos[mask]/ mesh.rsph
+    ynrm = mesh.edge.ypos[mask]/ mesh.rsph
+    znrm = mesh.edge.zpos[mask]/ mesh.rsph
+
+    vone = np.vstack((xone, yone, zone)).T
+    vtwo = np.vstack((xtwo, ytwo, ztwo)).T
+    vnrm = np.vstack((xnrm, ynrm, znrm)).T
+
+#-- https://stackoverflow.com/questions/5188561/
+#-- signed-angle-between-
+#-- two-3d-vectors-with-same-origin-within-the-same-plane
+    v1x2 = np.cross(vtwo, vone)
+    beta[mask] = np.arctan2(np.sum(v1x2 * vnrm, axis=1), 
+                            np.sum(vone * vtwo, axis=1))
+
     mask = mesh.edge.ylat <  0.
 
     xnew = mesh.rsph * np.cos(mesh.edge.xlon[mask]) * \
@@ -850,13 +859,18 @@ def circ_sine(mesh):
     xtwo = xnew - mesh.edge.xpos[mask]
     ytwo = ynew - mesh.edge.ypos[mask]
     ztwo = znew - mesh.edge.zpos[mask]
+
+    xnrm = mesh.edge.xpos[mask]/ mesh.rsph
+    ynrm = mesh.edge.ypos[mask]/ mesh.rsph
+    znrm = mesh.edge.zpos[mask]/ mesh.rsph
  
-    len1 = np.sqrt(xone ** 2 + yone ** 2 + zone ** 2)
-    len2 = np.sqrt(xtwo ** 2 + ytwo ** 2 + ztwo ** 2)
- 
-    beta[mask] = np.arccos(
-        (xone * xtwo + 
-         yone * ytwo + zone * ztwo) / len1 / len2)
+    vone = np.vstack((xone, yone, zone)).T
+    vtwo = np.vstack((xtwo, ytwo, ztwo)).T
+    vnrm = np.vstack((xnrm, ynrm, znrm)).T    
+
+    v1x2 = np.cross(vtwo, vone)
+    beta[mask] = np.arctan2(np.sum(v1x2 * vnrm, axis=1), 
+                            np.sum(vone * vtwo, axis=1))
 
     sin_ = np.asarray(np.sin(beta), dtype=reals_t)
     cos_ = np.asarray(np.cos(beta), dtype=reals_t)
@@ -1094,6 +1108,11 @@ def load_flow(name, mesh=None, lean=False, step=-1):
     flow.ff_edge = np.zeros((nedg), dtype=flt32_t)
     flow.ff_vert = np.zeros((nvrt), dtype=flt32_t)
 
+    flow.c1_edge = np.ones ((nedg), dtype=flt32_t)
+    flow.c2_edge = np.ones ((nedg), dtype=flt32_t)
+    flow.z0_edge = np.ones ((nedg), dtype=flt32_t)
+    flow.n0_edge = np.ones ((nedg), dtype=flt32_t)
+
     if ("uu_edge" in data.variables.keys()):
         flow.uu_edge = np.asarray(
             data.variables[
@@ -1163,7 +1182,20 @@ def load_flow(name, mesh=None, lean=False, step=-1):
     if ("fVertex" in data.variables.keys()):
         flow.ff_vert = np.asarray(
             data.variables["fVertex"][:], dtype=flt32_t)
-    
+
+    if ("c1_edge" in data.variables.keys()):
+        flow.c1_edge = np.asarray(
+            data.variables["c1_edge"][:], dtype=flt32_t)
+    if ("c2_edge" in data.variables.keys()):
+        flow.c2_edge = np.asarray(
+            data.variables["c2_edge"][:], dtype=flt32_t)
+    if ("z0_edge" in data.variables.keys()):
+        flow.z0_edge = np.asarray(
+            data.variables["z0_edge"][:], dtype=flt32_t)    
+    if ("n0_edge" in data.variables.keys()):
+        flow.n0_edge = np.asarray(
+            data.variables["n0_edge"][:], dtype=flt32_t)
+
     if (lean is True): return flow
       
     flow.vv_edge = np.zeros((nedg), dtype=flt32_t)
@@ -1213,6 +1245,11 @@ def sort_flow(flow, mesh=None, lean=False):
     flow.ff_edge = flow.ff_edge[mesh.edge.ifwd - 1]
     flow.ff_cell = flow.ff_cell[mesh.cell.ifwd - 1]
     
+    flow.c1_edge = flow.c1_edge[mesh.edge.ifwd - 1]
+    flow.c2_edge = flow.c2_edge[mesh.edge.ifwd - 1]
+    flow.z0_edge = flow.z0_edge[mesh.edge.ifwd - 1]
+    flow.n0_edge = flow.n0_edge[mesh.edge.ifwd - 1]
+
     if (flow.hh_cell is not None):
         flow.hh_cell = \
             flow.hh_cell[mesh.cell.ifwd - 1]
@@ -1258,6 +1295,7 @@ def load_forc(name, flow=None, lean=False, step=+0):
     if (step >= 0): flow.next.uE_edge = None
     if (step >= 0): flow.next.hE_edge = None
     if (step >= 0): flow.next.Tu_edge = None
+    if (step >= 0): flow.next.uW_edge = None
     if (step >= 0): flow.next.Xi_cell = None
     
     flow.step = step
@@ -1285,6 +1323,11 @@ def load_forc(name, flow=None, lean=False, step=+0):
         flow.next.Tu_edge = np.asarray(
             data.variables[
                 "Tu_edge"][step, :, +0 ], dtype=reals_t)
+
+    if ("uW_edge" in data.variables.keys()):
+        flow.next.uW_edge = np.asarray(
+            data.variables[
+                "uW_edge"][step, :, +0 ], dtype=reals_t)
                 
     if ("Xi_cell" in data.variables.keys()):
         flow.next.Xi_cell = np.asarray(
@@ -1309,6 +1352,10 @@ def sort_forc(flow, mesh=None, lean=False):
     if (flow.next.Tu_edge is not None):
         flow.next.Tu_edge = \
             flow.next.Tu_edge[mesh.edge.ifwd - 1]
+
+    if (flow.next.uW_edge is not None):
+        flow.next.uW_edge = \
+            flow.next.uW_edge[mesh.edge.ifwd - 1]
             
     if (flow.next.Xi_cell is not None):
         flow.next.Xi_cell = \

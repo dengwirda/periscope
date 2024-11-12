@@ -20,6 +20,8 @@ from _dx import computeBC, limiterWD, \
                 computeVV, addtendGZ, \
                 computeNu, addtendDU, addtendVU, \
                 addtendXI, addtendTU
+                
+from mem import variables
 
 def rhs_slw_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
 
@@ -48,8 +50,7 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
     hh_edge, uu_edge = computeBC(
         mesh, mats, cnfg, 
         hh_edge, uu_edge, gravity, 
-        hE_prev, uE_prev,
-        hE_next, uE_next)
+        hE_prev, uE_prev, hE_next, uE_next)
         
     uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
   
@@ -58,14 +59,14 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
                                           hh_tend)
     
     # shock sub-grid
-    hs_edge = computeHs(mesh, mats, cnfg, hh_cell, zb_cell,
+    nu_shoc = computeHs(mesh, mats, cnfg, hh_cell, zb_cell,
                                           gravity,
                                           uu_edge)
 
     # del^k dissipation
     hh_tend = addtendVH(mesh, mats, cnfg, hh_cell, zb_cell, 
                                           gravity,
-                                          hs_edge, 
+                                          nu_shoc, 
                                           hh_tend)
 
     hh_tend[mesh.cell.mask] = flt64_t(0.0)
@@ -112,14 +113,16 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
 
     hh_dual, hh_edge, hh_quad, hh_bias = \
               compute_H(mesh, mats, cnfg, hh_cell, uu_edge)
-              
+          
+    """    
+    # don't re-init. BCs from h tend. eval.
     hh_edge, uu_edge = computeBC(
         mesh, mats, cnfg, 
         hh_edge, uu_edge, gravity, 
-        hE_prev, uE_prev,
-        hE_next, uE_next)
+        hE_prev, uE_prev, hE_next, uE_next)
 
     uu_edge = limiterWD(mesh, mats, cnfg, hh_edge, uu_edge)
+    """
 
     vv_edge = computeVV(mesh, mats, cnfg, uu_edge)
 
@@ -144,7 +147,10 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
                                           uu_tend)
 
     # leith sub-grid
-    nu_edge = computeNu(mesh, mats, cnfg, r2_dual, rv_cell)
+    nu_turb = computeNu(mesh, mats, cnfg, r2_dual, rv_cell)
+    
+    # shock sub-grid
+    nu_shoc = variables.nu_shoc  # from h tend. eval.
 
     # div^k dissipation
     uu_tend = addtendDU(mesh, mats, cnfg, hh_cell, hh_edge, 
@@ -155,7 +161,7 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, uu_tend):
     uu_tend = addtendVU(mesh, mats, cnfg, hh_cell, hh_edge, 
                                           hh_quad, hh_dual, 
                                           uu_edge,
-                                          nu_edge,
+                                          nu_turb, nu_shoc,
                                           uu_tend)
     
     # external geo-pot.

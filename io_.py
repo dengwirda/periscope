@@ -46,7 +46,7 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
     hh_edge, hh_dual, hh_bias, \
     ke_cell, ke_bias, \
     rv_cell, pv_cell, rv_dual, pv_dual, pv_edge, pv_bias, \
-    vv_edge, nu_edge, hs_edge = diag_vars (
+    vv_edge, nu_turb, nu_shoc = diag_vars (
         mesh, mats, flow, cnfg, hh_cell, uu_edge
         )
 
@@ -168,7 +168,7 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))   
                 
     if (out_.nu_turb):
-        xt_dual = mats.dual_tail_sums * nu_edge
+        xt_dual = mats.dual_tail_sums * nu_turb
         xt_dual/= mesh.vert.area
     
         data.variables["nu_turb"][step, :, :] = \
@@ -176,7 +176,7 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
                 mesh.vert.irev - 1], (1, mesh.vert.size, 1))
 
     if (out_.nu_shoc):
-        xt_dual = mats.dual_tail_sums * hs_edge
+        xt_dual = mats.dual_tail_sums * nu_shoc
         xt_dual/= mesh.vert.area
     
         data.variables["nu_shoc"][step, :, :] = \
@@ -321,10 +321,26 @@ def init_file(name, cnfg, save, mesh, flow):
     data["ff_vert"].long_name = "Coriolis parameter on duals"
     data["ff_vert"][:] = flow.ff_vert
 
-    data.createVariable("h2_diff", "f4", ("nCells"))
-    data["h2_diff"].long_name = "DEL^2(H) diffusion coefficient"
-    data.createVariable("h4_diff", "f4", ("nCells"))
-    data["h4_diff"].long_name = "DEL^4(H) diffusion coefficient"
+    data.createVariable("c1_edge", "f4", ("nEdges"))
+    data["c1_edge"].long_name = "Drag coefficient (linlaw) on edges"
+    data["c1_edge"][:] = flow.c1_edge
+    data.createVariable("c2_edge", "f4", ("nEdges"))
+    data["c2_edge"].long_name = "Drag coefficient (sqrlaw) on edges"
+    data["c2_edge"][:] = flow.c2_edge
+
+    data.createVariable("z0_edge", "f4", ("nEdges"))
+    data["z0_edge"].long_name = "Drag roughness (loglaw) on edges"
+    data["z0_edge"][:] = flow.z0_edge
+    data.createVariable("n0_edge", "f4", ("nEdges"))
+    data["n0_edge"].long_name = "Manning coeff. (manlaw) on edges"
+    data["n0_edge"][:] = flow.n0_edge
+
+    data.createVariable("h2_diff", "f4", ("nVertices"))
+    data["h2_diff"].long_name = \
+        "DEL^2(H) diffusion coefficient, remapped to duals"
+    data.createVariable("h4_diff", "f4", ("nVertices"))
+    data["h4_diff"].long_name = \
+        "DEL^4(H) diffusion coefficient, remapped to duals"
     
     data.createVariable("d2_visc", "f4", ("nVertices"))
     data["d2_visc"].long_name = \
@@ -375,6 +391,12 @@ def init_file(name, cnfg, save, mesh, flow):
             "uu_edge", "f4", ("Time", "nEdges", "nVertLevels"))
         data["uu_edge"].long_name = "Normal velocity on edges" 
         out_.uu_edge = True
+
+    if ("vv_edge" in cnfg.save_vars):
+        data.createVariable(
+            "vv_edge", "f4", ("Time", "nEdges", "nVertLevels"))
+        data["vv_edge"].long_name = "Tangential velocity on edges" 
+        out_.vv_edge = True
     
     if ("hh_cell" in cnfg.save_vars):   
         data.createVariable(

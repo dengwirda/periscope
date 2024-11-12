@@ -94,18 +94,8 @@ def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
 
     hh_dual, hh_edge, hh_quad, hh_bias = compute_H(
         mesh, mats, cnfg, hh_cell, uu_edge)
-
-    hh_edge, uu_edge = computeBC(
-        mesh, mats, cnfg, 
-        hh_edge, uu_edge, gravity, 
-        hE_prev, uE_prev,
-        hE_next, uE_next)
-        
-    uu_edge = limiterWD(
-        mesh, mats, cnfg, hh_edge, uu_edge)
-        
-    vv_edge = computeVV(
-        mesh, mats, cnfg, uu_edge)
+ 
+    vv_edge = computeVV(mesh, mats, cnfg, uu_edge)
 
     ke_cell, ke_bias = computeKE(
         mesh, mats, cnfg, 
@@ -120,10 +110,10 @@ def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
         ff_dual, ff_edge, ff_cell, 
         +1. / 2. * cnfg.time_step)
         
-    nu_edge = computeNu(
+    nu_turb = computeNu(
         mesh, mats, cnfg, r2_dual, rv_cell)
 
-    hs_edge = computeHs(
+    nu_shoc = computeHs(
         mesh, mats, cnfg, hh_cell, zb_cell, gravity, 
                                    uu_edge)
 
@@ -131,7 +121,7 @@ def diag_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge):
            ke_cell, ke_bias, \
            rv_cell, pv_cell, \
            rv_dual, pv_dual, pv_edge, pv_bias, \
-           vv_edge, nu_edge, hs_edge
+           vv_edge, nu_turb, nu_shoc
 
 
 def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
@@ -154,17 +144,7 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     hh_dual, hh_edge, hh_quad, hh_bias = compute_H(
         mesh, mats, cnfg, hh_cell, uu_edge)
 
-    hh_edge, uu_edge = computeBC(
-        mesh, mats, cnfg, 
-        hh_edge, uu_edge, gravity, 
-        hE_prev, uE_prev,
-        hE_next, uE_next)
-        
-    uu_edge = limiterWD(
-        mesh, mats, cnfg, hh_edge, uu_edge)
-        
-    vv_edge = computeVV(
-        mesh, mats, cnfg, uu_edge)
+    vv_edge = computeVV(mesh, mats, cnfg, uu_edge)
 
     ke_edge = uu_edge ** 2
     ke_edge*= hh_edge * mesh.edge.area
@@ -194,9 +174,9 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     return kk_sums, pv_sums
 
 
-def computeBC(mesh, mats, cnfg,
-        hh_edge, uu_edge, gravity, hE_prev, uE_prev,
-                                   hE_next, uE_next):
+def computeBC(mesh, mats, cnfg, hh_edge, uu_edge, 
+        gravity, 
+        hE_prev, uE_prev, hE_next, uE_next):
         
 #-- setup open bnd. conditions
    
@@ -206,7 +186,8 @@ def computeBC(mesh, mats, cnfg,
     ttic = time.time()
         
     hh_edge, uu_edge = _computeBC(
-        mesh, mats, cnfg, hh_edge, uu_edge, gravity, 
+        mesh, mats, cnfg, 
+        hh_edge, uu_edge, gravity, 
         hE_prev, uE_prev, hE_next, uE_next)
         
     ttoc = time.time()
@@ -283,8 +264,8 @@ def computeKE(mesh, mats, cnfg,
  
     ke_cell = _computeKE(
         mesh, mats, cnfg, 
-            hh_cell, hh_edge, uu_edge, vv_edge)
-        
+        hh_cell, hh_edge, hh_dual, uu_edge, vv_edge)
+
     ttoc = time.time()
     tcpu.computeKE = tcpu.computeKE + (ttoc - ttic)
 
@@ -324,21 +305,24 @@ def computePV(mesh, mats, cnfg,
   
     rv_dual, pv_dual, r2_dual, p2_dual, \
     rv_cell, pv_cell, \
-    rv_edge, pv_edge = _build_PV(
+    rv_edge, pv_edge =  _build_PV(
         mesh, mats, cnfg, 
         hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, 
         ff_dual, ff_edge, ff_cell, 
         delta_t)
-            
+    
     up_edge = variables.pv_bias
             
-    pv_edge, up_edge = upwinding(
+    pv_edge, up_edge =  upwinding(
         mesh, mats, cnfg, 
         p2_dual, pv_dual, pv_cell, uu_edge, vv_edge, 
         pv_edge, up_edge,
         delta_t, PV_TINY, UU_TINY, 
         cnfg.pv_upwind, cnfg.pv_up_phi)
-          
+
+    pv_edge[mesh.edge.open] = \
+        pv_cell[mesh.edge.cell[mesh.edge.open,0] - 1]
+    
     return rv_dual, pv_dual, r2_dual, p2_dual, \
            rv_cell, pv_cell, \
            pv_edge, up_edge
@@ -415,19 +399,19 @@ def computeNu(mesh, mats, cnfg, rv_dual, rv_cell):
 
 #-- compute leith viscosities
 
-    nu_edge = variables.nu_edge
+    nu_turb = variables.nu_turb
 
-    if (cnfg.leith_chi == 0): return nu_edge
+    if (cnfg.leith_chi == 0): return nu_turb
 
     ttic = time.time()
 
-    nu_edge = _computeNu(
+    nu_turb = _computeNu(
         mesh, mats, cnfg, rv_dual, rv_cell)
     
     ttoc = time.time()
     tcpu.computeNu = tcpu.computeNu + (ttoc - ttic)
 
-    return nu_edge
+    return nu_turb
 
 
 def computeHs(mesh, mats, cnfg, hh_cell, zb_cell,
@@ -436,22 +420,22 @@ def computeHs(mesh, mats, cnfg, hh_cell, zb_cell,
 
 #-- compute shock dissipation
 
-    hs_edge = variables.hs_edge
+    nu_shoc = variables.nu_shoc
 
-    if (cnfg.shock_chi == 0): return hs_edge
+    if (cnfg.shock_chi == 0): return nu_shoc
 
     ttic = time.time()
 
     hh_tiny = cnfg.wetdry_h0 * 10.0
 
-    hs_cell = _computeHs(
+    nu_shoc = _computeHs(
         mesh, mats, cnfg, hh_cell, 
             zb_cell, gravity, hh_tiny, uu_edge)
     
     ttoc = time.time()
     tcpu.computeHs = tcpu.computeHs + (ttoc - ttic)
 
-    return hs_cell
+    return nu_shoc
     
 
 def addtendDU(mesh, mats, cnfg, hh_cell, hh_edge, 
@@ -479,7 +463,7 @@ def addtendDU(mesh, mats, cnfg, hh_cell, hh_edge,
 def addtendVU(mesh, mats, cnfg, hh_cell, hh_edge, 
                                 hh_quad, hh_dual, 
                                 uu_edge,
-                                nu_edge, 
+                                nu_turb, nu_shoc,
                                 uu_tend):
 
 #-- viscous del^k operators
@@ -492,9 +476,9 @@ def addtendVU(mesh, mats, cnfg, hh_cell, hh_edge,
 
     uu_tend = _computeVU(
         mesh, mats, cnfg, 
-            hh_cell, hh_edge, 
-            hh_quad, hh_dual, 
-            uu_edge, nu_edge, hh_tiny, uu_tend)
+            hh_cell, hh_edge, hh_quad, hh_dual, 
+            uu_edge, nu_turb, nu_shoc, 
+            hh_tiny, uu_tend)
 
     ttoc = time.time()
     tcpu.computeVU = tcpu.computeVU + (ttoc - ttic)
@@ -504,7 +488,7 @@ def addtendVU(mesh, mats, cnfg, hh_cell, hh_edge,
     
 def addtendVH(mesh, mats, cnfg, hh_cell, zb_cell, 
                                 gravity,
-                                hs_edge, 
+                                nu_shoc, 
                                 hh_tend):
 
 #-- diffusive del^k operators
@@ -518,7 +502,7 @@ def addtendVH(mesh, mats, cnfg, hh_cell, zb_cell,
     hh_tend = _computeVH(
         mesh, mats, cnfg, 
             hh_cell, zb_cell, 
-            gravity, hs_edge, hh_tiny, hh_tend)
+            gravity, nu_shoc, hh_tiny, hh_tend)
     
     ttoc = time.time()
     tcpu.computeVH = tcpu.computeVH + (ttoc - ttic)
@@ -531,13 +515,14 @@ def addtendXI(mesh, mats, cnfg, Xi_prev, Xi_next,
 
 #-- get grad of ext. geo-pot.
 
-    if (Xi_prev is None): return uu_tend
+    if (Xi_prev is None or
+            cnfg.no_geopot): return uu_tend
 
     ttic = time.time()
 
     uu_tend = _computeXI(
         mesh, mats, cnfg, 
-                 Xi_prev, Xi_next, uu_tend)
+            Xi_prev, Xi_next, uu_tend)
         
     ttoc = time.time()
     tcpu.computeXI = tcpu.computeXI + (ttoc - ttic)
@@ -551,12 +536,15 @@ def addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
 
 #-- forcing from external tau
 
-    if (Tu_prev is None): return uu_tend
+    if (Tu_prev is None or
+            cnfg.no_stress): return uu_tend
 
     ttic = time.time()
 
+    hh_tiny = cnfg.wetdry_h0 * 10.0
+
     uu_tend = _computeTU(
-        mesh, mats, cnfg, 
+        mesh, mats, cnfg, hh_tiny,
             Tu_prev, Tu_next, hh_edge, uu_tend)
     
     ttoc = time.time()
@@ -565,19 +553,26 @@ def addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
     return uu_tend
 
 
-def computeCd(mesh, mats, cnfg, gravity, hh_cell, 
-                                uu_edge):
+def computeCd(mesh, mats, cnfg, gravity, uu_edge,
+                                c1_edge, c2_edge,
+                                z0_edge, 
+                                n0_edge):
 
 #-- composite bottom drag c_d
 
-    vv_edge = computeVV(
-        mesh, mats, cnfg, uu_edge)
-
     ttic = time.time()
-        
+    
+    ke_cell = variables.ke_cell  # from prev. eval.
+
+    hh_edge = variables.hh_edge
+    vv_edge = variables.vv_edge
+    
     cd_edge = _computeCd(
-        mesh, mats, cnfg, HH_TINY, 
-            gravity, hh_cell, uu_edge, vv_edge)
+        mesh, mats, cnfg, 
+            HH_TINY, gravity, 
+            hh_edge, ke_cell, uu_edge, vv_edge,
+            c1_edge, c2_edge, 
+            z0_edge, n0_edge)
             
     ttoc = time.time()
     tcpu.computeCd = tcpu.computeCd + (ttoc - ttic)

@@ -19,7 +19,7 @@ from ops import operators
 #-- Idealised vortex-pair test-cases
 #-- Authors: Darren Engwirda
 
-def init(name, save, rsph, case):
+def init(name, save, rsph, case, slip):
 
 #------------------------------------ load an MPAS mesh file
 
@@ -42,10 +42,10 @@ def init(name, save, rsph, case):
         ValueError("Unsupported test-case.")
 
     if (case == 1): 
-        vtx1(name, save, rsph, mesh, mats)
+        vtx1(name, save, rsph, mesh, mats, slip)
         
     if (case == 2): 
-        vtx2(name, save, rsph, mesh, mats)
+        vtx2(name, save, rsph, mesh, mats, slip)
         
     if (case >= 3): 
         ValueError("Unsupported test-case.")
@@ -53,7 +53,7 @@ def init(name, save, rsph, case):
     return
 
 
-def vtx1(name, save, rsph, mesh, mats):
+def vtx1(name, save, rsph, mesh, mats, slip):
 
 #-- Merging (submesoscale) vortices:
 #-- G. Roullet & T. Gaillard (2022): A Fast Monotone Discretization 
@@ -90,7 +90,7 @@ def vtx1(name, save, rsph, mesh, mats):
     uu_edge = -(grav / f) * mats.edge_grad_perp * hh_vert
     
     bc_slip = np.zeros(uu_edge.shape, dtype=np.float64)
-    bc_slip[mesh.edge.mask] = 1.  # free slip
+    bc_slip[mesh.edge.mask] = slip  # 0=no slip, 1=free slip
     
     rv_dual = mats.dual_curl_sums * uu_edge
     rv_dual/= mesh.vert.area
@@ -149,7 +149,7 @@ def vtx1(name, save, rsph, mesh, mats):
     return
 
 
-def vtx2(name, save, rsph, mesh, mats):
+def vtx2(name, save, rsph, mesh, mats, slip):
 
 #-- Dipole//wall interaction:
 #-- G. Roullet & T. Gaillard (2022): A Fast Monotone Discretization 
@@ -186,7 +186,7 @@ def vtx2(name, save, rsph, mesh, mats):
     uu_edge = -(grav / f) * mats.edge_grad_perp * hh_vert
 
     bc_slip = np.zeros(uu_edge.shape, dtype=np.float64)
-    bc_slip[mesh.edge.mask] = 0.  # no slip
+    bc_slip[mesh.edge.mask] = slip  # 0=no slip, 1=free slip
     
     rv_dual = mats.dual_curl_sums * uu_edge
     rv_dual/= mesh.vert.area
@@ -267,9 +267,15 @@ if (__name__ == "__main__"):
         default=0., required=False, 
         help="Value of sphere_radius; zero to use mesh data.")
 
+    parser.add_argument(
+        "--wall-slip", dest="wall_slip", type=float,
+        default=1., required=False, 
+        help="Wall slip BCs; 0=no slip, 1=free slip.")
+
     args = parser.parse_args()
 
     init(name=args.mesh_file,
          save=args.init_file,
          rsph=args.radius,
-         case=args.test_case)
+         case=args.test_case,
+         slip=args.wall_slip)

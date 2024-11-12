@@ -121,16 +121,35 @@ def swe(cnfg):
 
     ttic = time.time()
 
-    mesh.cell.mask[flow.is_mask]= True
-    mesh.edge.mask[flow.uu_mask]= True
-    mesh.vert.mask[flow.rv_mask]= True
-    
+    mesh.cell.mask[flow.is_mask] = True
+    mesh.edge.mask[flow.uu_mask] = True
+    mesh.vert.mask[flow.rv_mask] = True
+
+    # compact list of edges on open BCs
+    mesh.edge.open = \
+        np.full(mesh.edge.size, False, dtype=bool)
+    mesh.edge.open[flow.is_open] = True
     mesh.edge.open = np.asarray(
         np.argwhere(
-    flow.is_open).ravel(), dtype=index_t)
-    
+    mesh.edge.open).ravel(), dtype=index_t)
+
+    # compact list of edges on wall BCs
+    mesh.edge.wall = \
+        np.full(mesh.edge.size, False, dtype=bool)
+    mesh.edge.wall[mesh.edge.mask] = True
+    mesh.edge.wall[mesh.edge.open] = False
+    mesh.edge.wall = np.asarray(
+        np.argwhere(
+    mesh.edge.wall).ravel(), dtype=index_t)
+
     # set sparse spatial operators
     mats = operators(mesh)
+
+    # const. scaling on drag param
+    flow.c1_edge*= cnfg.linlaw_cd
+    flow.c2_edge*= cnfg.sqrlaw_cd
+    flow.z0_edge*= cnfg.loglaw_z0
+    flow.n0_edge*= cnfg.manlaw_n0
 
     # remap fe,fc is more accurate?
     flow.ff_edge = mats.edge_tail_sums*flow.ff_vert
@@ -181,27 +200,91 @@ def swe(cnfg):
 
     uu_edge[mesh.edge.mask] = 0.  # ensure BC
     uu_edge[mesh.edge.open] = \
-            u0_edge [mesh.edge.open]
-    
+                u0_edge[mesh.edge.open]
+   
+    # pre-process slip BCs
     mesh.edge.slip = mesh.edge.mask * \
                      flow.bc_slip
-    mesh.edge.slip  [mesh.edge.open] = reals_t(1.)
-    
-    mesh.vert.slip = mats.dual_edge_sums * \
-                     mesh.edge.slip
-    mesh.vert.slip/= np.maximum(+1, 
-                     mats.dual_edge_sums * \
-                     mesh.edge.mask)
+    mesh.edge.slip  [mesh.edge.open] = reals_t(1.0)
 
-    #!! how does the masking really work?
-    mesh.edge.wadj = np.maximum(
-         mesh.vert.slip[mesh.edge.vert[:, 0] - 1],
-         mesh.vert.slip[mesh.edge.vert[:, 1] - 1])
+    mesh.vert.slip = \
+        np.zeros(mesh.vert.size, dtype=reals_t)
+    for edge in range(0, mesh.edge.size):
+        ivrt = mesh.edge.vert[edge, 0] - 1
+        jvrt = mesh.edge.vert[edge, 1] - 1
+        mesh.vert.slip[ivrt] = max(
+        mesh.vert.slip[ivrt], mesh.edge.slip[edge])
+        mesh.vert.slip[jvrt] = max(
+        mesh.vert.slip[jvrt], mesh.edge.slip[edge])
+
+    # is adj. to open edge
+    mesh.vert.open = np.unique(
+        mesh.edge.vert[mesh.edge.open, :] - 1)
+    mesh.vert.open = \
+        mesh.vert.open[mesh.vert.open >= 0]
+
+    mesh.cell.open = np.unique(
+        mesh.edge.cell[mesh.edge.open, :] - 1)
+    mesh.cell.open = \
+        mesh.cell.open[mesh.cell.open >= 0]
+
+    # is adj. to wall edge
+    mesh.vert.wall = np.unique(
+        mesh.edge.vert[mesh.edge.wall, :] - 1)
+    mesh.vert.wall = \
+        mesh.vert.wall[mesh.vert.wall >= 0]
+    mesh.vert.wall = mesh.vert.wall[
+        mesh.vert.mask[mesh.vert.wall]== 0]
+
+    mesh.cell.wall = np.unique(
+        mesh.edge.cell[mesh.edge.wall, 0] - 1)
+    mesh.cell.wall = \
+        mesh.cell.wall[mesh.cell.wall >= 0]
+    mesh.cell.wall = mesh.cell.wall[
+        mesh.cell.mask[mesh.cell.wall]== 0]
+
+    # compute partial subcell near walls
+    # 0. ==> omit subcell
+    # 1. ==> keep subcell
+    mesh.edge.part = \
+        np.full(mesh.edge.size, 1., dtype=reals_t)
+    mesh.edge.part*= 1. - mesh.edge.slip
+    mesh.edge.part[mesh.edge.open] = 1.0
     
+    mesh.vert.part = \
+        mats.dual_tail_sums * mesh.edge.part
+    mesh.vert.part/= mesh.vert.area
+   
+    # extrapolation on u^perp near walls
+    # A_cell / (A_cell - A_slip)
+    # to account for slip BCs in stencil
+    mesh.edge.perp = \
+        np.full(mesh.edge.size, 0., dtype=reals_t)
+    mesh.edge.perp+= 0. + mesh.edge.slip
+    mesh.edge.perp[mesh.edge.open] = 0.0
+
+    cell_perp_subs = \
+        mats.cell_wing_sums * mesh.edge.perp
+    edge_perp_subs = \
+        mats.edge_cell_sums * cell_perp_subs
+    edge_perp_full = \
+        mats.edge_cell_sums * mesh.cell.area
+
+    edge_perp_subs = edge_perp_full - edge_perp_subs
+    edge_perp_subs = np.maximum(
+        edge_perp_subs, 1.E-08 * edge_perp_full)
+    mesh.edge.perp = edge_perp_full / edge_perp_subs
+
+    # to set the "slipperiness" at walls
+    mesh.edge.perp[mesh.edge.wall] *= \
+                   mesh.edge.slip [mesh.edge.wall]
+    
+    # build multiplicative masks
     mesh.cell.fmsk = reals_t(1.0 - mesh.cell.mask)
     mesh.edge.fmsk = reals_t(1.0 - mesh.edge.mask)
     mesh.vert.fmsk = reals_t(1.0 - mesh.vert.mask)
-    
+
+    # dx scaling for dissipation
     cnfg.anylaw_cd = \
         max([cnfg.linlaw_cd, cnfg.sqrlaw_cd, 
              cnfg.loglaw_z0, cnfg.manlaw_n0] 
@@ -244,6 +327,7 @@ def swe(cnfg):
     cnfg.shock_max = np.asarray(
         (cnfg.shock_max * s2_edge), dtype=reals_t)
 
+    # start forward integrations
     ch_cell = variables.ch_cell
     cu_edge = variables.cu_edge
 
@@ -381,10 +465,17 @@ def swe(cnfg):
     data.variables["u4_visc"][:] = \
                xt_dual[mesh.vert.irev - 1] ** 2
     
+    xt_dual = mats.dual_tail_sums * cnfg.hh_diff_2
+    xt_dual/= mesh.vert.area
+
     data.variables["h2_diff"][:] = \
-        cnfg.hh_diff_2[mesh.cell.irev - 1]
+               xt_dual[mesh.vert.irev - 1]
+
+    xt_dual = mats.dual_tail_sums * cnfg.hh_diff_4
+    xt_dual/= mesh.vert.area
+
     data.variables["h4_diff"][:] = \
-        cnfg.hh_diff_4[mesh.cell.irev - 1] ** 2
+               xt_dual[mesh.vert.irev - 1] ** 2
     
     data.close()
 
@@ -438,14 +529,14 @@ if (__name__ == "__main__"):
         default="RK32-FB",
         required=False, 
         help="Time integration scheme = {RK32-FB}, " +
-                                        "RK22-FB, ")
-
+                                        "RK22-FB. ")
+    """
     parser.add_argument(
         "--sub-steps", dest="sub_steps", type=int,
         default=0,
         required=False, help="Number of fast steps; " + 
                             "for slow-fast integrators.")
-                            
+    """                     
     parser.add_argument(
         "--save-freq", dest="save_freq", type=int,
         required=False, 
@@ -498,7 +589,7 @@ if (__name__ == "__main__"):
 
     parser.add_argument(
         "--pv-up-phi", dest="pv_up_phi", type=float,
-        default=1./ 8.,
+        default=0.1250,
         required=False,
         help="Upwind PV.-flux bias {BIAS = +1./ 8.}.")
     
@@ -507,7 +598,7 @@ if (__name__ == "__main__"):
         default="UPWIND",
         required=False, 
         help="PV.-flux formulation = {UPWIND}, CENTRE.")
-
+    
     parser.add_argument(
         "--ke-upwind", dest="ke_upwind", type=str,
         default="AUST-const",
@@ -517,7 +608,7 @@ if (__name__ == "__main__"):
 
     parser.add_argument(
         "--ke-up-phi", dest="ke_up_phi", type=float,
-        default=1./ 8.,
+        default=0.1250,
         required=False,
         help="Upwind KE.-edge bias {BIAS = +1./ 8.}.")
 
@@ -525,7 +616,19 @@ if (__name__ == "__main__"):
         "--ke-scheme", dest="ke_scheme", type=str,
         default="CENTRE",
         required=False, 
-        help="KE.-grad formulation = {CENTRE}, SKINNY.")
+        help="KE.-grad formulation = {CENTRE}, UPWIND.")
+    
+    parser.add_argument(
+        "--ke-weight", dest="ke_weight", type=float,
+        default=0.6667,
+        required=False, 
+        help="Bias to KE.-cell vs KE.-dual {2./ 3.}.")
+
+    parser.add_argument(
+        "--ke-method", dest="ke_method", type=float,
+        default=1.0000,
+        required=False, 
+        help="Bias to KE.-LSQR vs KE.-TRSK {1./ 1.}.")
 
     parser.add_argument(
         "--ref-scale", dest="ref_scale", type=float,
@@ -676,7 +779,19 @@ if (__name__ == "__main__"):
         type=lambda x: bool(strtobool(str(x.strip()))),
         required=False, 
         default=False, help="Disable coriolis terms.")
+
+    parser.add_argument(
+        "--no-geopot", dest="no_geopot", 
+        type=lambda x: bool(strtobool(str(x.strip()))),
+        required=False, 
+        default=False, help="Disable geopot forcing.")
     
+    parser.add_argument(
+        "--no-stress", dest="no_stress", 
+        type=lambda x: bool(strtobool(str(x.strip()))),
+        required=False, 
+        default=False, help="Disable stress forcing.")
+
     parser.add_argument(
         "--FB-weight", dest="fb_weight", type=float,
         required=False,

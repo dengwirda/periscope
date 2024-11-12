@@ -124,7 +124,7 @@ A number of test cases are available to run out-of-the-box:
     --save-freq=40 --stat-freq=40 \
     --hh-scheme="upwind" \
     --wetdry-h0=1.E-03 \
-    --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
+    --loglaw-z0=0.0100 --loglaw-lo=0.0025 --loglaw-hi=1. \
     --uu-visc-2=1.E+02 --uu-visc-4=1.E+11 \
     --hh-diff-2=1.E+02 --hh-diff-4=1.E+11 \
     --numthread=cores
@@ -134,7 +134,8 @@ A number of test cases are available to run out-of-the-box:
     python3 ICs/vtx.py \
     --mesh-file="mesh_disk_3.nc" \
     --init-file="merger_3.nc" \
-    --test-case=1
+    --test-case=1 \
+    --wall-slip=1.
 
     python3 swe.py \
     --mesh-file="merger_3.nc" \
@@ -147,8 +148,9 @@ A number of test cases are available to run out-of-the-box:
 
     python3 ICs/vtx.py \
     --mesh-file="mesh_disk_3.nc" \
-    --init-file="dipole_3.nc" \
-    --test-case=2
+    --init-file="dipole_3_fs.nc" \
+    --test-case=2 \
+    --wall-slip=1.
 
     python3 swe.py \
     --mesh-file="dipole_3.nc" \
@@ -157,6 +159,12 @@ A number of test cases are available to run out-of-the-box:
     --save-freq=250 --stat-freq=250 \
     --numthread=cores
     
+    python3 ICs/vtx.py \
+    --mesh-file="mesh_disk_3.nc" \
+    --init-file="dipole_3_ns.nc" \
+    --test-case=2 \
+    --wall-slip=0.
+
     python3 swe.py \
     --mesh-file="dipole_3.nc" \
     --num-steps=10000 \
@@ -182,7 +190,7 @@ A number of test cases are available to run out-of-the-box:
     --save-freq=144 --stat-freq=144 \
     --hh-scheme="upwind" \
     --wetdry-h0=1.E-03 \
-    --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
+    --loglaw-z0=0.0100 --loglaw-lo=0.0025 --loglaw-hi=1. \
     --uu-visc-2=1.E+02 --uu-visc-4=1.E+11 \
     --hh-diff-2=1.E+02 --hh-diff-4=1.E+11 \
     --leith-chi=0.3875 --leith-max=1.E+03 \
@@ -204,7 +212,7 @@ A number of test cases are available to run out-of-the-box:
     --save-freq=50 --stat-freq=50 \
     --hh-scheme="upwind" \
     --wetdry-h0=1.E-03 \
-    --loglaw-z0=0.0010 --loglaw-lo=0.0025 --loglaw-hi=1. \
+    --loglaw-z0=0.0100 --loglaw-lo=0.0025 --loglaw-hi=1. \
     --uu-visc-2=1.E+02 --uu-visc-4=1.E+11 \
     --hh-diff-2=1.E+02 --hh-diff-4=1.E+11 \
     --numthread=cores

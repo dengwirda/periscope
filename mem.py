@@ -81,8 +81,6 @@ def init_pool(mesh):
             np.empty(mesh.vert.size, dtype=reals_t)
     variables.pv_dual = \
             np.empty(mesh.vert.size, dtype=reals_t)
-    variables.ke_dual = \
-            np.empty(mesh.vert.size, dtype=reals_t)    
 
     variables.r2_dual = \
             np.empty(mesh.vert.size, dtype=reals_t)
@@ -109,12 +107,12 @@ def init_pool(mesh):
     variables.ke_bias = \
             np.zeros(mesh.edge.size, dtype=reals_t)
     
-    variables.nu_edge = \
+    variables.nu_turb = \
             np.zeros(mesh.edge.size, dtype=reals_t)
 
-    variables.hs_edge = \
+    variables.nu_shoc = \
             np.zeros(mesh.edge.size, dtype=reals_t)
-    variables.hs_cell = \
+    variables.hs_shoc = \
             np.empty(mesh.cell.size, dtype=reals_t)
         
     variables.cd_edge = \
@@ -124,6 +122,11 @@ def init_pool(mesh):
             np.empty(mesh.cell.size, dtype=reals_t)
     variables.pv_cell = \
             np.empty(mesh.cell.size, dtype=reals_t)
+
+    variables.ke_edge = \
+            np.empty(mesh.edge.size, dtype=reals_t)
+    variables.ke_dual = \
+            np.empty(mesh.vert.size, dtype=reals_t)
     variables.ke_cell = \
             np.empty(mesh.cell.size, dtype=reals_t)
 
