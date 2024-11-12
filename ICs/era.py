@@ -20,18 +20,7 @@ from ops import operators
 #-- BTR model config. using ERA5 forcing
 #-- Authors: Darren Engwirda
 
-def coarsen(data, down):
-#-- coarsen onto lower freq. temporal spacing 
-    shap = list(data.shape); shap[0] //= down
-
-    xtmp = np.zeros((shap), dtype=np.float64)
-    for step in range(down):
-        xtmp += data[step::down, :, :] / down
-
-    return np.asarray(xtmp, dtype=np.float32)
-
-
-def init(name, save, era5, back, ramp, down, deep, rsph=0.):
+def init(name, save, era5, back, ramp, deep, rsph=0.E+0):
 
 #------------------------------------ load an MPAS mesh file
 
@@ -80,7 +69,7 @@ def init(name, save, era5, back, ramp, down, deep, rsph=0.):
     bc_slip = 0.875 * \
         np.ones((mesh.edge.size), dtype=np.float32)
 
-    print("Preprocessing forcing...")
+    print("Build long term means...")
 
     fdat = xarray.open_dataset(back)
     pbar = np.asarray(fdat[ "sp"][:])
@@ -112,13 +101,8 @@ def init(name, save, era5, back, ramp, down, deep, rsph=0.):
 
     patm-= pbar  # subtract long-term mean p_atm
 
-    # average over cycles
-    patm = coarsen(patm, down=down)
-    ux10 = coarsen(ux10, down=down)
-    uy10 = coarsen(uy10, down=down)
-
     nfrc = patm.shape[0]
-    xx_time = np.linspace(0., nfrc * 60. * 60. * down, nfrc)  # ERA5 hr
+    xx_time = np.linspace(0., nfrc * 3600., nfrc)  # ERA5 hr
 
     # initial linear ramp
     rfac = np.minimum(
@@ -303,10 +287,6 @@ if (__name__ == "__main__"):
         required=True, help="Length of initial ramp.")
 
     parser.add_argument(
-        "--averaging", dest="averaging", type=int,
-        required=True, help="Num. cycles to average.")
-
-    parser.add_argument(
         "--max-depth", dest="max_depth", type=float,
         required=True, help="Limit on max ocn depth.")
 
@@ -321,8 +301,7 @@ if (__name__ == "__main__"):
          save=args.init_file,
          era5=args.era5_file,
          back=args.mean_file,
-         ramp=args.ramp_days,
-         down=args.averaging, 
+         ramp=args.ramp_days, 
          deep=args.max_depth,
          rsph=args.radius)
 
