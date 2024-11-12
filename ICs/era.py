@@ -72,7 +72,7 @@ def init(name, save, era5, back, ramp, deep, rsph=0.E+0):
     print("Build long term means...")
 
     fdat = xarray.open_dataset(back)
-    pbar = np.asarray(fdat[ "sp"][:])
+    pbar = np.asarray(fdat["msl"][:])
     ubar = np.asarray(fdat["u10"][:])
     vbar = np.asarray(fdat["v10"][:])
 
@@ -89,7 +89,7 @@ def init(name, save, era5, back, ramp, deep, rsph=0.E+0):
     fdat = xarray.open_dataset(era5)
     xlon = np.asarray(fdat["longitude"][:]) * np.pi / 180.
     ylat = np.asarray(fdat[ "latitude"][:]) * np.pi / 180.
-    patm = np.asarray(fdat[ "sp"][:])
+    patm = np.asarray(fdat["msl"][:])
     ux10 = np.asarray(fdat["u10"][:])
     uy10 = np.asarray(fdat["v10"][:])
 
