@@ -2352,6 +2352,7 @@ def _computeVH(mesh, mats, cnfg,
     
     
 def _computeTU(mesh, mats, cnfg, 
+        const REALS_t hh_tiny,
     np.ndarray[REALS_t, ndim=1] Tu_prev,
     np.ndarray[REALS_t, ndim=1] Tu_next,
     np.ndarray[REALS_t, ndim=1] hh_edge,
@@ -2392,7 +2393,10 @@ def _computeTU(mesh, mats, cnfg,
               + (ZERO + frc_blend) * TU_NEXT[edge]
                       )
                 
-            UU_TEND[edge]-= TU_EDGE/ HH_EDGE[edge]
+        #-- limit applied stresses in quasi-dry layers
+            UU_TEND[edge]-= (
+                TU_EDGE / max (hh_tiny, HH_EDGE[edge])
+                )
         
     return uu_tend
     

@@ -541,8 +541,10 @@ def addtendTU(mesh, mats, cnfg, Tu_prev, Tu_next,
 
     ttic = time.time()
 
+    hh_tiny = cnfg.wetdry_h0 * 10.0
+
     uu_tend = _computeTU(
-        mesh, mats, cnfg, 
+        mesh, mats, cnfg, hh_tiny,
             Tu_prev, Tu_next, hh_edge, uu_tend)
     
     ttoc = time.time()
