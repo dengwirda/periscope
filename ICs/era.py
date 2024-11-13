@@ -368,9 +368,10 @@ def init(name, save, nsqr,
         uu_norm = \
             np.sqrt(ux_edge ** 2 + uy_edge ** 2)
 
-        # Garratt's form
+        # Garratt's form, with saturation
+        uu_scal = np.minimum(33.3333, uu_norm)
         cw_edge = 1. / 1000. * \
-            (0.75 + 0.067 * uu_norm) * arho / orho
+            (0.75 + 0.067 * uu_scal) * arho / orho
 
         Tx_edge = cw_edge * uu_norm * ux_edge
         Ty_edge = cw_edge * uu_norm * uy_edge
