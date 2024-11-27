@@ -50,9 +50,9 @@ def init(name, save, nsqr,
 
     mats = operators(mesh)
 
-    grav = 9.81 * (1. - 0.08)   # gravity + SAL
+    grav = 9.80616              # gravity
     erot = 7.292E-05            # Earth's omega
-    orho = 1027.                # seawater density
+    orho = 1035.                # seawater density
     arho = 1.225                # atmosph. density
     irho = 1000.                # iceshelf density
     
@@ -181,7 +181,7 @@ def init(name, save, nsqr,
 
     gamma = np.sqrt(dzdx ** 2 + dzdy ** 2) / alpha
     gamma[gamma<=1.] = 1.
-    c1_24hr*= 1. / gamma
+    c1_24hr*= 1. / gamma ** 2
     c1_24hr*= np.sqrt(dzdx ** 2 + dzdy ** 2)
 
     # 12hr:
@@ -197,7 +197,7 @@ def init(name, save, nsqr,
 
     gamma = np.sqrt(dzdx ** 2 + dzdy ** 2) / alpha
     gamma[gamma<=1.] = 1.
-    c1_12hr*= 1. / gamma
+    c1_12hr*= 1. / gamma ** 2
     c1_12hr*= np.sqrt(dzdx ** 2 + dzdy ** 2)
 
     # 06hr:
@@ -213,19 +213,19 @@ def init(name, save, nsqr,
 
     gamma = np.sqrt(dzdx ** 2 + dzdy ** 2) / alpha
     gamma[gamma<=1.] = 1.
-    c1_06hr*= 1. / gamma
+    c1_06hr*= 1. / gamma ** 2
     c1_06hr*= np.sqrt(dzdx ** 2 + dzdy ** 2)
 
     #!! how to choose weights? energy per constituent?
-    c1_cell = 2. / 6. * c1_24hr + \
-              3. / 6. * c1_12hr + \
-              1. / 6. * c1_06hr
+    c1_cell = 3. / 12. * c1_24hr + \
+              8. / 12. * c1_12hr + \
+              1. / 12. * c1_06hr
 
     # depth, background and upper scalings on cd
     c1_cell*= np.sqrt(np.maximum(
-        +0., hh_cell - 8.)) / 48. / np.pi ** 2
+        0., hh_cell - 64.)) / 256. / np.pi ** 2
     c1_cell+= 1.E-08  # extra global dissipation
-    c1_cell = np.minimum(c1_cell, +0.01)  # max bound
+    c1_cell = np.minimum(c1_cell, 0.001)  # max bound
 
     # add extra top surface drag for ice-shelves
     c2_cell = np.zeros((mesh.cell.size), dtype=np.float32)
@@ -235,14 +235,22 @@ def init(name, save, nsqr,
 
     c2_cell[ih_cell>0.] = .0025  # extra drag in fisc
    
-    # move drag coefficients from cells to edges
-    c1_edge = mats.edge_wing_sums * (c1_cell ** 2)
+    # map drag coefficients, from cells to edges
+    c1_vert = mats.dual_kite_sums *  c1_cell  # simpson's
+    c1_vert/= mesh.vert.area
+    c1_edge = mats.edge_wing_sums *  c1_cell
     c1_edge/= mesh.edge.area
-    c1_edge = np.sqrt(c1_edge)
+    c1_ends = mats.edge_tail_sums *  c1_vert
+    c1_ends/= mesh.edge.area
+    c1_edge = 4. / 6. * c1_edge + 2. / 6. * c1_ends
 
-    c2_edge = mats.edge_wing_sums * (c2_cell ** 2)
+    c2_vert = mats.dual_kite_sums *  c2_cell
+    c2_vert/= mesh.vert.area
+    c2_edge = mats.edge_wing_sums *  c2_cell
     c2_edge/= mesh.edge.area
-    c2_edge = np.sqrt(c2_edge)
+    c2_ends = mats.edge_tail_sums *  c2_vert
+    c2_ends/= mesh.edge.area
+    c2_edge = 4. / 6. * c2_edge + 2. / 6. * c2_ends
 
     print("Preprocessing forcing...")
 
@@ -296,7 +304,7 @@ def init(name, save, nsqr,
     Tu_curl = np.zeros(
         (nfrc, mesh.vert.size), dtype=np.float32)
 
-    for step in range(1, nfrc):
+    for step in range(1, 8): #nfrc):
         # interp. p_atm
         """
         ifun = RectBivariateSpline(
