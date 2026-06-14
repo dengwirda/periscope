@@ -42,34 +42,20 @@ To run the shallow-water solver (see `swe.py --help`):
 
     python swe.py \
     --mesh-file="path+name-to-mpas-mesh+init-file" \
-    --numthread=cores \
+    --numthread=N \
     --time-span="WdXhYmZs" \ 
     --save-time="WdXhYmZs"
 
 Solver output is saved to an MPAS-'ish' NetCDF file that can be visualised using
-e.g. paraview.
+e.g. [paraview](https://www.paraview.org/download/).
 
-Input files for various cases can be built from MPAS-format mesh files using the 
-utilities provided.
+Input files for various cases can be built from 
+[MPAS-format](https://mpas-dev.github.io/files/documents/MPAS-MeshSpec.pdf) mesh 
+files using the utilities provided &mdash; see the cases in `run` for details.
 
-The barotopic jet of [Galewesky et al](https://doi.org/10.1111/j.1600-0870.2004.00071.x):
-
-    python ICs/jet.py \
-    --mesh-file="path+name-to-mpas-mesh-file" \
-    --init-file="path+name-to-mpas-init-file" \
-    --with-pert=True --radius=6371220.
-    
-Various [Williamson et al](https://doi.org/10.1016/S0021-9991(05)80016-6) SWE configurations:
-
-    python ICs/wtc.py \
-    --mesh-file="path+name-to-mpas-mesh-file" \
-    --init-file="path+name-to-mpas-init-file" \
-    --radius=6371220. --test-case=N
-
-as well as a range of other flows &mdash; see the cases in `run` for details.
-
-For example, to build + run the Galewsky jet test case using a CVT-optimised 
-'level-7' icosahedral mesh (available in the repo release assets):
+For example, to build and run the barotopic jet of 
+[Galewesky et al](https://doi.org/10.1111/j.1600-0870.2004.00071.x) 
+(meshes available from the repository release assets):
 
     python ICs/jet.py \
     --mesh-file="mesh_w_elev_cvt_7.nc" \
