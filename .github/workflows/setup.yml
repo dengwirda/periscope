@@ -3,16 +3,15 @@ name: periscope test
 on:
   workflow_dispatch:
   pull_request:
-  push:
 
 jobs:
   build:
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.12"]
+        python-version: ["3.14"]
 
     steps:
       - uses: actions/checkout@v3
@@ -28,16 +27,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
           
       - name: Install dependencies on unx
-        if: startsWith(matrix.os, 'ubuntu')
+        if: startsWith(matrix.config.name, 'ubuntu')
         run: |
           sudo apt-get update
+          sudo apt-get gcc g++ gfortran
+          sudo apt-get install ninja-build
+          ninja --version
           g++ --version
-          
-      - name: Install dependencies on osx
-        if: startsWith(matrix.os, 'macos')
-        run: |
-          brew install llvm libomp
-          clang++ --version
+          gfortran --version
           
       - name: Install dependencies
         run: |
@@ -48,162 +45,102 @@ jobs:
       - name: Build periscope back-end
         run: python setup.py build_ext --inplace
 
+      - name: Build periscope external
+        run: |
+          cd ${{github.workspace}}/ext
+          python -m numpy.f2py -c -m akima_ *.f
+          cd ${{github.workspace}}
+
       - name: Download test assets
         uses: dsaltares/fetch-gh-release-asset@master
         with:
-          repo: dengwirda/periscope
+          repo: dengwirda/periscope-dev
+          file: mesh_w_elev_cvt_8.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download test assets
+        uses: dsaltares/fetch-gh-release-asset@master
+        with:
+          repo: dengwirda/periscope-dev
           file: mesh_w_elev_cvt_7.zip
           token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Download test assets
         uses: dsaltares/fetch-gh-release-asset@master
         with:
-          repo: dengwirda/periscope
-          file: mesh_disk_2.zip
+          repo: dengwirda/periscope-dev
+          file: mesh_disk_3.zip
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download test assets
         uses: dsaltares/fetch-gh-release-asset@master
         with:
-          repo: dengwirda/periscope
-          file: mesh_20to38N_30km.zip
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Download test assets
-        uses: dsaltares/fetch-gh-release-asset@master
-        with:
-          repo: dengwirda/periscope
+          repo: dengwirda/periscope-dev
           file: fujii.zip
           token: ${{ secrets.GITHUB_TOKEN }}
           
-      - name: Unpack test assets
+      - name: Unpack test case assets
         run: unzip "*.zip"
 
       - name: Run periscope testcase 1
         run: |
-          python ICs/wtc.py \
-          --mesh-file="mesh_w_elev_cvt_7.nc" \
-          --init-file="wtc2_cvt_7.nc" \
-          --radius=6371220. \
-          --test-case=2
-          python swe.py \
-          --mesh-file="wtc2_cvt_7.nc" \
-          --numthread=2 \
-          --num-steps=576 --time-step=300.0 \
-          --save-freq=288 --stat-freq=288 \
-          --integrate="RK32-FB"
-          python3 chk.py \
-          --soln-file="out_wtc2_cvt_7.nc"
+          export BINDIR=${{github.workspace}}
+          export MSHDIR=${{github.workspace}}
+          export NUMCPU=$(nproc); echo ${NUMCPU}
+          ${{github.workspace}}/run/wtc/ics_tc2_60km.sh
+          ${{github.workspace}}/run/wtc/run_tc2_60km_fast.sh
+          python chk.py --soln-file="out_tc2_cvt_7.nc"
           
       - name: Run periscope testcase 2
         run: |
-          python3 ICs/jet.py \
-          --mesh-file="mesh_w_elev_cvt_7.nc" \
-          --init-file="bjet_cvt_7.nc" \
-          --radius=6371220. \
-          --with-pert=TRUE
-          python3 swe.py \
-          --mesh-file="bjet_cvt_7.nc" \
-          --numthread=2 \
-          --num-steps=640 --time-step=135.0 \
-          --save-freq=640 --stat-freq=320 \
-          --integrate="RK22-FB"
-          python3 chk.py \
-          --soln-file="out_bjet_cvt_7.nc"
+          export BINDIR=${{github.workspace}}
+          export MSHDIR=${{github.workspace}}
+          export NUMCPU=$(nproc); echo ${NUMCPU}
+          ${{github.workspace}}/run/wtc/ics_tc5_60km.sh
+          ${{github.workspace}}/run/wtc/run_tc5_60km_fast.sh
+          python chk.py --soln-file="out_tc5_cvt_7.nc"
           
       - name: Run periscope testcase 3
         run: |
-          python3 ICs/vtx.py \
-          --mesh-file="mesh_disk_2.nc" \
-          --init-file="merger_2.nc" \
-          --test-case=1 \
-          --wall-slip=1.
-          python3 swe.py \
-          --mesh-file="merger_2.nc" \
-          --numthread=2 \
-          --num-steps=500 --time-step=0.002 \
-          --save-freq=250 --stat-freq=250
-          python3 chk.py \
-          --soln-file="out_merger_2.nc"
+          export BINDIR=${{github.workspace}}
+          export MSHDIR=${{github.workspace}}
+          export NUMCPU=$(nproc); echo ${NUMCPU}
+          ${{github.workspace}}/run/wtc/ics_tc6_60km.sh
+          ${{github.workspace}}/run/wtc/run_tc6_60km_fast.sh
+          python chk.py --soln-file="out_tc6_cvt_7.nc"
           
       - name: Run periscope testcase 4
         run: |
-          python3 ICs/wav.py \
-          --mesh-file="mesh_w_elev_cvt_7.nc" \
-          --init-file="tsu_cvt_7.nc" \
-          --radius=6371220. \
-          --test-case=4 \
-          --xydz-file="fujii.txydz"
-          python3 swe.py \
-          --mesh-file="tsu_cvt_7.nc" \
-          --numthread=2 \
-          --num-steps=960 --time-step=45. \
-          --save-freq=80 --stat-freq=80 \
-          --hh-scheme="upwind" \
-          --wetdry-h0=1.E-03 \
-          --sqrlaw-cd=0.0010 \
-          --uu-visc-2=1.E+02 --uu-visc-4=1.E+11 \
-          --hh-diff-2=1.E+02 --hh-diff-4=1.E+11
-          python3 chk.py \
-          --soln-file="out_tsu_cvt_7.nc"
+          export BINDIR=${{github.workspace}}
+          export MSHDIR=${{github.workspace}}
+          export NUMCPU=$(nproc); echo ${NUMCPU}
+          ${{github.workspace}}/run/wav/ics_lgw_60km.sh
+          ${{github.workspace}}/run/wav/run_lgw_60km_fast.sh
+          python chk.py --soln-file="out_lgw_cvt_7.nc"
 
       - name: Run periscope testcase 5
         run: |
-          python3 ICs/obc.py \
-          --mesh-file="mesh_disk_2.nc" \
-          --init-file="wake_2.nc" \
-          --radius=50000. \
-          --test-case=1
-          python3 swe.py \
-          --mesh-file="wake_2.nc" \
-          --forc-file="frc_wake_2.nc" \
-          --numthread=2 \
-          --num-steps=864 --time-step=0.125 \
-          --save-freq=288 --stat-freq=288 \
-          --hh-scheme="upwind" \
-          --wetdry-h0=1.E-03 \
-          --loglaw-z0=0.0100 --loglaw-lo=0.0025 --loglaw-hi=1. \
-          --uu-visc-4=1.E+11 --hh-diff-4=1.E+11 \
-          --leith-chi=0.3875 --leith-max=1.E+03 \
-          --shock-chi=0.5000 --shock-max=1.E+06
-          python3 chk.py \
-          --soln-file="out_wake_2.nc"
+          export BINDIR=${{github.workspace}}
+          export MSHDIR=${{github.workspace}}
+          export NUMCPU=$(nproc); echo ${NUMCPU}
+          ${{github.workspace}}/run/wav/ics_tsu_30km.sh
+          ${{github.workspace}}/run/wav/run_tsu_30km_fast.sh
+          python chk.py --soln-file="out_tsu_cvt_8.nc"
 
       - name: Run periscope testcase 6
         run: |
-          python3 ICs/obc.py \
-          --mesh-file="mesh_disk_2.nc" \
-          --init-file="hill_2.nc" \
-          --radius=50000. \
-          --test-case=2
-          python3 swe.py \
-          --mesh-file="hill_2.nc" \
-          --forc-file="frc_hill_2.nc" \
-          --numthread=2 \
-          --num-steps=500 --time-step=0.2 \
-          --save-freq=50 --stat-freq=50 \
-          --hh-scheme="upwind" \
-          --wetdry-h0=1.E-03 \
-          --loglaw-z0=0.0100 --loglaw-lo=0.0025 --loglaw-hi=1. \
-          --uu-visc-2=1.E+02 --uu-visc-4=1.E+11 \
-          --hh-diff-2=1.E+02 --hh-diff-4=1.E+11
-          python3 chk.py \
-          --soln-file="out_hill_2.nc"
+          export BINDIR=${{github.workspace}}
+          export MSHDIR=${{github.workspace}}
+          export NUMCPU=$(nproc); echo ${NUMCPU}
+          ${{github.workspace}}/run/obc/ics_wake.sh
+          ${{github.workspace}}/run/obc/run_wake_fast.sh
+          python chk.py --soln-file="out_wake_3.nc"
 
       - name: Run periscope testcase 7
         run: |
-          python3 ICs/wdg.py \
-          --mesh-file="mesh_20to38N_30km.nc" \
-          --init-file="gyre_fs_30km.nc" \
-          --radius=6371220. --wall-slip=1.
-          python3 swe.py \
-          --mesh-file="gyre_fs_30km.nc" \
-          --forc-file="gyre_fs_30km.nc" \
-          --soln-file="gyre_fs_30km_00to01years.nc" \
-          --numthread=2 \
-          --num-steps=5760 --time-step=5400. \
-          --save-freq=480 --stat-freq=480 \
-          --linlaw-cd=1.E-07 \
-          --uu-visc-2=5.E+02 --ref-scale=-1 --msh-fixes=0
-          python3 chk.py \
-          --soln-file="gyre_fs_30km_00to01years.nc"
+          export BINDIR=${{github.workspace}}
+          export MSHDIR=${{github.workspace}}
+          export NUMCPU=$(nproc); echo ${NUMCPU}
+          ${{github.workspace}}/run/obc/ics_hill.sh
+          ${{github.workspace}}/run/obc/run_hill_fast.sh
+          python chk.py --soln-file="out_hill_3.nc"
