@@ -1,7 +1,62 @@
 
+import os
+import sys
 import numpy as np
 from scipy import spatial
 from scipy.sparse import csr_matrix
+
+HERE = os.path.abspath(os.path.dirname(__file__))
+
+sys.path.insert(1, os.path.join(HERE, "ext"))
+
+#-- simple interfaces to Akima's interpolation schemes
+from ext.akima import interp1d, interp2d
+
+def flatten(alat, flat):
+#-- geodetic => geocentric mapping for (mean) spheroid
+    return np.arctan(
+        (1. - flat) ** 2 * np.tan(alat))
+
+
+def idw_remap(ppos, qpos, halo, dpow=4):
+
+#-- return inverse distance weighted interpolation matrix
+
+    tree = spatial.cKDTree(ppos, leafsize=32)
+
+    try:  # scipy renaming
+        dist, near = \
+            tree.query(qpos, k=halo, n_jobs=-1)
+    except:
+        dist, near = \
+            tree.query(qpos, k=halo, workers=-1)
+
+    scal = dist / np.mean(dist)  # careful w. precision
+
+    tiny = 1.E-12 * np.mean(scal)
+
+    wght = (1. / np.maximum(tiny, scal)) ** dpow
+   
+    dist = np.mean(dist, axis=+1)
+
+    wsum = np.maximum(tiny, np.sum(wght, axis=1))
+
+    nbse = ppos.shape[0]
+    npts = qpos.shape[0]
+
+    ivec = []; jvec = []; xvec = []
+    for next in range(halo):
+        ivec.append(np.arange(npts))
+        jvec.append(near[:, next])
+        xvec.append(wght[:, next] / wsum)
+
+    ivec = np.concatenate(ivec)
+    jvec = np.concatenate(jvec)
+    xvec = np.concatenate(xvec)
+
+    return csr_matrix(
+        (xvec, (ivec, jvec)), shape=(npts, nbse)), dist
+
 
 def find_cell(mesh, xlon, ylat):
 
@@ -13,7 +68,7 @@ def find_cell(mesh, xlon, ylat):
     ppos[:, 1] = mesh.cell.ypos
     ppos[:, 2] = mesh.cell.zpos
 
-    tree = spatial.cKDTree(ppos, leafsize=8)
+    tree = spatial.cKDTree(ppos, leafsize=32)
 
     qpos = np.zeros(
         (xlon.shape[ 0], 3), dtype=np.float64)
@@ -23,7 +78,7 @@ def find_cell(mesh, xlon, ylat):
                              np.cos(ylat)
     qpos[:, 2] = mesh.rsph * np.sin(ylat)
     
-    try:  # ridiculous argument renaming...
+    try:  # scipy renaming
         __, near = tree.query(qpos, n_jobs=-1)
     except:
         __, near = tree.query(qpos, workers=-1)
@@ -36,12 +91,12 @@ def find_edge(mesh, xlon, ylat):
 #-- nearest edges to unstructured [x,y] points
 
     ppos = np.zeros(
-        (mesh.cell.size, 3), dtype=np.float64)
+        (mesh.edge.size, 3), dtype=np.float64)
     ppos[:, 0] = mesh.edge.xpos
     ppos[:, 1] = mesh.edge.ypos
     ppos[:, 2] = mesh.edge.zpos
 
-    tree = spatial.cKDTree(ppos, leafsize=8)
+    tree = spatial.cKDTree(ppos, leafsize=32)
 
     qpos = np.zeros(
         (xlon.shape[ 0], 3), dtype=np.float64)
@@ -51,7 +106,7 @@ def find_edge(mesh, xlon, ylat):
                              np.cos(ylat)
     qpos[:, 2] = mesh.rsph * np.sin(ylat)
     
-    try:  # ridiculous argument renaming...
+    try:  # scipy renaming
         __, near = tree.query(qpos, n_jobs=-1)
     except:
         __, near = tree.query(qpos, workers=-1)
@@ -64,12 +119,12 @@ def find_dual(mesh, xlon, ylat):
 #-- nearest duals to unstructured [x,y] points
 
     ppos = np.zeros(
-        (mesh.cell.size, 3), dtype=np.float64)
+        (mesh.vert.size, 3), dtype=np.float64)
     ppos[:, 0] = mesh.vert.xpos
     ppos[:, 1] = mesh.vert.ypos
     ppos[:, 2] = mesh.vert.zpos
 
-    tree = spatial.cKDTree(ppos, leafsize=8)
+    tree = spatial.cKDTree(ppos, leafsize=32)
 
     qpos = np.zeros(
         (xlon.shape[ 0], 3), dtype=np.float64)
@@ -79,7 +134,7 @@ def find_dual(mesh, xlon, ylat):
                              np.cos(ylat)
     qpos[:, 2] = mesh.rsph * np.sin(ylat)
     
-    try:  # ridiculous argument renaming...
+    try:  # scipy renaming
         __, near = tree.query(qpos, n_jobs=-1)
     except:
         __, near = tree.query(qpos, workers=-1)

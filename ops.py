@@ -110,6 +110,16 @@ def operators(mesh):
     mats.quad_curl_sums = mats.edge_vert_sums \
                         * mats.dual_curl_sums
 
+    mesh.quad = base()
+    mesh.quad.area      = mats.edge_vert_sums \
+                        * mesh.vert.area
+
+    mesh.quad.area = reals_t(mesh.quad.area)
+    
+    mesh.cell.area = reals_t(mesh.cell.area)
+    mesh.vert.area = reals_t(mesh.vert.area)
+    mesh.edge.area = reals_t(mesh.edge.area)
+
     ttoc = time.time()
     print("-MATS done (sec):", round(ttoc - ttic, 2))
     
@@ -148,48 +158,6 @@ def operators(mesh):
     print("-WSYM done (sec):", round(ttoc - ttic, 2))
 
     ttic = time.time()
-
-    # ensure remapping is always at worst dissipative
-    # due to floating-point round-off!
-    # this modifies the mesh data-structure in-place.
-    crhs = np.ones(mesh.cell.size, 
-                   dtype=flt64_t)
-    erhs = np.ones(mesh.edge.size, 
-                   dtype=flt64_t)
-    vrhs = np.ones(mesh.vert.size, 
-                   dtype=flt64_t)
-
-    mesh.vert.area = (
-        0.5 * mats.dual_kite_sums * crhs +
-        0.5 * mats.dual_tail_sums * erhs
-        )
-        
-    mesh.vert.area = reals_t(mesh.vert.area)
-    
-    mesh.edge.area = (
-        0.5 * mats.edge_wing_sums * crhs +
-        0.5 * mats.edge_tail_sums * vrhs
-        )
-
-    mesh.edge.area = reals_t(mesh.edge.area)
-    
-    mesh.quad = base()
-    mesh.quad.area = mats.edge_vert_sums \
-                   * mesh.vert.area
-
-    mesh.quad.area = reals_t(mesh.quad.area)
-       
-    mesh.cell.area = (
-        0.5 * mats.cell_wing_sums * erhs +
-        0.5 * mats.cell_kite_sums * vrhs
-        )
-
-    mesh.cell.area = reals_t(mesh.cell.area)
- 
-    ttoc = time.time()
-    print("-AREA done (sec):", round(ttoc - ttic, 2))
-    
-    ttic = time.time()
     
     # least-squares vector reconst. operators
     mats.dual_lsqr_xnrm, \
@@ -227,10 +195,7 @@ def operators(mesh):
 
 
 def cell_flux_sums(mesh):
-
-#-- CELL-FLUX-SUMS: returns SUM(l_e * F_e) via sparse matrix
-#-- operator OP. Use DIV(F) = OP * F, where F is a vector of
-#-- (signed) fluxes for all edges in the mesh.
+#-- div(f) = D_c,e * f, builds sparse matrix operator D_c,e
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -264,10 +229,7 @@ def cell_flux_sums(mesh):
 
 
 def cell_curl_sums(mesh):
-
-#-- CELL-CURL-SUMS: returns SUM(f_e * P_e) via sparse matrix
-#-- operator OP. Use CURL(P) = OP * P where P is a vector of
-#-- (perpendicular) fluxes for edges in the mesh.
+#-- rot(f) = R_c,e * f, builds sparse matrix operator R_c,e
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -301,21 +263,26 @@ def cell_curl_sums(mesh):
 
 
 def cell_kite_sums(mesh):
+#-- map duals-to-cells, builds sparse matrix operator M_c,v
 
     return dual_kite_sums(mesh).transpose(copy=True).tocsr()
 
 
 def cell_wing_sums(mesh):
+#-- map edges-to-cells, builds sparse matrix operator M_c,e
 
     return edge_wing_sums(mesh).transpose(copy=True).tocsr()
 
 
 def dual_tail_sums(mesh):
+#-- map edges-to-duals, builds sparse matrix operator M_v,e
 
     return edge_tail_sums(mesh).transpose(copy=True).tocsr()
 
 
 def cell_edge_sums(mesh):
+#-- map edges-to-cells, builds sparse matrix operator A_c,e
+#-- simple, unweighted average
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -339,6 +306,8 @@ def cell_edge_sums(mesh):
 
 
 def cell_vert_sums(mesh):
+#-- map duals-to-cells, builds sparse matrix operator A_c,v
+#-- simple, unweighted average
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -362,6 +331,7 @@ def cell_vert_sums(mesh):
 
 
 def edge_tail_sums(mesh):
+#-- map duals-to-edges, builds sparse matrix operator M_e,v
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -388,6 +358,7 @@ def edge_tail_sums(mesh):
 
 
 def edge_wing_sums(mesh):
+#-- map cells-to-edges, builds sparse matrix operator M_e,c
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -414,6 +385,8 @@ def edge_wing_sums(mesh):
 
 
 def edge_vert_sums(mesh):
+#-- map duals-to-edges, builds sparse matrix operator A_c,v
+#-- simple, unweighted average
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -439,6 +412,8 @@ def edge_vert_sums(mesh):
 
 
 def edge_cell_sums(mesh):
+#-- map cells-to-edges, builds sparse matrix operator A_e,c
+#-- simple, unweighted average
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -464,10 +439,7 @@ def edge_cell_sums(mesh):
 
 
 def edge_grad_norm(mesh):
-
-#-- EDGE-GRAD-NORM: returns (Q(j)-Q(i))/lij as sparse matrix
-#-- operator OP. Use GRAD(Q) = OP * Q where Q is a vector of
-#-- cell-centred scalars for all cells in the mesh.
+#-- grad f = G_e,c * f, builds sparse matrix operator G_e,c
 
     icel = mesh.edge.cell[:, 0] - 1
     jcel = mesh.edge.cell[:, 1] - 1
@@ -494,10 +466,7 @@ def edge_grad_norm(mesh):
 
 
 def edge_grad_perp(mesh):
-
-#-- EDGE-GRAD-PERP: returns (V(j)-V(i))/vij as sparse matrix
-#-- operator OP. Use GRAD(V) = OP * V where V is a vector of
-#-- node-centred scalars for all nodes in the mesh.
+#-- grad f = G_e,v * f, builds sparse matrix operator G_e,v
 
     ivrt = mesh.edge.vert[:, 0] - 1
     jvrt = mesh.edge.vert[:, 1] - 1
@@ -524,11 +493,7 @@ def edge_grad_perp(mesh):
 
 
 def edge_flux_perp(mesh):
-
-#-- EDGE-FLUX-PERP: returns f_perp, via the TRSK-type scheme
-#-- for edges sandwiched between cells.
-#-- Use f_perp = OP * f_nrm to reconstruct the perpendicular
-#-- component of a vector field F. 
+#-- perp F = P_e,e * F, builds sparse matrix operator P_e,e
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -558,6 +523,7 @@ def edge_flux_perp(mesh):
 
 
 def dual_flux_sums(mesh):
+#-- div(f) = D_v,e * f, builds sparse matrix operator D_v,e
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -594,10 +560,7 @@ def dual_flux_sums(mesh):
 
 
 def dual_curl_sums(mesh):
-
-#-- DUAL-CURL-SUMS: returns SUM(lij * F_e) via sparse matrix
-#-- operator OP. Use CURL(F) = OP * F where F is a vector of
-#-- (signed) fluxes for all edges in the mesh.
+#-- rot(f) = R_v,e * f, builds sparse matrix operator R_v,e
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -634,6 +597,7 @@ def dual_curl_sums(mesh):
 
 
 def dual_kite_sums(mesh):
+#-- map cells-to-duals, builds sparse matrix operator M_v,c
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -660,6 +624,8 @@ def dual_kite_sums(mesh):
 
 
 def dual_cell_sums(mesh):
+#-- map cells-to-duals, builds sparse matrix operator A_v,c
+#-- simple, unweighted average
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -685,6 +651,8 @@ def dual_cell_sums(mesh):
 
 
 def dual_edge_sums(mesh):
+#-- map edges-to-duals, builds sparse matrix operator A_v,e
+#-- simple, unweighted average
 
     xvec = np.array([], dtype=reals_t)
     ivec = np.array([], dtype=index_t)
@@ -710,7 +678,6 @@ def dual_edge_sums(mesh):
 
 
 def dual_lsqr_mats(mesh):
-
 #-- lsqr matrices for nrm. + prp. cell reconstructions
 
     ndir = np.vstack((
@@ -767,7 +734,6 @@ def dual_lsqr_mats(mesh):
 
 
 def dual_lsqr_fxyz(mesh):
-
 #-- dual reconstruction via "small" dual-based stencil
 
     Rinv, Rdet, matR, \
@@ -855,7 +821,6 @@ def dual_lsqr_fxyz(mesh):
 
 
 def cell_lsqr_mats(mesh):
-
 #-- lsqr matrices for nrm. + prp. cell reconstructions
 
     edir = np.vstack((
@@ -923,7 +888,6 @@ def cell_lsqr_mats(mesh):
 
 
 def cell_lsqr_fxyz(mesh):
-
 #-- cell reconstruction via "large" cell-based stencil
 
     Rinv, Rdet, matR = cell_lsqr_mats(mesh)
@@ -984,7 +948,6 @@ def cell_lsqr_fxyz(mesh):
 
 
 def edge_lsqr_mats(mesh):
-
 #-- lsqr matrices for nrm. + prp. edge reconstructions
 
     ndir = np.vstack((
@@ -1078,7 +1041,6 @@ def edge_lsqr_mats(mesh):
 
 
 def edge_lsqr_fxyz(mesh):
-
 #-- edge reconstruction via "large" cell-based stencil
 
     Rinv, Rdet, matR, \
@@ -1143,6 +1105,7 @@ def edge_lsqr_fxyz(mesh):
 
 
 def edge_lsqr_perp(mesh, mats):
+#-- perp F = P_e,e * F, builds sparse matrix operator P_e,e
 
     xprp = mesh.edge.xprp
     xprp = spdiags(
@@ -1165,6 +1128,7 @@ def edge_lsqr_perp(mesh, mats):
     
     
 def edge_lsqr_norm(mesh, mats):
+#-- norm F = N_e,e * F, builds sparse matrix operator N_e,e
 
     xnrm = mesh.edge.xnrm
     xnrm = spdiags(
@@ -1187,10 +1151,8 @@ def edge_lsqr_norm(mesh, mats):
 
 
 def edge_dual_reco(mesh, mats):
-
-#-- EDGE-DUAL-RECO: returns .5 * (xe - xv) * grad(F) part of
-#-- edge reconstruction operator,
-#-- with gradients estimated using "2-ring" stencil on duals.
+#-- 1/2 * (xe - xv) * grad(f) part of edge reconstruction 
+#-- operator, grad computed via "2-ring" stencil on duals.
 
     vrt1 = mesh.edge.vert[:, 0] - 1
     xev1 = mesh.edge.xpos - mesh.vert.xpos[vrt1]
@@ -1235,10 +1197,8 @@ def edge_dual_reco(mesh, mats):
 
 
 def edge_cell_reco(mesh, mats):
-
-#-- EDGE-CELL-RECO: returns .5 * (xe - xc) * grad(F) part of
-#-- edge reconstruction operator,
-#-- with gradients estimated using "2-ring" stencil on cells.
+#-- 1/2 * (xe - xc) * grad(F) part of edge reconstruction 
+#-- operator, grad computed via "2-ring" stencil on cells.
 
     cel1 = mesh.edge.cell[:, 0] - 1
     xec1 = mesh.edge.xpos - mesh.cell.xpos[cel1]

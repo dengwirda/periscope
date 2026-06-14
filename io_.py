@@ -15,7 +15,7 @@ from _fp import reals_t, index_t
 
 from log import tcpu
 
-from _dx import diag_vars
+from _dx import calc_vars
 
 class base: pass
 out_ = base()
@@ -26,6 +26,7 @@ out_.hh_cell = False
 out_.hh_edge = False
 out_.hh_dual = False
 out_.zt_cell = False
+out_.qq_cell = False
 out_.du_cell = False
 out_.uh_cell = False
 out_.ke_bias = False
@@ -39,20 +40,31 @@ out_.ux_cell = False
 out_.uy_cell = False
 out_.uz_cell = False
 out_.nu_turb = False
+out_.nu_wave = False
 out_.nu_shoc = False
+out_.nu_thin = False
+out_.xi_tide = False
+out_.xi_self = False
+out_.uu_filt = False
+out_.ke_filt = False
 
-def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
+def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge,
+                                                  qq_cell):
 
     hh_edge, hh_dual, hh_bias, \
     ke_cell, ke_bias, \
     rv_cell, pv_cell, rv_dual, pv_dual, pv_edge, pv_bias, \
-    vv_edge, nu_turb, nu_shoc = diag_vars (
-        mesh, mats, flow, cnfg, hh_cell, uu_edge
+    vv_edge, nu_turb, nu_wave, os_wave, nu_shoc, os_shoc, \
+    nu_thin, uu_filt, Xi_tide, Xi_self = calc_vars (
+        mesh, mats, flow, cnfg, hh_cell, uu_edge, qq_cell
         )
 
     ttic = time.time()
 
     data = nc.Dataset(save, "a", format="NETCDF4")
+
+    # seconds elapsed since epoch
+    data.timeisnow = cnfg.timeisnow
 
     # xt variables are tmp scratch
 
@@ -60,18 +72,18 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
         data.variables["uu_edge"][step, :, :] = \
             np.reshape(uu_edge[
                 mesh.edge.irev - 1], (1, mesh.edge.size, 1))
-                
+            
     if (out_.vv_edge):
         data.variables["vv_edge"][step, :, :] = \
             np.reshape(vv_edge[
                 mesh.edge.irev - 1], (1, mesh.edge.size, 1))
                 
     if (out_.hh_bias):
-        xt_dual = mats.dual_tail_sums * hh_bias
-        xt_dual/= mesh.vert.area
+        _t_dual = mats.dual_tail_sums * hh_bias
+        _t_dual/= mesh.vert.area
 
         data.variables["hh_bias"][step, :, :] = \
-            np.reshape(xt_dual[
+            np.reshape(_t_dual[
                 mesh.vert.irev - 1], (1, mesh.vert.size, 1))
                 
     if (out_.hh_cell):         
@@ -88,29 +100,34 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
         data.variables["hh_dual"][step, :, :] = \
             np.reshape(hh_dual[
                 mesh.vert.irev - 1], (1, mesh.vert.size, 1))
-                
+    
     if (out_.zt_cell):
-        xt_cell = flow.zb_cell + hh_cell
+        _t_cell = flow.zb_cell + hh_cell
     
         data.variables["zt_cell"][step, :, :] = \
-            np.reshape(xt_cell[
+            np.reshape(_t_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+
+    if (out_.qq_cell):
+        data.variables["qq_cell"][step, :, :] = \
+            np.reshape(qq_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
 
     if (out_.du_cell):
-        xt_cell = mats.cell_flux_sums * uu_edge
-        xt_cell/= mesh.cell.area
+        _t_cell = mats.cell_flux_sums * uu_edge
+        _t_cell/= mesh.cell.area
 
         data.variables["du_cell"][step, :, :] = \
-            np.reshape(xt_cell[
+            np.reshape(_t_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
 
     if (out_.uh_cell):
-        xt_edge = uu_edge * hh_edge
-        xt_cell = mats.cell_flux_sums * xt_edge
-        xt_cell/= mesh.cell.area
+        _t_edge = uu_edge * hh_edge
+        _t_cell = mats.cell_flux_sums * _t_edge
+        _t_cell/= mesh.cell.area
 
         data.variables["uh_cell"][step, :, :] = \
-            np.reshape(xt_cell[
+            np.reshape(_t_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
 
     if (out_.ke_cell):
@@ -119,11 +136,11 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1)) 
 
     if (out_.pv_bias):
-        xt_dual = mats.dual_tail_sums * pv_bias
-        xt_dual/= mesh.vert.area
+        _t_dual = mats.dual_tail_sums * pv_bias
+        _t_dual/= mesh.vert.area
 
         data.variables["pv_bias"][step, :, :] = \
-            np.reshape(xt_dual[
+            np.reshape(_t_dual[
                 mesh.vert.irev - 1], (1, mesh.vert.size, 1))
     
     if (out_.pv_dual):        
@@ -147,44 +164,190 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge):
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
                 
     if (out_.ux_cell):
-        xt_cell = mats.cell_lsqr_xnrm * uu_edge
+        _t_cell = mats.cell_lsqr_xnrm * uu_edge
 
         data.variables["ux_cell"][step, :, :] = \
-            np.reshape(xt_cell[
+            np.reshape(_t_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
                 
     if (out_.uy_cell):
-        xt_cell = mats.cell_lsqr_ynrm * uu_edge
+        _t_cell = mats.cell_lsqr_ynrm * uu_edge
 
         data.variables["uy_cell"][step, :, :] = \
-            np.reshape(xt_cell[
+            np.reshape(_t_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
                 
     if (out_.uz_cell):
-        xt_cell = mats.cell_lsqr_znrm * uu_edge
+        _t_cell = mats.cell_lsqr_znrm * uu_edge
 
         data.variables["uz_cell"][step, :, :] = \
-            np.reshape(xt_cell[
+            np.reshape(_t_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))   
                 
     if (out_.nu_turb):
-        xt_dual = mats.dual_tail_sums * nu_turb
-        xt_dual/= mesh.vert.area
+        _t_dual = mats.dual_tail_sums * nu_turb
+        _t_dual/= mesh.vert.area
     
         data.variables["nu_turb"][step, :, :] = \
-            np.reshape(xt_dual[
+            np.reshape(_t_dual[
+                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+
+    if (out_.nu_thin):
+        _t_dual = mats.dual_tail_sums * nu_thin
+        _t_dual/= mesh.vert.area
+    
+        data.variables["nu_thin"][step, :, :] = \
+            np.reshape(_t_dual[
+                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+
+    if (out_.nu_wave):
+        _t_dual = mats.dual_tail_sums * nu_wave
+        _t_dual/= mesh.vert.area
+    
+        data.variables["nu_wave"][step, :, :] = \
+            np.reshape(_t_dual[
+                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+
+        _t_dual = mats.dual_tail_sums * os_wave
+        _t_dual/= mesh.vert.area
+    
+        data.variables["os_wave"][step, :, :] = \
+            np.reshape(_t_dual[
                 mesh.vert.irev - 1], (1, mesh.vert.size, 1))
 
     if (out_.nu_shoc):
-        xt_dual = mats.dual_tail_sums * nu_shoc
-        xt_dual/= mesh.vert.area
+        _t_dual = mats.dual_tail_sums * nu_shoc
+        _t_dual/= mesh.vert.area
     
         data.variables["nu_shoc"][step, :, :] = \
-            np.reshape(xt_dual[
+            np.reshape(_t_dual[
                 mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+
+        _t_dual = mats.dual_kite_sums * os_shoc
+        _t_dual/= mesh.vert.area
+    
+        data.variables["os_shoc"][step, :, :] = \
+            np.reshape(_t_dual[
+                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+
+    if (out_.xi_tide):
+        data.variables["Xi_tide"][step, :, :] = \
+            np.reshape(Xi_tide[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+
+    if (out_.xi_self):
+        data.variables["Xi_self"][step, :, :] = \
+            np.reshape(Xi_self[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+
+    if (out_.uu_filt):
+        data.variables["uu_filt"][step, :, :] = \
+            np.reshape(uu_filt[
+                mesh.edge.irev - 1], (1, mesh.edge.size, 1))
+
+    if (out_.ke_filt):
+        vv_filt = mats.edge_lsqr_perp * uu_filt
+
+        _t_edge = .5 * uu_filt ** 2 + \
+                  .5 * vv_filt ** 2
+
+        _t_cell = mats.cell_wing_sums * _t_edge
+        _t_cell/= mesh.cell.area
+
+        data.variables["ke_filt"][step, :, :] = \
+            np.reshape(_t_cell[
+                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
 
     data.close()
     
+    ttoc = time.time()
+    tcpu.filewrite = tcpu.filewrite + (ttoc - ttic)
+
+
+def save_last(save, mesh, mats, flow, cnfg, step, kp_sum_, en_sum_,
+                                                  hh_min_, hh_max_,
+                                                  uu_min_, uu_max_,
+                                                  qq_min_, qq_max_,
+                                                  zt_rms_,
+                                         ke_ave_, ke_rms_, ke_max_,
+                                         dk_ave_, dk_rms_, dk_max_):
+
+    ttic = time.time()
+
+    data = nc.Dataset(save, "a", format="NETCDF4")
+
+    data.variables["subdomn"][:] = \
+        mesh.cell.subd[mesh.cell.irev - 1]
+
+    # xt variables are tmp scratch
+
+    data.variables["kp_sums"][:] = kp_sum_
+    data.variables["en_sums"][:] = en_sum_
+    
+    data.variables["hh_min_"][:] = \
+               hh_min_[mesh.cell.irev - 1]
+    data.variables["hh_max_"][:] = \
+               hh_max_[mesh.cell.irev - 1]
+               
+    data.variables["uu_min_"][:] = \
+               uu_min_[mesh.edge.irev - 1]
+    data.variables["uu_max_"][:] = \
+               uu_max_[mesh.edge.irev - 1]
+
+    data.variables["zt_rms_"][:] = np.sqrt(
+    1./ step * zt_rms_[mesh.cell.irev - 1])
+
+    data.variables["ke_ave_"][:] = \
+    1./ step * ke_ave_[mesh.cell.irev - 1]
+    data.variables["ke_rms_"][:] = np.sqrt(
+    1./ step * ke_rms_[mesh.cell.irev - 1])
+    data.variables["ke_max_"][:] = \
+               ke_max_[mesh.cell.irev - 1]
+
+    xt_dual = mats.dual_tail_sums * dk_ave_
+    xt_dual/= mesh.vert.area
+
+    data.variables["dk_ave_"][:] = \
+               xt_dual[mesh.vert.irev - 1]
+
+    xt_dual = mats.dual_tail_sums * dk_rms_
+    xt_dual/= mesh.vert.area
+
+    data.variables["dk_rms_"][:] = np.sqrt(
+               xt_dual[mesh.vert.irev - 1])
+
+    xt_dual = mats.dual_tail_sums * dk_max_
+    xt_dual/= mesh.vert.area
+
+    data.variables["dk_max_"][:] = \
+               xt_dual[mesh.vert.irev - 1]
+    
+    xt_dual = mats.dual_tail_sums * cnfg.uu_visc_2
+    xt_dual/= mesh.vert.area
+    
+    data.variables["u2_visc"][:] = \
+               xt_dual[mesh.vert.irev - 1]
+    
+    xt_dual = mats.dual_tail_sums * cnfg.uu_visc_4
+    xt_dual/= mesh.vert.area
+    
+    data.variables["u4_visc"][:] = \
+               xt_dual[mesh.vert.irev - 1]
+    
+    xt_dual = mats.dual_tail_sums * cnfg.hh_diff_2
+    xt_dual/= mesh.vert.area
+
+    data.variables["h2_diff"][:] = \
+               xt_dual[mesh.vert.irev - 1]
+
+    xt_dual = mats.dual_tail_sums * cnfg.hh_diff_4
+    xt_dual/= mesh.vert.area
+
+    data.variables["h4_diff"][:] = \
+               xt_dual[mesh.vert.irev - 1] ** 2
+    
+    data.close()
+
     ttoc = time.time()
     tcpu.filewrite = tcpu.filewrite + (ttoc - ttic)
     
@@ -193,13 +356,29 @@ def init_file(name, cnfg, save, mesh, flow):
 
     ttic = time.time()
     
+    TIMECHUNK = 4
+    MESHCHUNK = 4096
+    LVLSCHUNK = 1
+
     data = nc.Dataset(save, "w", format="NETCDF4")
-    data.on_a_sphere = "YES"
-    data.sphere_radius = mesh.rsph
+    if (mesh.rsph is not None):
+        data.on_a_sphere = "YES"
+        data.sphere_radius = mesh.rsph
+    else:
+        data.on_a_sphere = "NO"
+    data.sphere_flatten = mesh.flat
     data.config_gravity = flow.gravity
-    data.is_periodic = "NO"
+    if (mesh.wrap [0] is None and 
+        mesh.wrap [1] is None):
+        data.is_periodic = "NO"
+    else:
+        data.is_periodic = "YES"
+        if (mesh.wrap[0] is not None):
+            data.x_period = mesh.wrap[0]
+        if (mesh.wrap[1] is not None):
+            data.y_period = mesh.wrap[1]
     data.source = "PERISCOPE"
-    
+
     for attr in vars(cnfg):  # add user-opts to output
         vals = getattr(cnfg, attr)
         if (vals is None): continue
@@ -310,6 +489,10 @@ def init_file(name, cnfg, save, mesh, flow):
     data.createVariable("zb_cell", "f4", ("nCells"))
     data["zb_cell"].long_name = "Elevation of lower surface"
     data["zb_cell"][:] = flow.zb_cell
+    data.createVariable("zb_drag", "f4", ("nCells"))
+    data["zb_drag"].long_name = \
+        "Elevation of lower surface, hrm. mean for subgrid drag"
+    data["zb_drag"][:] = flow.zb_drag
 
     data.createVariable("ff_cell", "f4", ("nCells"))
     data["ff_cell"].long_name = "Coriolis parameter on cells"
@@ -335,19 +518,15 @@ def init_file(name, cnfg, save, mesh, flow):
     data["n0_edge"].long_name = "Manning coeff. (manlaw) on edges"
     data["n0_edge"][:] = flow.n0_edge
 
+    data.createVariable("subdomn", "i4", ("nCells"))
+    data.variables["subdomn"].long_name = "Subdomain ID, on cells"
+
     data.createVariable("h2_diff", "f4", ("nVertices"))
     data["h2_diff"].long_name = \
         "DEL^2(H) diffusion coefficient, remapped to duals"
     data.createVariable("h4_diff", "f4", ("nVertices"))
     data["h4_diff"].long_name = \
         "DEL^4(H) diffusion coefficient, remapped to duals"
-    
-    data.createVariable("d2_visc", "f4", ("nVertices"))
-    data["d2_visc"].long_name = \
-        "DIV^2(U) viscosity coefficient, remapped to duals"
-    data.createVariable("d4_visc", "f4", ("nVertices"))
-    data["d4_visc"].long_name = \
-        "DIV^4(U) viscosity coefficient, remapped to duals"
     
     data.createVariable("u2_visc", "f4", ("nVertices"))
     data["u2_visc"].long_name = \
@@ -357,11 +536,11 @@ def init_file(name, cnfg, save, mesh, flow):
         "DEL^4(U) viscosity coefficient, remapped to duals"
     
     data.createVariable(
-        "u0_edge", "f4", ("nEdges", "nVertLevels"))
+        "u0_edge", "f8", ("nEdges", "nVertLevels"))
     data["u0_edge"].long_name = "Normal velocity initial conditions" 
     data["u0_edge"][:] = flow.uu_edge
     data.createVariable(
-        "h0_cell", "f4", ("nCells", "nVertLevels"))    
+        "h0_cell", "f8", ("nCells", "nVertLevels"))    
     data["h0_cell"].long_name = "Layer thickness initial conditions"
     data["h0_cell"][:] = flow.hh_cell
 
@@ -372,6 +551,30 @@ def init_file(name, cnfg, save, mesh, flow):
         "uu_max_", "f4", ("nEdges", "nVertLevels"))
     data["uu_max_"].long_name = "Max. normal velocity for all steps"
     
+    data.createVariable(
+        "zt_rms_", "f4", ("nCells", "nVertLevels"))    
+    data["zt_rms_"].long_name = "RMS. of free surface for all steps"
+
+    data.createVariable(
+        "ke_ave_", "f4", ("nCells", "nVertLevels"))    
+    data["ke_ave_"].long_name = "Mean kinetic energy for all steps"
+    data.createVariable(
+        "ke_rms_", "f4", ("nCells", "nVertLevels"))    
+    data["ke_rms_"].long_name = "RMS. kinetic energy for all steps"
+    data.createVariable(
+        "ke_max_", "f4", ("nCells", "nVertLevels"))    
+    data["ke_max_"].long_name = "Max. kinetic energy for all steps"
+
+    data.createVariable(
+        "dk_ave_", "f4", ("nVertices", "nVertLevels"))    
+    data["dk_ave_"].long_name = "Mean dissipation for all steps"
+    data.createVariable(
+        "dk_rms_", "f4", ("nVertices", "nVertLevels"))    
+    data["dk_rms_"].long_name = "RMS. dissipation for all steps"
+    data.createVariable(
+        "dk_max_", "f4", ("nVertices", "nVertLevels"))    
+    data["dk_max_"].long_name = "Max. dissipation for all steps"
+
     data.createVariable(
         "hh_min_", "f4", ("nCells", "nVertLevels"))    
     data["hh_min_"].long_name = "Min. layer thickness for all steps"
@@ -388,139 +591,227 @@ def init_file(name, cnfg, save, mesh, flow):
 
     if ("uu_edge" in cnfg.save_vars):
         data.createVariable(
-            "uu_edge", "f4", ("Time", "nEdges", "nVertLevels"))
+            "uu_edge", "f8", ("Time", "nEdges", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["uu_edge"].long_name = "Normal velocity on edges" 
         out_.uu_edge = True
 
     if ("vv_edge" in cnfg.save_vars):
         data.createVariable(
-            "vv_edge", "f4", ("Time", "nEdges", "nVertLevels"))
+            "vv_edge", "f4", ("Time", "nEdges", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["vv_edge"].long_name = "Tangential velocity on edges" 
         out_.vv_edge = True
     
     if ("hh_cell" in cnfg.save_vars):   
         data.createVariable(
-            "hh_cell", "f4", ("Time", "nCells", "nVertLevels"))    
+            "hh_cell", "f8", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["hh_cell"].long_name = "Layer thickness on cells"
         out_.hh_cell = True
         
     if ("hh_edge" in cnfg.save_vars):   
         data.createVariable(
-            "hh_edge", "f4", ("Time", "nEdges", "nVertLevels"))    
+            "hh_edge", "f4", ("Time", "nEdges", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["hh_edge"].long_name = "Layer thickness on edges"
         out_.hh_edge = True
         
     if ("hh_dual" in cnfg.save_vars):   
         data.createVariable(
-            "hh_dual", "f4", ("Time", "nVertices", "nVertLevels"))    
+            "hh_dual", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["hh_dual"].long_name = "Layer thickness on vertices"
         out_.hh_dual = True
         
     if ("zt_cell" in cnfg.save_vars):
         data.createVariable(
-            "zt_cell", "f4", ("Time", "nCells", "nVertLevels"))
+            "zt_cell", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["zt_cell"].long_name = "Elevation of upper surface"
         out_.zt_cell = True
 
+    if ("qq_cell" in cnfg.save_vars):   
+        data.createVariable(
+            "qq_cell", "f8", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
+        data["qq_cell"].long_name = "Tracer value on cells"
+        out_.qq_cell = True
+
     if ("du_cell" in cnfg.save_vars):
         data.createVariable(
-            "du_cell", "f4", ("Time", "nCells", "nVertLevels"))
+            "du_cell", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["du_cell"].long_name = \
             "Divergence of velocity on cells"
         out_.du_cell = True
     
     if ("uh_cell" in cnfg.save_vars):
         data.createVariable(
-            "uh_cell", "f4", ("Time", "nCells", "nVertLevels"))
+            "uh_cell", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["uh_cell"].long_name = \
             "Divergence of thickness flux on cells"
         out_.uh_cell = True
 
     if ("hh_bias" in cnfg.save_vars):
         data.createVariable(
-            "hh_bias", "f4", ("Time", "nVertices", "nVertLevels"))
+            "hh_bias", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["hh_bias"].long_name = \
             "Upwind-bias for HH, remapped to duals"
         out_.hh_bias = True
 
     if ("ke_bias" in cnfg.save_vars):
         data.createVariable(
-            "ke_bias", "f4", ("Time", "nVertices", "nVertLevels"))
+            "ke_bias", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["ke_bias"].long_name = \
             "Upwind-bias for KE, remapped to duals"
         out_.ke_bias = True
     
     if ("pv_bias" in cnfg.save_vars):
         data.createVariable(
-            "pv_bias", "f4", ("Time", "nVertices", "nVertLevels"))
+            "pv_bias", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["pv_bias"].long_name = \
             "Upwind-bias for PV, remapped to duals"
         out_.pv_bias = True
 
     if ("ke_cell" in cnfg.save_vars):
         data.createVariable(
-            "ke_cell", "f4", ("Time", "nCells", "nVertLevels"))
+            "ke_cell", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["ke_cell"].long_name = "Kinetic energy on cells"
         out_.ke_cell = True
         
     if ("pv_dual" in cnfg.save_vars):
         data.createVariable(
-            "pv_dual", "f4", ("Time", "nVertices", "nVertLevels"))
-        data["pv_dual"].long_name = "Potential vorticity on duals"
+            "pv_dual", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
+        data["pv_dual"].long_name = \
+            "Absolute vorticity curl(u) + f, on duals"
         out_.pv_dual = True       
     
     if ("rv_dual" in cnfg.save_vars):
         data.createVariable(
-            "rv_dual", "f4", ("Time", "nVertices", "nVertLevels"))
+            "rv_dual", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["rv_dual"].long_name = "Relative vorticity on duals"
         out_.rv_dual = True
         
     if ("pv_cell" in cnfg.save_vars):
         data.createVariable(
-            "pv_cell", "f4", ("Time", "nCells", "nVertLevels"))
-        data["pv_cell"].long_name = "Potential vorticity on cells"
+            "pv_cell", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
+        data["pv_cell"].long_name = \
+            "Absolute vorticity curl(u) + f, on cells"
         out_.pv_cell = True       
     
     if ("rv_cell" in cnfg.save_vars):
         data.createVariable(
-            "rv_cell", "f4", ("Time", "nCells", "nVertLevels"))
+            "rv_cell", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["rv_cell"].long_name = "Relative vorticity on cells"
         out_.rv_cell = True
         
     if ("ux_cell" in cnfg.save_vars):
         data.createVariable(
-            "ux_cell", "f4", ("Time", "nCells", "nVertLevels"))
+            "ux_cell", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["ux_cell"].long_name = \
             "Reconstructed velocity on cells in x-axis direction"
         out_.ux_cell = True
         
     if ("uy_cell" in cnfg.save_vars):
         data.createVariable(
-            "uy_cell", "f4", ("Time", "nCells", "nVertLevels"))
+            "uy_cell", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["uy_cell"].long_name = \
             "Reconstructed velocity on cells in y-axis direction"
         out_.uy_cell = True
         
     if ("uz_cell" in cnfg.save_vars):
         data.createVariable(
-            "uz_cell", "f4", ("Time", "nCells", "nVertLevels"))
+            "uz_cell", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["uz_cell"].long_name = \
             "Reconstructed velocity on cells in z-axis direction"
         out_.uz_cell = True
         
     if ("nu_turb" in cnfg.save_vars):
         data.createVariable(
-            "nu_turb", "f4", ("Time", "nVertices", "nVertLevels"))
+            "nu_turb", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["nu_turb"].long_name = \
             "Turbulent eddy viscosity, remapped to duals"
         out_.nu_turb = True
 
+    if ("nu_thin" in cnfg.save_vars):
+        data.createVariable(
+            "nu_thin", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
+        data["nu_thin"].long_name = \
+            "Wet-dry region viscosity, remapped to duals"
+        out_.nu_thin = True
+
+    if ("nu_wave" in cnfg.save_vars):
+        data.createVariable(
+            "nu_wave", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
+        data["nu_wave"].long_name = \
+            "Artificial diffusivity (waves), remapped to duals"
+        data.createVariable(
+            "os_wave", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
+        data["os_wave"].long_name = \
+            "Oscillation sensor (waves), remapped to duals"
+        out_.nu_wave = True
+
     if ("nu_shoc" in cnfg.save_vars):
         data.createVariable(
-            "nu_shoc", "f4", ("Time", "nVertices", "nVertLevels"))
+            "nu_shoc", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
         data["nu_shoc"].long_name = \
-            "Artificial diffusivity, remapped to duals"
+            "Artificial diffusivity (shock), remapped to duals"
+        data.createVariable(
+            "os_shoc", "f4", ("Time", "nVertices", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
+        data["os_shoc"].long_name = \
+            "Oscillation sensor (shock), remapped to duals"
         out_.nu_shoc = True
+
+    if ("xi_tide" in cnfg.save_vars):
+        data.createVariable(
+            "Xi_tide", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
+        data["Xi_tide"].long_name = \
+            "Applied tidal potential on cells"
+        out_.xi_tide = True
+
+    if ("xi_self" in cnfg.save_vars):
+        data.createVariable(
+            "Xi_self", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
+        data["Xi_self"].long_name = \
+            "Self attraction & loading potential on cells"
+        out_.xi_self = True
+
+    if ("uu_filt" in cnfg.save_vars):
+        data.createVariable(
+            "uu_filt", "f4", ("Time", "nEdges", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
+        data["uu_filt"].long_name = \
+            "Time-filtered normal velocity on edges"
+        out_.uu_filt = True
+
+    if ("ke_filt" in cnfg.save_vars):
+        data.createVariable(
+            "ke_filt", "f4", ("Time", "nCells", "nVertLevels"), 
+            chunksizes=(TIMECHUNK, MESHCHUNK, LVLSCHUNK))
+        data["ke_filt"].long_name = \
+            "Time-filtered kinetic energy on cells"
+        out_.ke_filt = True
 
     data.close()
     

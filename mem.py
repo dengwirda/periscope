@@ -10,6 +10,8 @@ import numpy as np
 
 from _fp import flt32_t, flt64_t
 from _fp import reals_t, index_t
+from _fp import udata_t, hdata_t, qdata_t
+from _fp import utend_t, htend_t, qtend_t
 
 class base: pass
 variables = base()
@@ -34,46 +36,70 @@ def init_pool(mesh):
         cell_pool.append(
             np.empty(mesh.cell.size, dtype=reals_t))
     
+    variables.is_zero = \
+            np.zeros(mesh._max_size, dtype=reals_t)
+
     variables.hh_cell = \
-            np.empty(mesh.cell.size, dtype=flt64_t)
+            np.empty(mesh.cell.size, dtype=hdata_t)
     variables.uu_edge = \
-            np.empty(mesh.edge.size, dtype=flt64_t)
+            np.empty(mesh.edge.size, dtype=udata_t)
+    variables.qq_cell = \
+            np.empty(mesh.cell.size, dtype=qdata_t)
 
     variables.hh_min_ = \
             np.empty(mesh.cell.size, dtype=reals_t)
     variables.uu_min_ = \
             np.empty(mesh.edge.size, dtype=reals_t)
+    variables.qq_min_ = \
+            np.empty(mesh.cell.size, dtype=reals_t)
     variables.hh_max_ = \
             np.empty(mesh.cell.size, dtype=reals_t)
     variables.uu_max_ = \
             np.empty(mesh.edge.size, dtype=reals_t)
-
-    variables.ch_cell = \
-            np.zeros(mesh.cell.size, dtype=flt64_t)
-    variables.cu_edge = \
-            np.zeros(mesh.edge.size, dtype=flt64_t)
+    variables.qq_max_ = \
+            np.empty(mesh.cell.size, dtype=reals_t)
+    variables.zt_rms_ = \
+            np.zeros(mesh.cell.size, dtype=reals_t)    
+    variables.ke_ave_ = \
+            np.zeros(mesh.cell.size, dtype=reals_t)
+    variables.ke_rms_ = \
+            np.zeros(mesh.cell.size, dtype=reals_t)
+    variables.ke_max_ = \
+            np.zeros(mesh.cell.size, dtype=reals_t)
+    variables.dk_ave_ = \
+            np.zeros(mesh.edge.size, dtype=reals_t)
+    variables.dk_rms_ = \
+            np.zeros(mesh.edge.size, dtype=reals_t)
+    variables.dk_max_ = \
+            np.zeros(mesh.edge.size, dtype=reals_t)
 
     variables.hh_tend = \
-            np.zeros(mesh.cell.size, dtype=flt64_t)
+            np.zeros(mesh.cell.size, dtype=htend_t)
     variables.uu_tend = \
-            np.zeros(mesh.edge.size, dtype=flt64_t)
+            np.zeros(mesh.edge.size, dtype=utend_t)
+    variables.qh_tend = \
+            np.zeros(mesh.cell.size, dtype=qtend_t)
+
+    variables.h0_tend = \
+            np.zeros(mesh.cell.size, dtype=htend_t)
+    variables.u0_tend = \
+            np.zeros(mesh.edge.size, dtype=utend_t)
+    variables.s0_tend = \
+            np.zeros(mesh.edge.size, dtype=utend_t)
 
     variables.hb_cell = \
-            np.empty(mesh.cell.size, dtype=flt64_t)
+            np.empty(mesh.cell.size, dtype=hdata_t)
 
     variables.h1_cell = \
-            np.empty(mesh.cell.size, dtype=flt64_t)
-    variables.u1_edge = \
-            np.empty(mesh.edge.size, dtype=flt64_t)
+            np.empty(mesh.cell.size, dtype=hdata_t)
     variables.h2_cell = \
-            np.empty(mesh.cell.size, dtype=flt64_t)
-    variables.u2_edge = \
-            np.empty(mesh.edge.size, dtype=flt64_t)
+            np.empty(mesh.cell.size, dtype=hdata_t)
     variables.h3_cell = \
-            np.empty(mesh.cell.size, dtype=flt64_t)
-    variables.u3_edge = \
-            np.empty(mesh.edge.size, dtype=flt64_t)
-
+            np.empty(mesh.cell.size, dtype=hdata_t)
+    
+    variables.uk_edge = \
+            np.empty(mesh.edge.size, dtype=udata_t)
+    
     variables.hh_dual = \
             np.empty(mesh.vert.size, dtype=reals_t)
             
@@ -82,9 +108,9 @@ def init_pool(mesh):
     variables.pv_dual = \
             np.empty(mesh.vert.size, dtype=reals_t)
 
-    variables.r2_dual = \
+    variables.rv_wide = \
             np.empty(mesh.vert.size, dtype=reals_t)
-    variables.p2_dual = \
+    variables.pv_wide = \
             np.empty(mesh.vert.size, dtype=reals_t)
             
     variables.vv_edge = \
@@ -109,13 +135,24 @@ def init_pool(mesh):
     
     variables.nu_turb = \
             np.zeros(mesh.edge.size, dtype=reals_t)
-
+    variables.nu_wave = \
+            np.zeros(mesh.edge.size, dtype=reals_t)
     variables.nu_shoc = \
             np.zeros(mesh.edge.size, dtype=reals_t)
-    variables.hs_shoc = \
+    variables.nu_thin = \
+            np.zeros(mesh.edge.size, dtype=reals_t)
+
+    variables.os_wave = \
+            np.empty(mesh.edge.size, dtype=reals_t)
+    variables.os_shoc = \
             np.empty(mesh.cell.size, dtype=reals_t)
         
     variables.cd_edge = \
+            np.empty(mesh.edge.size, dtype=reals_t)
+    variables.cd_save = \
+            np.empty(mesh.edge.size, dtype=reals_t)
+
+    variables.ke_diss = \
             np.empty(mesh.edge.size, dtype=reals_t)
             
     variables.rv_cell = \
@@ -124,11 +161,19 @@ def init_pool(mesh):
             np.empty(mesh.cell.size, dtype=reals_t)
 
     variables.ke_edge = \
-            np.empty(mesh.edge.size, dtype=reals_t)
+            np.zeros(mesh.edge.size, dtype=reals_t)
     variables.ke_dual = \
-            np.empty(mesh.vert.size, dtype=reals_t)
+            np.zeros(mesh.vert.size, dtype=reals_t)
     variables.ke_cell = \
-            np.empty(mesh.cell.size, dtype=reals_t)
+            np.zeros(mesh.cell.size, dtype=reals_t)
+
+    variables.uu_filt = \
+            np.zeros(mesh.edge.size, dtype=reals_t)
+
+    variables.Xi_tide = \
+            np.zeros(mesh.cell.size, dtype=reals_t)
+    variables.Xi_self = \
+            np.zeros(mesh.cell.size, dtype=reals_t)
 
 def get_vec_v():
     if (len(vert_pool) > 0):

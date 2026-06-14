@@ -10,6 +10,17 @@ import numpy as np
 
 flt32_t = np.float32
 flt64_t = np.float64
+
 index_t = np.int32
-reals_t = np.float32 # or np.float64
+reals_t = np.float32  # or np.float64
+
+bytes_t = np.int8
+
+udata_t = np.float32  # underlying
+hdata_t = np.float64
+qdata_t = np.float32
+
+utend_t = np.float64  # tendencies
+htend_t = np.float64
+qtend_t = np.float64
 

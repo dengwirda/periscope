@@ -2,7 +2,6 @@
 import numpy as np
 
 # Simple inv, det utilities for small-matrices.
-# Authors: Darren Engwirda
 
 def det_2x2(amat):
 

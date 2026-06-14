@@ -5,8 +5,16 @@ from netCDF4 import Dataset
 from scipy.sparse import csr_matrix, spdiags
 from scipy.sparse.csgraph import reverse_cuthill_mckee
 
+""" Parse MPAS-"ish" data-structures and init. mesh + flow
+"""
+#-- Part of the PERISCOPE solver
+#-- Darren Engwirda
+#-- d.engwirda@gmail.com
+#-- https://github.com/dengwirda/
+
 from _fp import flt32_t, flt64_t
-from _fp import reals_t, index_t
+from _fp import reals_t, index_t, bytes_t
+from _fp import udata_t, hdata_t, qdata_t
 
 def load_mesh(name, rsph=None):
     """
@@ -14,7 +22,6 @@ def load_mesh(name, rsph=None):
     local mesh data structure.
 
     """
-    # Authors: Darren Engwirda
 
     class base: pass
 
@@ -24,6 +31,7 @@ def load_mesh(name, rsph=None):
 
     mesh = base()
     mesh.rsph = flt64_t(data.sphere_radius)
+    mesh.flat = flt64_t(0.0)
     mesh.wrap = [None, None]
     
     if (str(data.on_a_sphere).upper() == "NO"):
@@ -42,6 +50,12 @@ def load_mesh(name, rsph=None):
         mesh.rsph = mesh.rsph * scal
     else:
         scal = flt64_t(1.)
+
+    try:
+    #-- flattening of spheroidal geometry
+        mesh.flat = flt64_t(data.sphere_flatten)
+    except:
+        mesh.flat = flt64_t(0.0)
 
     mesh.cell = base()
     mesh.cell.size = int(data.dimensions["nCells"].size)
@@ -92,6 +106,12 @@ def load_mesh(name, rsph=None):
     mesh.edge.wmul = \
         np.asarray(mesh.edge.wmul, dtype=reals_t)
     
+    # can be invalid on open boundaries; set to null if so
+    mesh.edge.wmul[np.isnan(mesh.edge.wmul)] = 0.
+
+    # redo cell-on-vert indices; mpas-tools can be invalid
+    mesh = vert_cell(mesh)
+
     # masking at boundaries of mesh; edges/duals via cells
     mesh.cell.mask = np.full(
         (mesh.cell.size), False, dtype=bool)
@@ -150,20 +170,117 @@ def load_mesh(name, rsph=None):
     mesh.cell.area = cell_area (mesh)
     mesh.vert.area = np.sum(mesh.vert.kite, axis=1)
     mesh.edge.area = np.sum(mesh.edge.wing, axis=1)
-    
-    # can set this as 2 * A_e / l_e instead of the TRSK-CV
-    # operators, as per Weller
-    mesh.edge.clen = 2.0 * mesh.edge.area / mesh.edge.vlen
-   #mesh.edge.clen = mesh.edge.dlen
 
-    # local characteristic edge length, for AUST upwinding
-    mesh.edge.slen = 0.5 * np.sqrt( mesh.edge.area * 2.0 )
+    mesh.edge.clen, mesh.edge.slen, mesh.edge.spac= \
+        mesh_spac(mesh)
 
-    # fixup area at boundaries
-    mesh.edge.slen[mesh.edge.mask]*= np.sqrt(2.0)
+    # max size of cell-, edge-, or vert-lists
+    mesh._max_size = np.max((mesh.cell.size, 
+                             mesh.edge.size, 
+                             mesh.vert.size))
 
     ttoc = time.time()
     print("-AREA done (sec):", round(ttoc - ttic, 2))
+
+    data.close()
+    return mesh
+
+
+def vert_cell(mesh):
+
+#-- reset cell-on-vert indexing; mpas-tools can be invalid
+
+    mesh.vert.cell[:] = 0
+
+#-- c0 should be common between [e0, e1]
+
+    okay = np.logical_and.reduce((
+        mesh.vert.edge[:, 0] >= 1, mesh.vert.edge[:, 1] >= 1
+        ) )
+
+    vidx = np.argwhere(okay).ravel()
+    e1st = mesh.vert.edge[okay, 0] - 1
+    e2nd = mesh.vert.edge[okay, 1] - 1
+
+    mask = np.logical_and.reduce((
+        mesh.edge.cell[e1st, 0] >= 1,
+           np.logical_or .reduce((
+        mesh.edge.cell[e1st, 0] == mesh.edge.cell[e2nd, 0],
+        mesh.edge.cell[e1st, 0] == mesh.edge.cell[e2nd, 1]
+        ) ) ) )
+
+    mesh.vert.cell[vidx[mask], 0] = \
+                mesh.edge.cell[e1st[mask], 0]
+
+    mask = np.logical_and.reduce((
+        mesh.edge.cell[e1st, 1] >= 1,
+           np.logical_or .reduce((
+        mesh.edge.cell[e1st, 1] == mesh.edge.cell[e2nd, 0],
+        mesh.edge.cell[e1st, 1] == mesh.edge.cell[e2nd, 1]
+        ) ) ) )
+
+    mesh.vert.cell[vidx[mask], 0] = \
+                mesh.edge.cell[e1st[mask], 1]
+
+#-- c1 should be common between [e1, e2]
+
+    okay = np.logical_and.reduce((
+        mesh.vert.edge[:, 1] >= 1, mesh.vert.edge[:, 2] >= 1
+        ) )
+
+    vidx = np.argwhere(okay).ravel()
+    e1st = mesh.vert.edge[okay, 1] - 1
+    e2nd = mesh.vert.edge[okay, 2] - 1
+
+    mask = np.logical_and.reduce((
+        mesh.edge.cell[e1st, 0] >= 1,
+           np.logical_or .reduce((
+        mesh.edge.cell[e1st, 0] == mesh.edge.cell[e2nd, 0],
+        mesh.edge.cell[e1st, 0] == mesh.edge.cell[e2nd, 1]
+        ) ) ) )
+
+    mesh.vert.cell[vidx[mask], 1] = \
+                mesh.edge.cell[e1st[mask], 0]
+
+    mask = np.logical_and.reduce((
+        mesh.edge.cell[e1st, 1] >= 1,
+           np.logical_or .reduce((
+        mesh.edge.cell[e1st, 1] == mesh.edge.cell[e2nd, 0],
+        mesh.edge.cell[e1st, 1] == mesh.edge.cell[e2nd, 1]
+        ) ) ) )
+
+    mesh.vert.cell[vidx[mask], 1] = \
+                mesh.edge.cell[e1st[mask], 1]
+
+#-- c2 should be common between [e2, e0]
+
+    okay = np.logical_and.reduce((
+        mesh.vert.edge[:, 2] >= 1, mesh.vert.edge[:, 0] >= 1
+        ) )
+
+    vidx = np.argwhere(okay).ravel()
+    e1st = mesh.vert.edge[okay, 2] - 1
+    e2nd = mesh.vert.edge[okay, 0] - 1
+
+    mask = np.logical_and.reduce((
+        mesh.edge.cell[e1st, 0] >= 1,
+           np.logical_or .reduce((
+        mesh.edge.cell[e1st, 0] == mesh.edge.cell[e2nd, 0],
+        mesh.edge.cell[e1st, 0] == mesh.edge.cell[e2nd, 1]
+        ) ) ) )
+
+    mesh.vert.cell[vidx[mask], 2] = \
+                mesh.edge.cell[e1st[mask], 0]
+
+    mask = np.logical_and.reduce((
+        mesh.edge.cell[e1st, 1] >= 1,
+           np.logical_or .reduce((
+        mesh.edge.cell[e1st, 1] == mesh.edge.cell[e2nd, 0],
+        mesh.edge.cell[e1st, 1] == mesh.edge.cell[e2nd, 1]
+        ) ) ) )
+
+    mesh.vert.cell[vidx[mask], 2] = \
+                mesh.edge.cell[e1st[mask], 1]
 
     return mesh
 
@@ -175,7 +292,8 @@ def circ_kite(mesh):
     kite = np.zeros((mesh.vert.size, 3), dtype=reals_t)
     
     mask = np.logical_and.reduce((
-        mesh.vert.cell[:, 0] >= 1, mesh.vert.edge[:, 1] >= 1
+        mesh.vert.cell[:, 0] >= 1, mesh.vert.edge[:, 1] >= 1,
+        mesh.vert.cell[:, 0] >= 1, mesh.vert.edge[:, 0] >= 1
         ) )
         
     kite[mask, 0]+= circ_area(
@@ -190,9 +308,9 @@ def circ_kite(mesh):
             mesh.edge.ylat[mesh.vert.edge[mask, 1] - 1])).T
     )
     
-    mask = np.logical_and.reduce((
-        mesh.vert.cell[:, 0] >= 1, mesh.vert.edge[:, 0] >= 1
-        ) )
+   #mask = np.logical_and.reduce((
+   #    mesh.vert.cell[:, 0] >= 1, mesh.vert.edge[:, 0] >= 1
+   #    ) )
         
     kite[mask, 0]+= circ_area(
         mesh.rsph,
@@ -206,8 +324,10 @@ def circ_kite(mesh):
             mesh.edge.ylat[mesh.vert.edge[mask, 0] - 1])).T
     )
 
+
     mask = np.logical_and.reduce((
-        mesh.vert.cell[:, 1] >= 1, mesh.vert.edge[:, 2] >= 1
+        mesh.vert.cell[:, 1] >= 1, mesh.vert.edge[:, 2] >= 1,
+        mesh.vert.cell[:, 1] >= 1, mesh.vert.edge[:, 1] >= 1
         ) )
         
     kite[mask, 1]+= circ_area(
@@ -222,9 +342,9 @@ def circ_kite(mesh):
             mesh.edge.ylat[mesh.vert.edge[mask, 2] - 1])).T
     )
     
-    mask = np.logical_and.reduce((
-        mesh.vert.cell[:, 1] >= 1, mesh.vert.edge[:, 1] >= 1
-        ) )
+   #mask = np.logical_and.reduce((
+   #    mesh.vert.cell[:, 1] >= 1, mesh.vert.edge[:, 1] >= 1
+   #    ) )
         
     kite[mask, 1]+= circ_area(
         mesh.rsph,
@@ -238,8 +358,10 @@ def circ_kite(mesh):
             mesh.edge.ylat[mesh.vert.edge[mask, 1] - 1])).T
     )
 
+
     mask = np.logical_and.reduce((
-        mesh.vert.cell[:, 2] >= 1, mesh.vert.edge[:, 0] >= 1
+        mesh.vert.cell[:, 2] >= 1, mesh.vert.edge[:, 0] >= 1,
+        mesh.vert.cell[:, 2] >= 1, mesh.vert.edge[:, 2] >= 1
         ) )
         
     kite[mask, 2]+= circ_area(
@@ -254,9 +376,9 @@ def circ_kite(mesh):
             mesh.edge.ylat[mesh.vert.edge[mask, 0] - 1])).T
     )
     
-    mask = np.logical_and.reduce((
-        mesh.vert.cell[:, 2] >= 1, mesh.vert.edge[:, 2] >= 1
-        ) )
+   #mask = np.logical_and.reduce((
+   #    mesh.vert.cell[:, 2] >= 1, mesh.vert.edge[:, 2] >= 1
+   #    ) )
         
     kite[mask, 2]+= circ_area(
         mesh.rsph,
@@ -921,6 +1043,40 @@ def mesh_sine(mesh):
     if (mesh.rsph is     None): return flat_sine(mesh)
     
 
+def mesh_spac(mesh):
+
+#-- compute extra spacing metrics
+
+    # set this as 2.0 * A_e / l_e instead of the TRSK
+    # operators, as per Weller
+    clen = 2.0 * mesh.edge.area / mesh.edge.vlen
+    
+    # local characteristic length, for AUST upwinding
+    slen = 0.5 * np.sqrt( mesh.edge.area * 2.0 )
+    slen[mesh.edge.mask]*= 2.0
+
+    # local characteristic length, for CFL. estimates
+    spac = clen.copy()
+    spac[mesh.edge.mask]*= 2.0
+
+    cel1 = mesh.edge.cell[:, 0] - 1
+    cel2 = mesh.edge.cell[:, 1] - 1
+
+    cel1[cel1<0] = cel2[cel1<0]
+    cel2[cel2<0] = cel1[cel2<0]
+
+    spac = np.minimum(
+        spac, np.sqrt(mesh.cell.area[cel1]))
+    spac = np.minimum(
+        spac, np.sqrt(mesh.cell.area[cel2]))
+    
+    clen = np.asarray(clen, dtype=reals_t)
+    slen = np.asarray(slen, dtype=reals_t)
+    spac = np.asarray(spac, dtype=reals_t)
+
+    return clen, slen, spac
+
+
 def sort_mesh(mesh, sort=None):
     """
     SORT-MESH: sort cells, edges and duals in the mesh to
@@ -928,6 +1084,8 @@ def sort_mesh(mesh, sort=None):
 
     """
     # Authors: Darren Engwirda
+
+    mesh.cell.subd = np.zeros(mesh.cell.size, dtype=index_t)
 
     mesh.cell.ifwd = np.arange(
         +0, mesh.cell.size, dtype=index_t) + 1
@@ -944,83 +1102,10 @@ def sort_mesh(mesh, sort=None):
 
     if (sort is None): return mesh
 
-#-- 1. sort cells via RCM ordering of adjacency matrix
+#-- 1. sort edges via RCM ordering of adjacency matrix
 
-    mesh.cell.ifwd = reverse_cuthill_mckee(
-        cell_adj_(mesh), symmetric_mode=True) + 1
-    
-    mesh.cell.irev = \
-        np.zeros(mesh.cell.size, dtype=index_t)
-    mesh.cell.irev[mesh.cell.ifwd - 1] = \
-        np.arange(mesh.cell.size, dtype=index_t) + 1
-
-    mask = mesh.cell.cell > 0
-    mesh.cell.cell[mask] = \
-        mesh.cell.irev[mesh.cell.cell[mask] - 1] + 0
-
-    mask = mesh.edge.cell > 0
-    mesh.edge.cell[mask] = \
-        mesh.cell.irev[mesh.edge.cell[mask] - 1] + 0
-
-    mask = mesh.vert.cell > 0
-    mesh.vert.cell[mask] = \
-        mesh.cell.irev[mesh.vert.cell[mask] - 1] + 0
-    
-    mesh.cell.xpos = mesh.cell.xpos[mesh.cell.ifwd - 1]
-    mesh.cell.ypos = mesh.cell.ypos[mesh.cell.ifwd - 1]
-    mesh.cell.zpos = mesh.cell.zpos[mesh.cell.ifwd - 1]
-    mesh.cell.xlon = mesh.cell.xlon[mesh.cell.ifwd - 1]
-    mesh.cell.ylat = mesh.cell.ylat[mesh.cell.ifwd - 1]
-    mesh.cell.vert = mesh.cell.vert[mesh.cell.ifwd - 1]
-    mesh.cell.edge = mesh.cell.edge[mesh.cell.ifwd - 1]
-    mesh.cell.cell = mesh.cell.cell[mesh.cell.ifwd - 1]
-    mesh.cell.topo = mesh.cell.topo[mesh.cell.ifwd - 1]
-    mesh.cell.mask = mesh.cell.mask[mesh.cell.ifwd - 1]
-    mesh.cell.area = mesh.cell.area[mesh.cell.ifwd - 1]
-
-#-- 2. sort duals via pseudo-linear cell-wise ordering
-
-    mesh.vert.ifwd = np.ravel(mesh.cell.vert)
-    mesh.vert.ifwd = mesh.vert.ifwd[mesh.vert.ifwd > 0]
-
-    __, imap = np.unique(mesh.vert.ifwd, return_index=True)
-
-    mesh.vert.ifwd = \
-        mesh.vert.ifwd[np.sort(imap, kind="stable")]
-
-    mesh.vert.irev = \
-        np.zeros(mesh.vert.size, dtype=index_t)
-    mesh.vert.irev[mesh.vert.ifwd - 1] = \
-        np.arange(mesh.vert.size, dtype=index_t) + 1
-
-    mask = mesh.cell.vert > 0
-    mesh.cell.vert[mask] = \
-        mesh.vert.irev[mesh.cell.vert[mask] - 1] + 0
-
-    mask = mesh.edge.vert > 0
-    mesh.edge.vert[mask] = \
-        mesh.vert.irev[mesh.edge.vert[mask] - 1] + 0
-
-    mesh.vert.xpos = mesh.vert.xpos[mesh.vert.ifwd - 1]
-    mesh.vert.ypos = mesh.vert.ypos[mesh.vert.ifwd - 1]
-    mesh.vert.zpos = mesh.vert.zpos[mesh.vert.ifwd - 1]
-    mesh.vert.xlon = mesh.vert.xlon[mesh.vert.ifwd - 1]
-    mesh.vert.ylat = mesh.vert.ylat[mesh.vert.ifwd - 1]
-    mesh.vert.kite = mesh.vert.kite[mesh.vert.ifwd - 1]
-    mesh.vert.edge = mesh.vert.edge[mesh.vert.ifwd - 1]
-    mesh.vert.cell = mesh.vert.cell[mesh.vert.ifwd - 1]
-    mesh.vert.mask = mesh.vert.mask[mesh.vert.ifwd - 1]
-    mesh.vert.area = mesh.vert.area[mesh.vert.ifwd - 1]
-
-#-- 3. sort edges via pseudo-linear cell-wise ordering
-
-    mesh.edge.ifwd = np.ravel(mesh.cell.edge)
-    mesh.edge.ifwd = mesh.edge.ifwd[mesh.edge.ifwd > 0]
-
-    __, imap = np.unique(mesh.edge.ifwd, return_index=True)
-
-    mesh.edge.ifwd = \
-        mesh.edge.ifwd[np.sort(imap, kind="stable")]
+    mesh.edge.ifwd = reverse_cuthill_mckee(
+        edge_adj_(mesh), symmetric_mode=False) + 1
 
     mesh.edge.irev = \
         np.zeros(mesh.edge.size, dtype=index_t)
@@ -1054,6 +1139,7 @@ def sort_mesh(mesh, sort=None):
     mesh.edge.dlen = mesh.edge.dlen[mesh.edge.ifwd - 1]
     mesh.edge.clen = mesh.edge.clen[mesh.edge.ifwd - 1]
     mesh.edge.slen = mesh.edge.slen[mesh.edge.ifwd - 1]
+    mesh.edge.spac = mesh.edge.spac[mesh.edge.ifwd - 1]
     mesh.edge.beta = mesh.edge.beta[mesh.edge.ifwd - 1]
     mesh.edge.cos_ = mesh.edge.cos_[mesh.edge.ifwd - 1]
     mesh.edge.sin_ = mesh.edge.sin_[mesh.edge.ifwd - 1]
@@ -1066,6 +1152,205 @@ def sort_mesh(mesh, sort=None):
     mesh.edge.topo = mesh.edge.topo[mesh.edge.ifwd - 1]
     mesh.edge.mask = mesh.edge.mask[mesh.edge.ifwd - 1]
     mesh.edge.area = mesh.edge.area[mesh.edge.ifwd - 1]
+
+#-- 2. sort cells via pseudo-linear cell-wise ordering
+    
+    mesh.cell.ifwd = np.ravel(mesh.edge.cell)
+    mesh.cell.ifwd = mesh.cell.ifwd[mesh.cell.ifwd > 0]
+
+    __, imap = np.unique(mesh.cell.ifwd, return_index=True)
+
+    mesh.cell.ifwd = \
+        mesh.cell.ifwd[np.sort(imap, kind="stable")]
+
+    mesh.cell.irev = \
+        np.zeros(mesh.cell.size, dtype=index_t)
+    mesh.cell.irev[mesh.cell.ifwd - 1] = \
+        np.arange(mesh.cell.size, dtype=index_t) + 1
+
+    mask = mesh.cell.cell > 0
+    mesh.cell.cell[mask] = \
+        mesh.cell.irev[mesh.cell.cell[mask] - 1] + 0
+
+    mask = mesh.edge.cell > 0
+    mesh.edge.cell[mask] = \
+        mesh.cell.irev[mesh.edge.cell[mask] - 1] + 0
+
+    mask = mesh.vert.cell > 0
+    mesh.vert.cell[mask] = \
+        mesh.cell.irev[mesh.vert.cell[mask] - 1] + 0
+
+    mesh.cell.subd = mesh.cell.subd[mesh.cell.ifwd - 1]    
+    mesh.cell.xpos = mesh.cell.xpos[mesh.cell.ifwd - 1]
+    mesh.cell.ypos = mesh.cell.ypos[mesh.cell.ifwd - 1]
+    mesh.cell.zpos = mesh.cell.zpos[mesh.cell.ifwd - 1]
+    mesh.cell.xlon = mesh.cell.xlon[mesh.cell.ifwd - 1]
+    mesh.cell.ylat = mesh.cell.ylat[mesh.cell.ifwd - 1]
+    mesh.cell.vert = mesh.cell.vert[mesh.cell.ifwd - 1]
+    mesh.cell.edge = mesh.cell.edge[mesh.cell.ifwd - 1]
+    mesh.cell.cell = mesh.cell.cell[mesh.cell.ifwd - 1]
+    mesh.cell.topo = mesh.cell.topo[mesh.cell.ifwd - 1]
+    mesh.cell.mask = mesh.cell.mask[mesh.cell.ifwd - 1]
+    mesh.cell.area = mesh.cell.area[mesh.cell.ifwd - 1]
+
+#-- 3. sort duals via pseudo-linear cell-wise ordering
+
+    mesh.vert.ifwd = np.ravel(mesh.edge.vert)
+    mesh.vert.ifwd = mesh.vert.ifwd[mesh.vert.ifwd > 0]
+
+    __, imap = np.unique(mesh.vert.ifwd, return_index=True)
+
+    mesh.vert.ifwd = \
+        mesh.vert.ifwd[np.sort(imap, kind="stable")]
+
+    mesh.vert.irev = \
+        np.zeros(mesh.vert.size, dtype=index_t)
+    mesh.vert.irev[mesh.vert.ifwd - 1] = \
+        np.arange(mesh.vert.size, dtype=index_t) + 1
+
+    mask = mesh.cell.vert > 0
+    mesh.cell.vert[mask] = \
+        mesh.vert.irev[mesh.cell.vert[mask] - 1] + 0
+
+    mask = mesh.edge.vert > 0
+    mesh.edge.vert[mask] = \
+        mesh.vert.irev[mesh.edge.vert[mask] - 1] + 0
+
+    mesh.vert.xpos = mesh.vert.xpos[mesh.vert.ifwd - 1]
+    mesh.vert.ypos = mesh.vert.ypos[mesh.vert.ifwd - 1]
+    mesh.vert.zpos = mesh.vert.zpos[mesh.vert.ifwd - 1]
+    mesh.vert.xlon = mesh.vert.xlon[mesh.vert.ifwd - 1]
+    mesh.vert.ylat = mesh.vert.ylat[mesh.vert.ifwd - 1]
+    mesh.vert.kite = mesh.vert.kite[mesh.vert.ifwd - 1]
+    mesh.vert.edge = mesh.vert.edge[mesh.vert.ifwd - 1]
+    mesh.vert.cell = mesh.vert.cell[mesh.vert.ifwd - 1]
+    mesh.vert.mask = mesh.vert.mask[mesh.vert.ifwd - 1]
+    mesh.vert.area = mesh.vert.area[mesh.vert.ifwd - 1]
+
+    return mesh
+
+
+def init_wall(mesh, flow):
+    """
+    INIT-WALL: build basic data structures for wall + open
+    boundaries.
+
+    """
+
+    mesh.cell.mask[flow.is_mask] = True
+    mesh.edge.mask[flow.uu_mask] = True
+    mesh.vert.mask[flow.rv_mask] = True
+
+    # compact list of edges on open BCs
+    mesh.edge.open = \
+        np.full(mesh.edge.size, False, dtype=bool)
+    mesh.edge.open[flow.is_open!=0] = True
+    mesh.edge.open = np.asarray(
+        np.argwhere(
+    mesh.edge.open).ravel(), dtype=index_t)
+
+    # compact list of edges on wall BCs
+    mesh.edge.wall = \
+        np.full(mesh.edge.size, False, dtype=bool)
+    mesh.edge.wall[mesh.edge.mask] = True
+    mesh.edge.wall[mesh.edge.open] = False
+    mesh.edge.wall = np.asarray(
+        np.argwhere(
+    mesh.edge.wall).ravel(), dtype=index_t)
+
+    return mesh
+
+
+def init_obcs(mesh, flow, mats):
+    """
+    INIT-OBCS: form computational stencils for wall + open
+    boundaries.
+
+    """
+
+    # pre-process slip BCs
+    mesh.edge.slip = mesh.edge.mask  * flow.bc_slip
+    mesh.edge.slip  [mesh.edge.open] = reals_t(1.0)
+
+    mesh.vert.slip = \
+        np.zeros(mesh.vert.size, dtype=reals_t)
+    for edge in range(0, mesh.edge.size):
+        ivrt = mesh.edge.vert[edge, 0] - 1
+        jvrt = mesh.edge.vert[edge, 1] - 1
+        mesh.vert.slip[ivrt] = max(
+        mesh.vert.slip[ivrt], mesh.edge.slip[edge])
+        mesh.vert.slip[jvrt] = max(
+        mesh.vert.slip[jvrt], mesh.edge.slip[edge])
+
+    # is adj. to open edge
+    mesh.vert.open = np.unique(
+        mesh.edge.vert[mesh.edge.open, :] - 1)
+    mesh.vert.open = \
+        mesh.vert.open[mesh.vert.open >= 0]
+
+    mesh.cell.open = np.unique(
+        mesh.edge.cell[mesh.edge.open, :] - 1)
+    mesh.cell.open = \
+        mesh.cell.open[mesh.cell.open >= 0]
+
+    # is adj. to wall edge
+    mesh.vert.wall = np.unique(
+        mesh.edge.vert[mesh.edge.wall, :] - 1)
+    mesh.vert.wall = \
+        mesh.vert.wall[mesh.vert.wall >= 0]
+    mesh.vert.wall = mesh.vert.wall[
+        mesh.vert.mask[mesh.vert.wall]== 0]
+
+    mesh.cell.wall = np.unique(
+        mesh.edge.cell[mesh.edge.wall, 0] - 1)
+    mesh.cell.wall = \
+        mesh.cell.wall[mesh.cell.wall >= 0]
+    mesh.cell.wall = mesh.cell.wall[
+        mesh.cell.mask[mesh.cell.wall]== 0]
+
+    # compute partial subcell near walls
+    # 0. ==> omit subcell
+    # 1. ==> keep subcell
+    mesh.edge.part = \
+        np.full(mesh.edge.size, 1., dtype=reals_t)
+    mesh.edge.part*= 1. - mesh.edge.slip
+    mesh.edge.part[mesh.edge.open] = 1.0
+    
+    mesh.vert.part = \
+        mats.dual_tail_sums * mesh.edge.part
+    mesh.vert.part/= mesh.vert.area
+   
+    # extrapolation on u^perp near walls
+    # A_cell / (A_cell - A_slip)
+    # to account for slip BCs in stencil
+    mesh.edge.perp = \
+        np.full(mesh.edge.size, 0., dtype=reals_t)
+    mesh.edge.perp+= 0. + mesh.edge.slip
+    mesh.edge.perp[mesh.edge.open] = 0.0
+
+    cell_perp_subs = \
+        mats.cell_wing_sums * mesh.edge.perp
+    edge_perp_subs = \
+        mats.edge_cell_sums * cell_perp_subs
+    edge_perp_full = \
+        mats.edge_cell_sums * mesh.cell.area
+
+    edge_perp_subs = edge_perp_full - edge_perp_subs
+    edge_perp_subs = np.maximum(
+        edge_perp_subs, 1.E-08 * edge_perp_full)
+    mesh.edge.perp = edge_perp_full / edge_perp_subs
+
+    # to set the "slipperiness" at walls
+    mesh.edge.perp[mesh.edge.wall] *= \
+                   mesh.edge.slip [mesh.edge.wall]
+
+    # set tendencies=0. at walls
+    mesh.edge.mask[mesh.edge.wall] = True
+
+    # build multiplicative masks
+    mesh.cell.fmsk = reals_t(1.0 - mesh.cell.mask)
+    mesh.edge.fmsk = reals_t(1.0 - mesh.edge.mask)
+    mesh.vert.fmsk = reals_t(1.0 - mesh.vert.mask)
 
     return mesh
 
@@ -1088,21 +1373,27 @@ def load_flow(name, mesh=None, lean=False, step=-1):
     ncel = int(data.dimensions["nCells"].size)
     nedg = int(data.dimensions["nEdges"].size)
     nvrt = int(data.dimensions["nVertices"].size)
-    nlev = int(data.dimensions["nVertLevels"].size)
+
+    if ("timeisnow" in data.ncattrs()):
+        flow.elapsed = flt64_t(data.timeisnow)
+    else:
+        flow.elapsed = flt64_t(0.0E+00)
 
     if ("config_gravity" in data.ncattrs()):
         flow.gravity = flt32_t(data.config_gravity)
     else:
         flow.gravity = flt32_t(9.80616)
 
-    flow.uu_edge = np.zeros((nedg), dtype=flt32_t)
-    flow.hh_cell = np.zeros((ncel), dtype=flt32_t)
+    flow.uu_edge = np.zeros((nedg), dtype=udata_t)
+    flow.uu_filt = np.zeros((nedg), dtype=reals_t)
+    flow.hh_cell = np.zeros((ncel), dtype=hdata_t)
 
     flow.zb_cell = np.zeros((ncel), dtype=flt32_t)
+    flow.zb_drag = np.zeros((ncel), dtype=flt32_t)
     
     flow.bc_slip = np.zeros((nedg), dtype=flt32_t)
-    flow.is_mask = np.zeros((ncel), dtype=bool)
-    flow.is_open = np.zeros((nedg), dtype=bool)
+    flow.is_mask = np.zeros((ncel), dtype=bytes_t)
+    flow.is_open = np.zeros((nedg), dtype=bytes_t)
     
     flow.ff_cell = np.zeros((ncel), dtype=flt32_t)
     flow.ff_edge = np.zeros((nedg), dtype=flt32_t)
@@ -1116,28 +1407,37 @@ def load_flow(name, mesh=None, lean=False, step=-1):
     if ("uu_edge" in data.variables.keys()):
         flow.uu_edge = np.asarray(
             data.variables[
-                "uu_edge"][step, :, +0 ], dtype=reals_t)
+                "uu_edge"][step, :, +0 ], dtype=udata_t)
+    if ("uu_filt" in data.variables.keys()):
+        flow.uu_filt = np.asarray(
+            data.variables[
+                "uu_filt"][step, :, +0 ], dtype=reals_t)
     if ("hh_cell" in data.variables.keys()):
         flow.hh_cell = np.asarray(
             data.variables[
-                "hh_cell"][step, :, +0 ], dtype=reals_t)
+                "hh_cell"][step, :, +0 ], dtype=hdata_t)
                 
     if ("u" in data.variables.keys()):
         flow.uu_edge = np.asarray(
             data.variables[
-                "u"][step, :, +0 ], dtype=reals_t)
+                "u"][step, :, +0 ], dtype=udata_t)
     if ("h" in data.variables.keys()):
         flow.hh_cell = np.asarray(
             data.variables[
-                "h"][step, :, +0 ], dtype=reals_t)
+                "h"][step, :, +0 ], dtype=hdata_t)
     
-    if ("zb_cell" in data.variables.keys()):
-        flow.zb_cell = np.asarray(
-            data.variables["zb_cell"][:], dtype=flt32_t)
-            
     if ("h_s" in data.variables.keys()):
         flow.zb_cell = np.asarray(
             data.variables["h_s"][:], dtype=flt32_t)
+
+    if ("zb_cell" in data.variables.keys()):
+        flow.zb_cell = np.asarray(
+            data.variables["zb_cell"][:], dtype=flt32_t)
+    if ("zb_drag" in data.variables.keys()):
+        flow.zb_drag = np.asarray(
+            data.variables["zb_drag"][:], dtype=flt32_t)
+    else:
+        flow.zb_drag = flow.zb_cell[:]
             
     if ("bc_slip" in data.variables.keys()):
         flow.bc_slip = np.asarray(
@@ -1145,23 +1445,40 @@ def load_flow(name, mesh=None, lean=False, step=-1):
     
     if ("is_open" in data.variables.keys()):
         flow.is_open = np.array(data.variables["is_open"])
-        flow.is_open = flow.is_open != 0  # to bool
+       #flow.is_open = flow.is_open != 0  # to bool
         
     if ("is_mask" in data.variables.keys()):
         flow.is_mask = np.array(data.variables["is_mask"])
-        flow.is_mask = flow.is_mask != 0  # to bool
+       #flow.is_mask = flow.is_mask != 0  # to bool
         
-    #!! these indices may not exist...
-    flow.uu_mask = np.logical_or.reduce((
-        flow.is_mask[mesh.edge.cell[:, 0] - 1],
-        flow.is_mask[mesh.edge.cell[:, 1] - 1]
-        ) )
+    if (mesh is not None):
+        cel1 = mesh.edge.cell[:, 0] - 1  # careful if null
+        cel2 = mesh.edge.cell[:, 1] - 1
         
-    flow.rv_mask = np.logical_or.reduce((
-        flow.is_mask[mesh.vert.cell[:, 0] - 1],
-        flow.is_mask[mesh.vert.cell[:, 1] - 1],
-        flow.is_mask[mesh.vert.cell[:, 2] - 1],
-        ) )
+        self = np.maximum.reduce((cel1, cel2))
+        cel1 = np.maximum(cel1, self)
+        cel2 = np.maximum(cel2, self)
+
+        flow.uu_mask = np.logical_or.reduce((
+            flow.is_mask[cel1] != +0, 
+            flow.is_mask[cel2] != +0
+            ) )
+            
+    if (mesh is not None):
+        cel1 = mesh.vert.cell[:, 0] - 1  # careful if null
+        cel2 = mesh.vert.cell[:, 1] - 1
+        cel3 = mesh.vert.cell[:, 2] - 1
+        
+        self = np.maximum.reduce((cel1, cel2, cel3))
+        cel1 = np.maximum(cel1, self)
+        cel2 = np.maximum(cel2, self)
+        cel3 = np.maximum(cel3, self)
+        
+        flow.rv_mask = np.logical_or.reduce((
+            flow.is_mask[cel1] != +0, 
+            flow.is_mask[cel2] != +0, 
+            flow.is_mask[cel3] != +0
+            ) )
         
     if ("ff_cell" in data.variables.keys()):
         flow.ff_cell = np.asarray(
@@ -1196,7 +1513,7 @@ def load_flow(name, mesh=None, lean=False, step=-1):
         flow.n0_edge = np.asarray(
             data.variables["n0_edge"][:], dtype=flt32_t)
 
-    if (lean is True): return flow
+    if (lean is True): data.close(); return flow
       
     flow.vv_edge = np.zeros((nedg), dtype=flt32_t)
 
@@ -1224,6 +1541,7 @@ def load_flow(name, mesh=None, lean=False, step=-1):
             data.variables[
                 "pv_dual"][step, :, +0 ], dtype=reals_t)
 
+    data.close()
     return flow
     
     
@@ -1232,6 +1550,7 @@ def sort_flow(flow, mesh=None, lean=False):
     if (mesh is None): return flow
 
     flow.zb_cell = flow.zb_cell[mesh.cell.ifwd - 1]
+    flow.zb_drag = flow.zb_drag[mesh.cell.ifwd - 1]
     
     flow.bc_slip = flow.bc_slip[mesh.edge.ifwd - 1]
     
@@ -1256,6 +1575,9 @@ def sort_flow(flow, mesh=None, lean=False):
     if (flow.uu_edge is not None):
         flow.uu_edge = \
             flow.uu_edge[mesh.edge.ifwd - 1]
+    if (flow.uu_filt is not None):
+        flow.uu_filt = \
+            flow.uu_filt[mesh.edge.ifwd - 1]
     
     if (lean is True): return flow
     
@@ -1298,7 +1620,7 @@ def load_forc(name, flow=None, lean=False, step=+0):
     if (step >= 0): flow.next.uW_edge = None
     if (step >= 0): flow.next.Xi_cell = None
     
-    flow.step = step
+    flow.next.step = step
 
     if (name == ""): return flow
 
@@ -1334,6 +1656,7 @@ def load_forc(name, flow=None, lean=False, step=+0):
             data.variables[
                 "Xi_cell"][step, :, +0 ], dtype=reals_t)
     
+    data.close()
     return flow
     
 
@@ -1362,6 +1685,132 @@ def sort_forc(flow, mesh=None, lean=False):
             flow.next.Xi_cell[mesh.cell.ifwd - 1]
             
     return flow
+
+
+def scan_bnds(mesh, join, sidx, midx, eidx, vnxt):
+
+#-- assemble list of edges on [s,m,e] loop
+
+    seen = np.zeros(mesh.edge.size, dtype=bool)
+    idxs = [sidx]; seen[sidx] = True
+    find = False; done = False
+    while (not done):
+        vnow = vnxt
+        enxt = -1
+        eadj = join[vnow, 0]
+        if (eadj >= 0 and not seen[eadj]): 
+            enxt = eadj
+
+        eadj = join[vnow, 1]
+        if (eadj >= 0 and not seen[eadj]): 
+            enxt = eadj
+
+        if (enxt <= -1): break
+
+        idxs.append(enxt)
+        seen[enxt] = True
+        if (enxt == midx): find = True
+        if (enxt == eidx): done = True
+        
+        vadj = mesh.edge.vert[enxt, 0] - 1
+        if (vadj >= 0 and vadj != vnow):
+            vnxt = vadj
+
+        vadj = mesh.edge.vert[enxt, 1] - 1
+        if (vadj >= 0 and vadj != vnow):
+            vnxt = vadj
+
+    return find, np.asarray(idxs, dtype=np.int32)
+
+
+def find_bnds(mesh, obcs):
+
+#-- BNDS[E]=K: Eth edge is part of Kth OBC
+
+#-- OBCs as [s,m,e] loops:
+#-- OBCS[K,0,:] = [sx,sy]
+#-- OBCS[K,1,:] = [mx,my]
+#-- OBCS[K,2,:] = [ex,ey]
+
+    bnds = np.zeros(mesh.edge.size, dtype=np.int32)
+
+    mask = np.logical_or.reduce((
+        mesh.edge.cell[:, 0] <= 0,
+        mesh.edge.cell[:, 1] <= 0
+        ) )
+    indx = np.argwhere(mask).ravel()
+
+    next = np.zeros(mesh.vert.size, dtype=np.int32)
+    join = -1 * np.ones(
+        (mesh.vert.size, 2), dtype=np.int32)
+    for epos in range(indx.size):
+        vrt1 = mesh.edge.vert[indx[epos],0] - 1
+        vrt2 = mesh.edge.vert[indx[epos],1] - 1
+
+        """
+        if (next[vrt1] >= 2 or 
+            next[vrt2] >= 2): 
+            raise ValueError("Nonmanifold BC edge")
+        """
+
+        if (next[vrt1] < 2):
+            join[vrt1, next[vrt1]] = indx[epos]
+            next[vrt1] += 1
+
+        if (next[vrt2] < 2):
+            join[vrt2, next[vrt2]] = indx[epos]
+            next[vrt2] += 1
+
+    for iobc in range(obcs.shape[0]):
+    #-- map [s,m,e] onto OBC edge indices
+        if (mesh.rsph is not None):
+
+            epos = np.vstack((mesh.edge.xlon[indx], 
+                              mesh.edge.ylat[indx]
+                ) ).T
+
+            slen = circ_dist(mesh.rsph, 
+                epos, np.atleast_2d(obcs[iobc, 0, :]))
+            mlen = circ_dist(mesh.rsph, 
+                epos, np.atleast_2d(obcs[iobc, 1, :]))
+            elen = circ_dist(mesh.rsph, 
+                epos, np.atleast_2d(obcs[iobc, 2, :]))
+
+            sidx = indx[np.argmin(slen)]
+            midx = indx[np.argmin(mlen)]
+            eidx = indx[np.argmin(elen)]
+
+        else:
+
+            epos = np.vstack((mesh.edge.xpos[indx], 
+                              mesh.edge.ypos[indx]
+                ) ).T
+
+            slen = flat_dist(mesh.wrap, 
+                epos, np.atleast_2d(obcs[iobc, 0, :]))
+            mlen = flat_dist(mesh.wrap, 
+                epos, np.atleast_2d(obcs[iobc, 1, :]))
+            elen = flat_dist(mesh.wrap, 
+                epos, np.atleast_2d(obcs[iobc, 2, :]))
+
+            sidx = indx[np.argmin(slen)]
+            midx = indx[np.argmin(mlen)]
+            eidx = indx[np.argmin(elen)]
+
+    #-- walk bnd. edges to form OBC loops
+        find, idxs = scan_bnds(
+            mesh, join, sidx, 
+            midx, eidx, mesh.edge.vert[sidx, 0] - 1)
+
+        if find: bnds[idxs] = iobc + 1
+
+        find, idxs = scan_bnds(
+            mesh, join, sidx, 
+            midx, eidx, mesh.edge.vert[sidx, 1] - 1)
+
+        if find: bnds[idxs] = iobc + 1
+
+    return bnds
     
 
 def cell_adj_(mesh):
@@ -1370,6 +1819,7 @@ def cell_adj_(mesh):
 
     ivec = np.array([], dtype=index_t)
     jvec = np.array([], dtype=index_t)
+    xvec = np.array([], dtype=flt32_t)
 
     for edge in range(np.max(mesh.cell.topo)):
 
@@ -1382,12 +1832,47 @@ def cell_adj_(mesh):
         mask = aidx >= 0
         cidx = cidx[mask]
         aidx = aidx[mask]
+        xval = np.ones(cidx.size, dtype=flt32_t)
 
         ivec = np.hstack((ivec, cidx))
         jvec = np.hstack((jvec, aidx))
+        xvec = np.hstack((xvec,-xval))
 
-    return csr_matrix((
-        np.ones(ivec.size, dtype=np.int8), (ivec, jvec)))
+        ivec = np.hstack((ivec, cidx))
+        jvec = np.hstack((jvec, cidx))
+        xvec = np.hstack((xvec, xval))
+        
+    return csr_matrix((xvec, (ivec, jvec)), 
+        shape=(mesh.cell.size, mesh.cell.size) )
+
+
+def edge_adj_(mesh):
+
+#-- form edgewise sparse adjacency graph
+
+    xvec = np.array([], dtype=flt32_t)
+    ivec = np.array([], dtype=index_t)
+    jvec = np.array([], dtype=index_t)
+
+    for edge in range(np.max(mesh.edge.topo)):
+
+        mask = mesh.edge.topo > edge
+
+        eidx = np.argwhere(mask).ravel()
+
+        edsh = mesh.edge.edge[mask, edge] - 1
+
+        mask = edsh >= 0
+        eidx = eidx[mask]
+        edsh = edsh[mask]
+        xval = np.ones(eidx.size, dtype=flt32_t)
+
+        ivec = np.hstack((ivec, eidx))
+        jvec = np.hstack((jvec, edsh))
+        xvec = np.hstack((xvec, xval))
+
+    return csr_matrix((xvec, (ivec, jvec)), 
+        shape=(mesh.edge.size, mesh.edge.size) )
 
 
 def circ_area(rs, pa, pb, pc):
