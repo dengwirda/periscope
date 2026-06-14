@@ -21,7 +21,8 @@ from map import maptocell
 # SWE test cases for linear wave problems
 # Authors: Darren Engwirda
 
-def init(name, save, rsph, _ics, case, xmid, ymid, hmag):
+def init(name, save, rsph, _ics, case, 
+         xmid, ymid, xfac, yfac, hmag):
 
 #------------------------------------ load an MPAS mesh file
 
@@ -47,13 +48,16 @@ def init(name, save, rsph, _ics, case, xmid, ymid, hmag):
         ValueError("Unsupported test-case.")
 
     if (case == 1):
-        wav1(name, save, rsph, mesh, mats, xmid, ymid, hmag)
+        wav1(name, save, rsph, mesh, mats, 
+             xmid, ymid, xfac, yfac, hmag)
         
     if (case == 2):
-        wav2(name, save, rsph, mesh, mats, xmid, ymid, hmag)
+        wav2(name, save, rsph, mesh, mats, 
+             xmid, ymid, xfac, yfac, hmag)
 
     if (case == 3):
-        tsu1(name, save, rsph, mesh, mats, xmid, ymid, hmag)
+        tsu1(name, save, rsph, mesh, mats, 
+             xmid, ymid, xfac, yfac, hmag)
         
     if (case == 4):
         tsu2(name, save, rsph, mesh, mats, _ics)
@@ -64,7 +68,8 @@ def init(name, save, rsph, _ics, case, xmid, ymid, hmag):
     return
 
 
-def wav1(name, save, rsph, mesh, mats, xmid, ymid, hmag):
+def wav1(name, save, rsph, mesh, mats, 
+         xmid, ymid, xfac, yfac, hmag):
 
 #-- simple isolated gravity-wave test-case
 
@@ -74,8 +79,8 @@ def wav1(name, save, rsph, mesh, mats, xmid, ymid, hmag):
     uu_edge = np.zeros(mesh.edge.size, dtype=np.float64)
 
     hh_cell = hmag * np.exp(
-            - 100. * (mesh.cell.xlon - xmid) ** 2 + \
-            - 100. * (mesh.cell.ylat - ymid) ** 2 ) \
+            - xfac * (mesh.cell.xlon - xmid) ** 2 + \
+            - yfac * (mesh.cell.ylat - ymid) ** 2 ) \
             + 500.0  # + 0.1
 
     zb_cell = np.zeros(mesh.cell.size, dtype=np.float64)
@@ -85,7 +90,8 @@ def wav1(name, save, rsph, mesh, mats, xmid, ymid, hmag):
     print("Output written to:", save)
 
     init = xarray.open_dataset(name)
-    init.attrs.update({"sphere_radius": mesh.rsph})
+    if (mesh.rsph is not None): 
+        init.attrs.update({"sphere_radius": mesh.rsph})
     init.attrs.update({"config_gravity": grav})
     init["xCell"] = (("nCells"), mesh.cell.xpos)
     init["yCell"] = (("nCells"), mesh.cell.ypos)
@@ -135,32 +141,37 @@ def wav1(name, save, rsph, mesh, mats, xmid, ymid, hmag):
     return
     
     
-def wav2(name, save, rsph, mesh, mats, xmid, ymid, hmag):
+def wav2(name, save, rsph, mesh, mats, 
+         xmid, ymid, xfac, yfac, hmag):
 
-#-- simple isolated gravity-wave test-case
-
-#-- reduced gravity version
+#-- distributed gravity-wave relaxation test-case
 
     erot = 7.292E-05            # Earth's omega
     grav = 9.80616              # gravity
-    
-    grav = grav / 100.          # reduced gravity
+
+    data = xarray.open_dataset(name)
+
+    zb_cell = np.zeros(mesh.cell.size, dtype=np.float32)
+    try:
+        zb_cell+= np.asarray(
+        data["bed_elevation"][:], dtype=np.float32)
+    except: pass
 
     uu_edge = np.zeros(mesh.edge.size, dtype=np.float64)
 
-    hh_cell = hmag * np.exp(
-            - 100. * (mesh.cell.xlon - xmid) ** 2 + \
-            - 100. * (mesh.cell.ylat - ymid) ** 2 ) \
-            + 500.0
+    zt_cell = (hmag *
+        np.sin(xfac * (mesh.cell.xlon - xmid)) *
+        np.cos(yfac * (mesh.cell.ylat - ymid)) )
 
-    zb_cell = np.zeros(mesh.cell.size, dtype=np.float64)
+    hh_cell = np.maximum(zt_cell - zb_cell, 0.0)
 
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
     print("Output written to:", save)
 
     init = xarray.open_dataset(name)
-    init.attrs.update({"sphere_radius": mesh.rsph})
+    if (mesh.rsph is not None): 
+        init.attrs.update({"sphere_radius": mesh.rsph})
     init.attrs.update({"config_gravity": grav})
     init["xCell"] = (("nCells"), mesh.cell.xpos)
     init["yCell"] = (("nCells"), mesh.cell.ypos)
@@ -184,13 +195,6 @@ def wav2(name, save, rsph, mesh, mats, xmid, ymid, hmag):
         ("Time", "nCells", "nVertLevels"),
         np.reshape(hh_cell, (1, mesh.cell.size, 1)))
     init["zb_cell"] = (("nCells"), zb_cell)
-
-    hh_dual = mats.dual_kite_sums * hh_cell
-    hh_dual/= mesh.vert.area
-
-    init["hh_dual"] = (
-        ("Time", "nVertices", "nVertLevels"),
-        np.reshape(hh_dual, (1, mesh.vert.size, 1)))
 
     init["uu_edge"] = (
         ("Time", "nEdges", "nVertLevels"),
@@ -210,7 +214,8 @@ def wav2(name, save, rsph, mesh, mats, xmid, ymid, hmag):
     return
 
 
-def tsu1(name, save, rsph, mesh, mats, xmid, ymid, hmag):
+def tsu1(name, save, rsph, mesh, mats, 
+         xmid, ymid, xfac, yfac, hmag):
 
 #-- earth-topography tsunami-wave test-case
 
@@ -222,49 +227,30 @@ def tsu1(name, save, rsph, mesh, mats, xmid, ymid, hmag):
     if ("bed_elevation" not in data.variables.keys()):
         raise ValueError("Elevation data not found.")
 
-    if ("ocn_cover" not in data.variables.keys()):
-        raise ValueError("Ocn.-mask data not found.")
+   #if ("ocn_cover" not in data.variables.keys()):
+   #    raise ValueError("Ocn.-mask data not found.")
 
     if ("ice_thickness" not in data.variables.keys()):
         raise ValueError("Elevation data not found.")
 
-    oc_mask = np.asarray(
-        data["ocn_cover"][:], dtype=np.float32)
+   #oc_mask = np.asarray(
+   #    data["ocn_cover"][:], dtype=np.float32)
 
     zb_cell = np.asarray(
         data["bed_elevation"][:], dtype=np.float64)
     zb_cell+= np.asarray(
         data["ice_thickness"][:], dtype=np.float64)
 
-    zb_cell[oc_mask >= 0.375] = \
-        np.minimum(-1.0, zb_cell[oc_mask >= 0.375])
+   #zb_cell[oc_mask >= 0.375] = \
+   #    np.minimum(-10., zb_cell[oc_mask >= 0.375])
+
+    zb_cell = np.minimum(-10.0, zb_cell)
 
     uu_edge = np.zeros(mesh.edge.size, dtype=np.float64)
 
-    """
-    hh_cell = -zb_cell + 1.00 * np.exp( -1. * (
-            100.0 * (mesh.cell.xlon - xmid) ** 2 + \
-            100.0 * (mesh.cell.ylat - ymid) ** 2
-            ) ** 1 )
-    """
-
-    """
     hh_cell = -zb_cell + hmag * np.exp( -1. * (
-            250.0 * (mesh.cell.xlon - xmid) ** 2 + \
-            250.0 * (mesh.cell.ylat - ymid) ** 2
-            ) ** 4 )
-    """
-
-    """
-    hh_cell = -zb_cell + hmag * np.exp( -1. * (
-            25000 * (mesh.cell.xlon - xmid) ** 2 + \
-            250.0 * (mesh.cell.ylat - ymid) ** 2
-            ) ** 4 )
-    """
-
-    hh_cell = -zb_cell + hmag * np.exp( -1. * (
-            250.0 * (mesh.cell.xlon - xmid) ** 2 + \
-            50000 * (mesh.cell.ylat - ymid) ** 2
+            xfac * (mesh.cell.xlon - xmid) ** 2 + \
+            yfac * (mesh.cell.ylat - ymid) ** 2
             ) ** 4 )
     
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
@@ -272,7 +258,8 @@ def tsu1(name, save, rsph, mesh, mats, xmid, ymid, hmag):
     print("Output written to:", save)
 
     init = xarray.open_dataset(name)
-    init.attrs.update({"sphere_radius": mesh.rsph})
+    if (mesh.rsph is not None): 
+        init.attrs.update({"sphere_radius": mesh.rsph})
     init.attrs.update({"config_gravity": grav})
     init["xCell"] = (("nCells"), mesh.cell.xpos)
     init["yCell"] = (("nCells"), mesh.cell.ypos)
@@ -308,7 +295,7 @@ def tsu1(name, save, rsph, mesh, mats, xmid, ymid, hmag):
     init["ff_vert"] = (("nVertices"),
         2.00E+00 * erot * np.sin(mesh.vert.ylat))
 
-    init["is_mask"] = (("nCells"), oc_mask<0.375)
+   #init["is_mask"] = (("nCells"), oc_mask<0.375)
 
     print(init)
 
@@ -346,8 +333,9 @@ def tsu2(name, save, rsph, mesh, mats, _ics):
     # smooth at grid-scale
     zb_dual = mats.dual_kite_sums * zb_cell
     zb_dual/= mesh.vert.area
-    zb_cell = mats.cell_kite_sums * zb_dual
-    zb_cell/= mesh.cell.area
+    z2_cell = mats.cell_kite_sums * zb_dual
+    z2_cell/= mesh.cell.area
+    zb_cell = 0.5 * zb_cell + 0.5 * z2_cell
 
     uu_edge = np.zeros(mesh.edge.size, dtype=np.float64)
 
@@ -367,7 +355,8 @@ def tsu2(name, save, rsph, mesh, mats, _ics):
     print("Output written to:", save)
 
     init = xarray.open_dataset(name)
-    init.attrs.update({"sphere_radius": mesh.rsph})
+    if (mesh.rsph is not None): 
+        init.attrs.update({"sphere_radius": mesh.rsph})
     init.attrs.update({"config_gravity": grav})
     init["xCell"] = (("nCells"), mesh.cell.xpos)
     init["yCell"] = (("nCells"), mesh.cell.ypos)
@@ -413,7 +402,7 @@ def tsu2(name, save, rsph, mesh, mats, _ics):
 if (__name__ == "__main__"):
     parser = argparse.ArgumentParser(
         description=__doc__,
-        formatter_class=argparse.RawTextHelpFormatter)
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument(
         "--mesh-file", dest="mesh_file", type=str,
@@ -425,7 +414,7 @@ if (__name__ == "__main__"):
 
     parser.add_argument(
         "--test-case", dest="test_case", type=int,
-        required=True, help="Test case number (1-3).")
+        required=True, help="Test case number (1-4).")
 
     parser.add_argument(
         "--xydz-file", dest="xydz_file", type=str,
@@ -449,6 +438,18 @@ if (__name__ == "__main__"):
         help="Centre of wave in lat. direction [deg].")
 
     parser.add_argument(
+        "--wave-xfac", dest="wave_xfac", type=float,
+        default=+250.,
+        required=False,
+        help="Wave width multiplier in lon-dir.")
+
+    parser.add_argument(
+        "--wave-yfac", dest="wave_yfac", type=float,
+        default=+250.,
+        required=False,
+        help="Wave width multiplier in lat-dir.")
+
+    parser.add_argument(
         "--wave-size", dest="wave_size", type=float,
         default=+5.00,
         required=False,
@@ -463,4 +464,6 @@ if (__name__ == "__main__"):
          case=args.test_case,
          xmid=args.wave_xmid,
          ymid=args.wave_ymid,
+         xfac=args.wave_xfac,
+         yfac=args.wave_yfac,
          hmag=args.wave_size)

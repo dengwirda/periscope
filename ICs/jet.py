@@ -80,8 +80,6 @@ def init(name, save, rsph=0.E+0, pert=True):
     erot = 7.292E-05            # Earth's omega
     grav = 9.80616 * (rsph / 6371220.0)     # gravity
 
-   #grav = grav / 100.
-
     lat0 = np.pi / 7.0          # jet lat width
     lat1 = np.pi / 2.0 - lat0
 
@@ -187,6 +185,17 @@ def init(name, save, rsph=0.E+0, pert=True):
 
     hdel = hdel + float(pert) * hadd
 
+#-- transform local to zonal + meridional
+    uW_e = mesh.edge.cos_ * unrm + \
+           mesh.edge.sin_ * uprp
+    uN_e =-mesh.edge.sin_ * unrm + \
+           mesh.edge.cos_ * uprp
+
+    uW_c = mats.cell_wing_sums* uW_e
+    uW_c/= mesh.cell.area
+    uN_c = mats.cell_wing_sums* uN_e
+    uN_c/= mesh.cell.area
+
 #-- inject mesh with IC.'s and write to MPAS-ish NetCDF file
 
     print("Output written to:", save)
@@ -227,6 +236,13 @@ def init(name, save, rsph=0.E+0, pert=True):
         ("Time", "nCells", "nVertLevels"),
         np.reshape(ke_c, (1, mesh.cell.size, 1)))
 
+    init["uW_cell"] = (
+        ("Time", "nCells", "nVertLevels"),
+        np.reshape(uW_c, (1, mesh.cell.size, 1)))
+    init["uN_cell"] = (
+        ("Time", "nCells", "nVertLevels"),
+        np.reshape(uN_c, (1, mesh.cell.size, 1)))
+
     init["streamfunction"] = (("nVertices"), vpsi)
     init["rv_dual"] = (
         ("Time", "nVertices", "nVertLevels"),
@@ -249,7 +265,7 @@ def init(name, save, rsph=0.E+0, pert=True):
 if (__name__ == "__main__"):
     parser = argparse.ArgumentParser(
         description=__doc__,
-        formatter_class=argparse.RawTextHelpFormatter)
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument(
         "--mesh-file", dest="mesh_file", type=str,

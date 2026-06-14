@@ -72,7 +72,8 @@ def init(name, save, rsph=0.0, slip=1.0):
     print("Output written to:", save)
 
     init = xarray.open_dataset(name)
-    init.attrs.update({"sphere_radius": mesh.rsph})
+    if (mesh.rsph is not None): 
+        init.attrs.update({"sphere_radius": mesh.rsph})
     init.attrs.update({"config_gravity": grav})
     init["xCell"] = (("nCells"), mesh.cell.xpos)
     init["yCell"] = (("nCells"), mesh.cell.ypos)
@@ -127,7 +128,7 @@ def init(name, save, rsph=0.0, slip=1.0):
 if (__name__ == "__main__"):
     parser = argparse.ArgumentParser(
         description=__doc__,
-        formatter_class=argparse.RawTextHelpFormatter)
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument(
         "--mesh-file", dest="mesh_file", type=str,

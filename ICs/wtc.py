@@ -253,7 +253,7 @@ def wtc5(name, save, rsph, mesh, mats):
 
     erot = 7.292E-05            # Earth's omega
     grav = 9.80616              # gravity
-   
+
     umag = 20.0                 # m/s flow
     g_h0 = 5960.0 * grav
 
@@ -353,15 +353,15 @@ def wtcd(name, save, rsph, mesh, mats):
 #-- reduced gravity version
 
     erot = 7.292E-05            # Earth's omega
-    grav = 9.80616 / 100.       # gravity
+    grav = 9.80616 / 250.0      # gravity
    
-    umag = 1.0                  # m/s flow
+    umag = 0.5                  # m/s flow
     g_h0 = 5960.0 * grav
 
     xmid = 3.0 * np.pi / 2.0
     ymid = 1.0 * np.pi / 6.0
     rrad = 1.0 * np.pi / 9.0
-    hs_0 = 2000.0
+    hs_0 = 3000.0
 
     sf_vert = rsph * umag * np.sin(mesh.vert.ylat) * -1.
 
@@ -388,7 +388,7 @@ def wtcd(name, save, rsph, mesh, mats):
     fz_cell = hs_0 * (1.0 - rr_cell / rrad) 
 
     zb_cell = cell_quad(mesh, fz_cell, fz_vert)
-    
+
     hh_cell = hh_cell - zb_cell
     
     rv_dual = mats.dual_curl_sums * uu_edge
@@ -590,7 +590,7 @@ def wtc6(name, save, rsph, mesh, mats):
 if (__name__ == "__main__"):
     parser = argparse.ArgumentParser(
         description=__doc__,
-        formatter_class=argparse.RawTextHelpFormatter)
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument(
         "--mesh-file", dest="mesh_file", type=str,

@@ -41,9 +41,7 @@ def init(name, save, rsph=0.E+0):
     erot = 7.292E-05            # Earth's omega
     grav = 9.80616              # gravity
    
-   #grav = grav / 100.          # reduced gravity
-
-    grav = 1.
+    grav = grav / 100.          # reduced gravity
 
     print("Computing streamfunction...")
 
@@ -82,7 +80,7 @@ def init(name, save, rsph=0.E+0):
 
     rv_dual[mesh.vert.mask] = 0.
 
-    rv_dual*= 1.E-03 #2.5E+06 * (1. / 2.) ** 2
+    rv_dual*= 2.5E+06 * (1. / 2.) ** 2
     rv_dual-= np.mean(rv_dual)
 
     sf_vert, info = gcrotmk(
@@ -98,7 +96,7 @@ def init(name, save, rsph=0.E+0):
     uu_edge = mats.edge_grad_perp * sf_vert * -1.
     vv_edge = mats.edge_grad_norm * sf_cell * -1.
 
-    hh_cell = 1. * np.ones(  # 5000.
+    hh_cell = 5000. * np.ones(
         (mesh.cell.size), dtype=np.float64)
     
     zb_cell = np.zeros(hh_cell.shape, dtype=np.float64)
@@ -142,22 +140,12 @@ def init(name, save, rsph=0.E+0):
         ("Time", "nVertices", "nVertLevels"),
         np.reshape(rv_dual, (1, mesh.vert.size, 1)))
 
-    """
     init["ff_cell"] = (("nCells"),
         2.00E+00 * erot * np.sin(mesh.cell.ylat))
     init["ff_edge"] = (("nEdges"),
         2.00E+00 * erot * np.sin(mesh.edge.ylat))
     init["ff_vert"] = (("nVertices"),
         2.00E+00 * erot * np.sin(mesh.vert.ylat))
-    """
-
-    f = 5.
-    init["ff_cell"] = (("nCells"),
-        f * np.ones(mesh.cell.size, dtype=np.float64))
-    init["ff_edge"] = (("nEdges"),
-        f * np.ones(mesh.edge.size, dtype=np.float64))
-    init["ff_vert"] = (("nVertices"),
-        f * np.ones(mesh.vert.size, dtype=np.float64))
 
     print(init)
 
@@ -168,7 +156,7 @@ def init(name, save, rsph=0.E+0):
 if (__name__ == "__main__"):
     parser = argparse.ArgumentParser(
         description=__doc__,
-        formatter_class=argparse.RawTextHelpFormatter)
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument(
         "--mesh-file", dest="mesh_file", type=str,
