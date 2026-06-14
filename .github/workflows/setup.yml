@@ -54,28 +54,28 @@ jobs:
       - name: Download test assets
         uses: dsaltares/fetch-gh-release-asset@master
         with:
-          repo: dengwirda/periscope-dev
+          repo: dengwirda/periscope
           file: mesh_w_elev_cvt_8.zip
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download test assets
         uses: dsaltares/fetch-gh-release-asset@master
         with:
-          repo: dengwirda/periscope-dev
+          repo: dengwirda/periscope
           file: mesh_w_elev_cvt_7.zip
           token: ${{ secrets.GITHUB_TOKEN }}
           
       - name: Download test assets
         uses: dsaltares/fetch-gh-release-asset@master
         with:
-          repo: dengwirda/periscope-dev
+          repo: dengwirda/periscope
           file: mesh_disk_3.zip
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Download test assets
         uses: dsaltares/fetch-gh-release-asset@master
         with:
-          repo: dengwirda/periscope-dev
+          repo: dengwirda/periscope
           file: fujii.zip
           token: ${{ secrets.GITHUB_TOKEN }}
           
