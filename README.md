@@ -63,7 +63,7 @@ For example, to build and run the barotopic jet of
     --with-pert=True --radius=6371220.
 
     python swe.py \
-    --mpas-file="jet_cvt_7.nc" \
+    --mesh-file="jet_cvt_7.nc" \
     --numthread=N \
     --time-span="6d" --save-time="1d" --stat-time="1d"
 
