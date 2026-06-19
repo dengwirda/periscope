@@ -1,4 +1,7 @@
 
+import time
+import sys
+import os
 import numpy as np
 import netCDF4 as nc
 
@@ -6,6 +9,9 @@ import argparse
 
 from scipy.interpolate import RegularGridInterpolator
 from scipy.sparse import csr_matrix
+
+sys.path.insert(
+    1, os.path.join(sys.path[0], ".."))
 
 from msh import load_mesh, cell_quad
 
