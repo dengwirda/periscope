@@ -67,26 +67,6 @@ def init_step(mesh, mats, flow, cnfg,
             uu_prev=uu_edge,uu_edge=uu_edge)
 
     return cnfg
-    
-
-def init_RKFB(cnfg):
-
-#-- Initialise coefficients for user time-stepping schemes
-
-    if   ("RK33" in cnfg.integrate):
-        #"""
-        cnfg.fb_weight = np.array([
-            0.301666666666667, 0.316666666666667,
-            0.366666666666667
-            ] )
-
-    else:#"RK43" in cnfg.integrate):
-        cnfg.fb_weight = np.array([
-            0.000000000000000, 0.500000000000000,
-            0.500000000000000, 0.000000000000000
-            ] )
-
-    return cnfg
 
 
 def step_eqns(mesh, mats, flow, cnfg, 
@@ -580,8 +560,6 @@ def step_RK43(mesh, mats, flow, cnfg,
     cnfg = mark_time(
         cnfg, flow, start_t + 0. / 1.0 * dt_step)
 
-    BETA = cnfg.fb_weight[0] * isFB
-    
     rhs_tde_d(  # eval. tides state 
         mesh, mats, flow, cnfg, hh_cell, uk_edge)
     rhs_all_d(  # eval. diagnostics 
@@ -648,8 +626,6 @@ def step_RK43(mesh, mats, flow, cnfg,
     cnfg = mark_time(
         cnfg, flow, start_t + 1. / 4.0 * dt_step)
 
-    BETA = cnfg.fb_weight[1] * isFB
-
 #-- skipping the new tide eval. is still 2nd-order accurate
 #   rhs_tde_d(  # eval. tides state 
 #       mesh, mats, flow, cnfg, h0_cell, uk_edge)
@@ -715,8 +691,6 @@ def step_RK43(mesh, mats, flow, cnfg,
     cnfg = mark_time(
         cnfg, flow, start_t + 1. / 3.0 * dt_step)
 
-    BETA = cnfg.fb_weight[2] * isFB
-   
 #-- skipping the new tide eval. is still 2nd-order accurate
 #   rhs_tde_d(  # eval. tides state 
 #       mesh, mats, flow, cnfg, h1_cell, uk_edge)
@@ -786,8 +760,6 @@ def step_RK43(mesh, mats, flow, cnfg,
     cnfg.time_step = k3_step
     cnfg = mark_time(
         cnfg, flow, start_t + 2. / 3.0 * dt_step)
-
-    BETA = cnfg.fb_weight[3] * isFB
 
     rhs_tde_d(  # eval. tides state 
         mesh, mats, flow, cnfg, h2_cell, uk_edge)

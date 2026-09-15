@@ -28,7 +28,7 @@ from mem import variables as _var
 from io_ import init_file, save_step, save_last
 
 from _dt import step_eqns, step_bnds, mark_time
-from _dt import init_RKFB, init_step
+from _dt import init_step
 from _dx import invariant, scale_mix
 
 def swe(cnfg):
@@ -55,8 +55,6 @@ def swe(cnfg):
     cnfg.save_prev = +0
 
     cnfg.completed = False
-
-    if not cnfg.fb_weight: init_RKFB (cnfg)
 
     # mesh, forcing & solution i/o 
     name = cnfg.mesh_file
@@ -193,7 +191,7 @@ def swe(cnfg):
                 ) ):
             sync = min(sync, cnfg.time_stop)
         
-        if (cnfg.timeisnow + 1./1. * cnfg.time_step > sync):
+        if (cnfg.timeisnow + 1.001 * cnfg.time_step > sync):
             cnfg.time_step = (sync - tnow) / 1.
            #print (f">SYNC: {+cnfg.time_step:+.2E}")
 

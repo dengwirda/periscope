@@ -433,12 +433,6 @@ if (__name__ == "__main__"):
         required=False, 
         default=False, help="Disable stress forcing.")
 
-    parser.add_argument(
-        "--FB-weight", dest="fb_weight", type=float,
-        required=False,
-        nargs="*",
-        help="Forward-backward weights for integrators.")
-
     cnfg = parser.parse_args()
 
     # sanitise time stepping params
