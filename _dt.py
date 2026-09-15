@@ -60,7 +60,7 @@ def init_step(mesh, mats, flow, cnfg,
         cnfg.time_step = cfl_adapt(
             mesh, mats, cnfg, 
             flow.gravity, hh_thin=cnfg.wetdry_h0 * 100.0,
-            rk_scal=1.0, rk_adv_=4.0/3.0,
+            rk_scal=1.0, rk_adv_=2.0/1.0,
             cfl_num=cnfg.cfl_limit, dt_prev=0,
             dt_jump=cnfg.dt_margin,
             hh_prev=hh_cell,hh_cell=hh_cell,
@@ -74,6 +74,7 @@ def init_RKFB(cnfg):
 #-- Initialise coefficients for user time-stepping schemes
 
     if   ("RK33" in cnfg.integrate):
+        #"""
         cnfg.fb_weight = np.array([
             0.301666666666667, 0.316666666666667,
             0.366666666666667
@@ -115,13 +116,13 @@ def step_try_(mesh, mats, flow, cnfg,
 
 #-- A single time-step - via user-defined method of choice
 
-    if   ("RK33" in cnfg.integrate):
+    if ("RK33" in cnfg.integrate):
 
         hh_cell, uu_edge, hb_cell = step_RK33(
             mesh, mats, 
             flow, cnfg, hh_cell, uu_edge, None, None)
 
-    elif ("RK43" in cnfg.integrate):
+    if ("RK43" in cnfg.integrate):
 
         hh_cell, uu_edge, hb_cell = step_RK43(
             mesh, mats, 
@@ -186,10 +187,45 @@ def step_RK33(mesh, mats, flow, cnfg,
               Rh_cell, Ru_edge):    # slow tend.
 
 #-- A 3-stage 3rd/2nd-order RK scheme:
-#-- D. Engwirda (2025): 3- and 4-stage forward-backward
+#-- D. Engwirda (2025): 3-, 4- and 5-stage forward-backward
 #-- Runge-Kutta methods for geophysical flows
 
 #-- drag included via a 2nd-order IMEX scheme
+
+    """
+    # scheme without forward-backward weights
+    b_11 = 0.00 ; b_10 = 1.00 - b_11
+    
+    b_22 = 0.00 ; b_21 = 1.00
+    b_20 = 1.00 - b_22 - b_21
+    
+    b_33 = 0.00 ; b_32 = 1.00 ; b_31 = 0.00
+    b_30 = 1.00 - b_33 - b_32 - b_31
+    """
+
+    """
+    # 2nd-order CFL=5.000 scheme
+    # rational, with robust stability wedge re: background Froude
+    # & (linear) 3rd-order cancelling
+    b_11 =25./48; b_10 = 1.00 - b_11
+    
+    b_22 = 4./15; b_21 = 7./15
+    b_20 = 1.00 - b_22 - b_21
+    
+    b_33 = 1./3.; b_32 = 7./48; b_31 = 5./24
+    b_30 = 1.00 - b_33 - b_32 - b_31
+    """
+
+    # 3rd-order CFL=4.625 scheme
+    # rational, with robust stability wedge re: background Froude
+    b_11 = 3./4.; b_10 = 1.00 - b_11
+    
+    b_22 = 4./15; b_21 = 7./15
+    b_20 = 1.00 - b_22 - b_21
+    
+    b_33 = 1./4.; b_32 = 3./16; b_31 = 3./8.
+    b_30 = 1.00 - b_33 - b_32 - b_31
+    
 
     start_t = cnfg.timeisnow
 
@@ -197,8 +233,6 @@ def step_RK33(mesh, mats, flow, cnfg,
     k2_step = 2.0 / 3.0 * cnfg.time_step
     k3_step = 1.0 / 1.0 * cnfg.time_step
     dt_step = 1.0 / 1.0 * cnfg.time_step
-
-    isFB = 1.0 * ("FB" in cnfg.integrate)
 
     gravity = flow.gravity
     
@@ -233,8 +267,6 @@ def step_RK33(mesh, mats, flow, cnfg,
     cnfg = mark_time(
         cnfg, flow, start_t + 0. / 1.0 * dt_step)
 
-    BETA = cnfg.fb_weight[0] * isFB
-    
     rhs_tde_d(  # eval. tides state 
         mesh, mats, flow, cnfg, hh_cell, uk_edge)
     rhs_all_d(  # eval. diagnostics 
@@ -269,9 +301,9 @@ def step_RK33(mesh, mats, flow, cnfg,
     u0_tend = rhs_fst_u(
         mesh, mats, flow, cnfg, hh_cell, uk_edge, u0_tend)
 
-    hb_cell = sum_2_way(
-        cnfg, hb_cell, 0.0 + 1.0 * BETA, h1_cell,
-                       1.0 - 1.0 * BETA, hh_cell)
+    hb_cell = sum_2_way(cnfg, hb_cell,
+                        b_11, h1_cell,
+                        b_10, hh_cell)
 
     uk_tend = cpy_x_vec(  cnfg, u0_tend, uk_tend)
     uk_tend = rhs_pgf_u(
@@ -301,8 +333,6 @@ def step_RK33(mesh, mats, flow, cnfg,
     cnfg = mark_time(
         cnfg, flow, start_t + 1. / 3.0 * dt_step)
 
-    BETA = cnfg.fb_weight[1] * isFB
-    
 #-- skipping the new tide eval. is still 2nd-order accurate
 #   rhs_tde_d(  # eval. tides state 
 #       mesh, mats, flow, cnfg, h1_cell, uk_edge)
@@ -336,13 +366,11 @@ def step_RK33(mesh, mats, flow, cnfg,
     uk_tend = rhs_fst_u(
         mesh, mats, flow, cnfg, h1_cell, uk_edge, uk_tend)    
     
-    if (BETA > +0.0): \
-    hb_cell = sum_2_way(
-        cnfg, hb_cell, 0.0 + 1.0 * BETA, h2_cell,
-                       1.0 - 1.0 * BETA, hh_cell)
-    else: \
-    hb_cell = cpy_x_vec(  cnfg, h1_cell, hb_cell)
-    
+    hb_cell = sum_3_way(cnfg, hb_cell,
+                        b_22, h2_cell,
+                        b_21, h1_cell,
+                        b_20, hh_cell)
+
     uk_tend = rhs_pgf_u(
         mesh, mats, flow, cnfg, hb_cell, uk_edge, uk_tend)
 
@@ -360,7 +388,7 @@ def step_RK33(mesh, mats, flow, cnfg,
 
     #-- theta scheme implicit solve
         uk_edge = inv_x_2nd(
-            cnfg, uk_edge, .5 * k2_step, ck_edge, uu_edge)
+            cnfg, uk_edge, 1. * k2_step, ck_edge, uu_edge)
 
     ttoc = time.time()
     tcpu.momentum_+= (ttoc - ttic)
@@ -374,8 +402,6 @@ def step_RK33(mesh, mats, flow, cnfg,
     cnfg = mark_time(
         cnfg, flow, start_t + 2. / 3.0 * dt_step)
 
-    BETA = cnfg.fb_weight[2] * isFB
-    
     rhs_tde_d(  # eval. tides state 
         mesh, mats, flow, cnfg, h2_cell, uk_edge)
     rhs_all_d(  # eval. diagnostics 
@@ -412,17 +438,15 @@ def step_RK33(mesh, mats, flow, cnfg,
     uk_tend = rhs_fst_u(
         mesh, mats, flow, cnfg, h2_cell, uk_edge, uk_tend)
 
+    hb_cell = sum_4_way(cnfg, hb_cell,
+                        b_33, h3_cell,
+                        b_32, h2_cell,
+                        b_31, h1_cell,
+                        b_30, hh_cell)
+
    #uu_tend = +1./4. * u0_tend + 3./4. * uk_tend
     uk_tend = sum_2_way(
         cnfg, uk_tend, 1. / 4., u0_tend, 3. / 4., uk_tend)
-
-   #hm_cell = (1.-2.*BETA)* h2_cell + 
-   #           2./3.*BETA * hh_cell + 4./3.*BETA* h3_cell
-   #hm_cell = +1./4. * hh_cell + 3./4. * hm_cell
-    hb_cell = sum_3_way(
-        cnfg, hb_cell, 0. + 1.0 * BETA , h3_cell,
-        +3.0 / 4.0 * (1.0 - 2.0 * BETA), h2_cell,
-        +1.0 / 2.0 * (1.0 / 2.0 + BETA), hh_cell)
 
     uk_tend = rhs_pgf_u(
         mesh, mats, flow, cnfg, hb_cell, uk_edge, uk_tend)
@@ -442,7 +466,7 @@ def step_RK33(mesh, mats, flow, cnfg,
 
     #-- theta scheme implicit solve
         uk_edge = inv_x_2nd(
-            cnfg, uk_edge, .5 * k3_step, cd_edge, uu_edge)
+            cnfg, uk_edge, 1. * k3_step, cd_edge, uu_edge)
 
     ttoc = time.time()
     tcpu.momentum_+= (ttoc - ttic)
@@ -458,7 +482,7 @@ def step_RK33(mesh, mats, flow, cnfg,
     cnfg.next_step = cfl_adapt(
         mesh, mats, cnfg, 
         gravity=gravity, hh_thin=cnfg.wetdry_h0 * 100.,
-        rk_scal=15./8.0, rk_adv_=4.0/3.0,
+        rk_scal=2.0/1.0, rk_adv_=2.0/1.0,
         cfl_num=cnfg.cfl_limit, dt_prev=cnfg.time_step,
         dt_jump=cnfg.dt_margin,
         hh_prev=hh_cell, hh_cell=h3_cell,
@@ -489,10 +513,28 @@ def step_RK43(mesh, mats, flow, cnfg,
               Rh_cell, Ru_edge):    # slow tend.
 
 #-- A 4-stage 4th/3rd-order RK scheme:
-#-- D. Engwirda (2025): 3- and 4-stage forward-backward
+#-- D. Engwirda (2025): 3-, 4- and 5-stage forward-backward
 #-- Runge-Kutta methods for geophysical flows
 
 #-- drag included via a 2nd-order IMEX scheme
+
+    """
+    # scheme without forward-backward weights
+    b_22 = 0.00 ; b_21 = 1.00
+    b_20 = 1.00 - b_22 - b_21
+    
+    b_33 = 0.00 ; b_32 = 1.00 ; b_31 = 0.00
+    b_30 = 1.00 - b_33 - b_32 - b_31
+    """
+
+    # 3rd-order CFL=sqrt(12.) scheme
+    # high-accuracy & exactly non-dissipative, moderate CFL
+    b_22 = 1./2.; b_21 = 0.00
+    b_20 = 1.00 - b_22 - b_21
+    
+    b_33 = 1./2.; b_32 = 0.00 ; b_31 = 0.00
+    b_30 = 1.00 - b_33 - b_32 - b_31
+    
 
     start_t = cnfg.timeisnow
 
@@ -641,12 +683,10 @@ def step_RK43(mesh, mats, flow, cnfg,
     uk_tend = rhs_fst_u(
         mesh, mats, flow, cnfg, h0_cell, uk_edge, uk_tend)
 
-    if (BETA > +0.0): \
-    hb_cell = sum_2_way(
-        cnfg, hb_cell, 0.0 + 1.0 * BETA, h1_cell,
-                       1.0 - 1.0 * BETA, hh_cell)
-    else: \
-    hb_cell = cpy_x_vec(  cnfg, h0_cell, hb_cell)
+    hb_cell = sum_3_way(cnfg, hb_cell,
+                        b_22, h1_cell,
+                        b_21, h0_cell,
+                        b_20, hh_cell)
 
     uk_tend = rhs_pgf_u(
         mesh, mats, flow, cnfg, hb_cell, uk_edge, uk_tend)
@@ -659,8 +699,8 @@ def step_RK43(mesh, mats, flow, cnfg,
             mesh, mats, cnfg, gravity, dz_drag,
             c1_edge, c2_edge, z0_edge, n0_edge)
 
-    #-- euler scheme implicit solve
-        uk_edge = inv_x_1st(
+    #-- theta scheme implicit solve
+        uk_edge = inv_x_2nd(
             cnfg, uk_edge, 1. * k1_step, ck_edge, uu_edge)
 
     ttoc = time.time()
@@ -710,12 +750,11 @@ def step_RK43(mesh, mats, flow, cnfg,
     uk_tend = rhs_fst_u(
         mesh, mats, flow, cnfg, h1_cell, uk_edge, uk_tend)
 
-    if (BETA > +0.0): \
-    hb_cell = sum_2_way(
-        cnfg, hb_cell, 0.0 + 1.0 * BETA, h2_cell,
-                       1.0 - 1.0 * BETA, hh_cell)
-    else: \
-    hb_cell = cpy_x_vec(  cnfg, h1_cell, hb_cell)
+    hb_cell = sum_4_way(cnfg, hb_cell,
+                        b_33, h2_cell,
+                        b_32, h1_cell,
+                        b_31, h0_cell,
+                        b_30, hh_cell)
     
     uk_tend = rhs_pgf_u(
         mesh, mats, flow, cnfg, hb_cell, uk_edge, uk_tend)
@@ -734,7 +773,7 @@ def step_RK43(mesh, mats, flow, cnfg,
 
     #-- theta scheme implicit solve
         uk_edge = inv_x_2nd(
-            cnfg, uk_edge, .5 * k2_step, ck_edge, uu_edge)
+            cnfg, uk_edge, 1. * k2_step, ck_edge, uu_edge)
 
     ttoc = time.time()
     tcpu.momentum_+= (ttoc - ttic)
@@ -790,13 +829,9 @@ def step_RK43(mesh, mats, flow, cnfg,
     uk_tend = sum_2_way(
         cnfg, uk_tend, 1. / 4., u0_tend, 3. / 4., uk_tend)
 
-   #hm_cell = (1.-2.*BETA)* h2_cell + 
-   #           2./3.*BETA * hh_cell + 4./3.*BETA* h3_cell
-   #hm_cell = +1./4. * hh_cell + 3./4. * hm_cell
-    hb_cell = sum_3_way(
-        cnfg, hb_cell, 0. + 1.0 * BETA , h3_cell,
-        +3.0 / 4.0 * (1.0 - 2.0 * BETA), h2_cell,
-        +1.0 / 2.0 * (1.0 / 2.0 + BETA), hh_cell)
+   #hm_cell = +1./4. * hh_cell + 3./4. * h2_cell
+    hb_cell = sum_2_way(
+        cnfg, hb_cell, 1. / 4., hh_cell, 3. / 4., h2_cell)
 
     uk_tend = rhs_pgf_u(
         mesh, mats, flow, cnfg, hb_cell, uk_edge, uk_tend)
@@ -816,7 +851,7 @@ def step_RK43(mesh, mats, flow, cnfg,
 
     #-- theta scheme implicit solve
         uk_edge = inv_x_2nd(
-            cnfg, uk_edge, .5 * k3_step, cd_edge, uu_edge)
+            cnfg, uk_edge, 1. * k3_step, cd_edge, uu_edge)
 
     ttoc = time.time()
     tcpu.momentum_+= (ttoc - ttic)
@@ -830,7 +865,7 @@ def step_RK43(mesh, mats, flow, cnfg,
     cnfg.next_step = cfl_adapt(
         mesh, mats, cnfg, 
         gravity=gravity, hh_thin=cnfg.wetdry_h0 * 100.,
-        rk_scal=3.0/2.0, rk_adv_=4.0/3.0,
+        rk_scal=13./9.0, rk_adv_=2.0/1.0,
         cfl_num=cnfg.cfl_limit, dt_prev=cnfg.time_step,
         dt_jump=cnfg.dt_margin,
         hh_prev=hh_cell, hh_cell=h3_cell,
@@ -844,7 +879,10 @@ def step_RK43(mesh, mats, flow, cnfg,
     h0_tend = set_x_vec(cnfg, h0_tend, 0.0E+00)
     u0_tend = set_x_vec(cnfg, u0_tend, 0.0E+00)
 
+    if (cnfg.next_step > 0.0): \
     hh_cell = cpy_x_vec(cnfg, h3_cell, hh_cell)
+
+    if (cnfg.next_step > 0.0): \
     uu_edge = cpy_x_vec(cnfg, uk_edge, uu_edge)
 
     ttoc = time.time()
@@ -866,7 +904,7 @@ try:
     from _kt import _inv_x_2nd as inv_x_2nd
     from _kt import _sum_2_way as sum_2_way
     from _kt import _sum_3_way as sum_3_way
-    from _kt import _sym_3_way as sym_3_way
+    from _kt import _sum_4_way as sum_4_way
     
 except ImportError:
     raise RuntimeError("Cython back-end not found")

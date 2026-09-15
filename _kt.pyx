@@ -434,6 +434,8 @@ def _inv_x_1st(cnfg,
     
     cdef REALS_t ONE_ = 1.0
     
+    cdef LOCAL_t diag
+
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t numchunks = cnfg.numchunks
 
@@ -451,8 +453,9 @@ def _inv_x_1st(cnfg,
                 chunksize=chunksize):
         #-- 1-stage inversion for implicit drag
                      
-            XX_DATA[ipos]/= CD_DATA[ipos] * rh_coef + \
-                            ONE_
+            diag = rh_coef * CD_DATA[ipos]
+
+            XX_DATA[ipos]/= ONE_ + diag
                         
     return xx_data
 
@@ -467,7 +470,12 @@ def _inv_x_2nd(cnfg,
     cdef INDEX_t ipos
     cdef INDEX_t NDAT = xx_data.size
     
+    cdef REALS_t HALF = 0.5
     cdef REALS_t ONE_ = 1.0
+    cdef REALS_t ETA_ = 16.
+    
+    cdef LOCAL_t lhs_, rhs_
+    cdef LOCAL_t diag, bias
     
     cdef INDEX_t numthread = cnfg.numthread
     cdef INDEX_t numchunks = cnfg.numchunks
@@ -475,10 +483,6 @@ def _inv_x_2nd(cnfg,
     cdef INDEX_t chunksize = max(1,
        ((NDAT // numthread // numchunks) // 8) * 8
         )
-    
-    # oscillatory if not off-centred
-    cdef REALS_t  ex_coef = (1. - 1./4.) * rh_coef
-    cdef REALS_t  im_coef = (1. + 1./4.) * rh_coef
 
     cdef FLTXX_t *XX_DATA = &xx_data[+0]
     cdef REALS_t *CD_DATA = &cd_data[+0]
@@ -488,13 +492,21 @@ def _inv_x_2nd(cnfg,
     
         for ipos in prange(0, NDAT, schedule="static", 
                 chunksize=chunksize):
+        #-- progressive off-centre to guarantee
+        #-- monotonicity as cd => inf
+
+            diag = rh_coef * CD_DATA[ipos]
+            bias = ETA_ * (diag * diag)
+            bias = bias / (bias + ONE_)
+            bias = HALF * (ONE_ + bias)
+
         #-- 2-stage inversion for implicit drag
-                    
-            XX_DATA[ipos]-= CD_DATA[ipos] * ex_coef * \
-                            RH_DATA[ipos]
-                            
-            XX_DATA[ipos]/= CD_DATA[ipos] * im_coef + \
-                            ONE_
+
+            rhs_ =(ONE_ - bias) * diag
+            lhs_ = ONE_ + bias  * diag
+
+            XX_DATA[ipos]-= rhs_ * RH_DATA[ipos]
+            XX_DATA[ipos]/= lhs_
                         
     return xx_data
 
@@ -573,6 +585,51 @@ def _sum_3_way(cnfg,
             YY_DATA[ipos] = X1_DATA[ipos] * x1_coef + \
                             X2_DATA[ipos] * x2_coef + \
                             X3_DATA[ipos] * x3_coef
+                                     
+    return yy_data
+
+
+def _sum_4_way(cnfg, 
+    np.ndarray[FLTXX_t, ndim=1] yy_data,
+        const FLTXX_t x1_coef, 
+    np.ndarray[FLTXX_t, ndim=1] x1_data,
+        const FLTXX_t x2_coef, 
+    np.ndarray[FLTXX_t, ndim=1] x2_data,
+        const FLTXX_t x3_coef, 
+    np.ndarray[FLTXX_t, ndim=1] x3_data,
+        const FLTXX_t x4_coef, 
+    np.ndarray[FLTXX_t, ndim=1] x4_data
+              ):
+    
+#-- yy = sum( bi * xi ), 4-array version
+    
+    cdef INDEX_t ipos
+    
+    cdef INDEX_t NDAT = x1_data.size
+    
+    cdef INDEX_t numthread = cnfg.numthread
+    cdef INDEX_t numchunks = cnfg.numchunks
+
+    cdef INDEX_t chunksize = max(1,
+       ((NDAT // numthread // numchunks) // 8) * 8
+        )
+    
+    cdef FLTXX_t *X1_DATA = &x1_data[+0]
+    cdef FLTXX_t *X2_DATA = &x2_data[+0]
+    cdef FLTXX_t *X3_DATA = &x3_data[+0]
+    cdef FLTXX_t *X4_DATA = &x4_data[+0]
+    cdef FLTXX_t *YY_DATA = &yy_data[+0]
+    
+    with nogil, parallel(num_threads=numthread):
+    
+        for ipos in prange(0, NDAT, schedule="static", 
+                chunksize=chunksize):        
+        #-- 3-way forward-backward averaging
+            
+            YY_DATA[ipos] = X1_DATA[ipos] * x1_coef + \
+                            X2_DATA[ipos] * x2_coef + \
+                            X3_DATA[ipos] * x3_coef + \
+                            X4_DATA[ipos] * x4_coef
                                      
     return yy_data
 
