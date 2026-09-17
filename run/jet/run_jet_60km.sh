@@ -28,10 +28,11 @@ then
     --mesh-file=${MSHDIR}/"jet_cvt_7.nc"
     --numthread=${NUMCPU}
     --integrate=${SCHEME}
+    --time-step=200.0
     --time-span="6d" --save-time="1d" --stat-time="1d"
   )
 
-  ${RUNNER} ${PYTHON} ${BINDIR}/swe.py "${opts[@]}"
+  ${PYTHON} ${BINDIR}/swe.py "${opts[@]}"
 
 else
   echo "PERISCOPE not found"

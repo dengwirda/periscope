@@ -89,15 +89,18 @@ def calc_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge,
 
 #-- compute diagnostic variables from the current state
 
-    ff_dual = flow.ff_vert; ff_edge = flow.ff_edge
-    ff_cell = flow.ff_cell
+    ff_dual = variables.ff_vert
+    ff_edge = variables.ff_edge
+    ff_cell = variables.ff_cell
     
     Xi_tide = variables.Xi_tide  # lagged values
     Xi_self = variables.Xi_self
 
     uu_filt = variables.uu_filt
 
-    zb_cell = flow.zb_cell; gravity = flow.gravity
+    zb_cell = variables.zb_cell
+
+    gravity = flow.gravity
 
     vv_edge = calc_perp(mesh, mats, cnfg, uu_edge)
 
@@ -142,10 +145,13 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge,
 
 #-- compute the discrete energy and enstrophy invariants
 
-    ff_dual = flow.ff_vert; ff_edge = flow.ff_edge
-    ff_cell = flow.ff_cell
+    ff_dual = variables.ff_vert
+    ff_edge = variables.ff_edge
+    ff_cell = variables.ff_cell
 
-    zb_cell = flow.zb_cell; gravity = flow.gravity
+    zb_cell = variables.zb_cell
+
+    gravity = flow.gravity
 
     vv_edge = calc_perp(mesh, mats, cnfg, uu_edge)
 
@@ -781,33 +787,4 @@ def calc_drag(mesh, mats, cnfg, gravity, dz_drag,
 
     return cd_edge
 
-
-try:
-    # load cython kernels, if compiled
-    from _kx import _calc_obcs
-    from _kx import _calc_udry
-    from _kx import _upwinding
-    from _kx import _calc_hmap
-    from _kx import _calc_u_ke
-    from _kx import _calc_u_pv
-    from _kx import _calc_perp
-    from _kx import _tend_hadv
-    from _kx import _tend_qadv
-    from _kx import _tend_uadv
-    from _kx import _tend_upgf
-    from _kx import _tend_ugeo
-    from _kx import _tend_utde
-    from _kx import _calc_umix
-    from _kx import _calc_uwav
-    from _kx import _calc_hmix
-    from _kx import _tend_umix
-    from _kx import _tend_hmix
-    from _kx import _tend_utau
-    from _kx import _tend_uflt
-    from _kx import _calc_drag
-    from tde import _calc_tide
-    from sal import _calc_self
-
-except ImportError:
-    raise RuntimeError("Cython back-end not found")
 
