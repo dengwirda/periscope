@@ -24,7 +24,6 @@ from rhs import rhs_all_u, rhs_slw_u, rhs_fst_u
 from rhs import rhs_pgf_u
 from rhs import rhs_all_h, rhs_slw_h, rhs_fst_h
 
-@jax.jit
 def step_RK33(mesh, mats, flow, cnfg):
 
 #-- A 3-stage 3rd/2nd-order RK scheme:

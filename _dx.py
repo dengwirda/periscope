@@ -15,7 +15,7 @@ import numpy as np
 from _fp import flt32_t, flt64_t
 from _fp import reals_t, index_t
 
-from _jo import op_product
+from _jo import op_product, pv_product
 
 def scale_mix(mesh, mats, cnfg):
 
@@ -440,18 +440,13 @@ def tend_uadv(mesh, mats, cnfg,
 
     pv_weight = cnfg.consts.pv_weight
 
-#-- split linear & nonlinear (curl(u) + f) / h
-    pv_edge =(pv_edge - ff_edge*pv_weight) /  hh_quad
+    pv_sub_ =(pv_edge - ff_edge * pv_weight) / hh_quad
+    pv_add_ =(pv_edge + ff_edge * pv_weight) / hh_quad
     uh_flux = uu_edge * hh_edge
 
-    fh_flux =(+2.00 * pv_weight * ff_edge) /  hh_quad
-
-
-    pv_flux = op_product(mats.edge.flux_perp, uh_flux * 
-                                   (pv_edge + fh_flux)
-        ) + \
-    pv_edge * op_product(mats.edge.flux_perp, uh_flux)
-
+    pv_flux = pv_product(mats.edge.flux_perp, uh_flux, 
+                                              pv_sub_, 
+                                              pv_add_)
 
     ke_grad = op_product(mats.edge.grad_norm, ke_cell)
 
