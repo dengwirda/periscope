@@ -12,6 +12,7 @@ import numpy as np
 
 import jax
 
+XLA_FLAGS="--xla_cpu_use_thunk_runtime=false"
 jax.config.update("jax_enable_x64", True)
 
 from _fp import flt32_t, flt64_t
@@ -157,11 +158,20 @@ def swe(cnfg):
 
     flow.jx, cnfg.jx = step_eqns(
         mesh.jx, mats.jx, flow.jx, cnfg.jx, cnfg.iteration)
-        
 
+        
+    jax.block_until_ready(flow.jx)
 
 
     ttoc = time.time()
+
+
+    hh_cell = np.asarray(flow.jx.prognostic.hh_cell, dtype=hdata_t)
+    uu_edge = np.asarray(flow.jx.prognostic.uu_edge, dtype=udata_t)
+
+    print(np.min(hh_cell), np.max(hh_cell))
+    print(np.min(uu_edge), np.max(uu_edge))
+
 
     """
     save_last(save, mesh, mats, flow, cnfg, step, 

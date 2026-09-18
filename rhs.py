@@ -15,76 +15,64 @@ from _fp import reals_t, index_t
 from _fp import udata_t, hdata_t, qdata_t
 from _fp import utend_t, htend_t, qtend_t
 
-"""
-from log import tcpu
+from _jv import jxp_prognostic
+from _jv import jxp_diagnostic
+from _jv import jxp_foundation
 
+from _dx import calc_hmap, tend_hadv
+from _dx import calc_u_ke, calc_u_pv, calc_perp
+from _dx import tend_uadv, tend_upgf
+
+"""
 from _dx import calc_obcs, calc_udry, \
-                calc_hmap, tend_hadv, \
-                calc_qmap, tend_qadv, \
-                calc_u_ke, calc_u_pv, calc_perp, \
-                tend_uadv, tend_upgf, tend_uflt, \
                 calc_umix, calc_uwav, calc_hmix, \
                 tend_umix, tend_hmix, \
-                tend_ugeo, tend_utau, \
                 tend_utde, calc_tide, calc_self
-                
-from mem import variables
 """
 
-def rhs_tde_d(mesh, mats, flow, cnfg, hh_cell, uu_edge):
+def rhs_tde_d(mesh, mats, cnfg, base, diag, hh_cell, uu_edge):
     
 #-- evaluate tide tendency diagnostics
     
     """
-    if cnfg.no_u_tend or \
-            not cnfg.calc_tide or cnfg.rhs_stage != 1: 
-        return
+    zb_cell = base.zb_cell 
 
-    zb_cell = variables.zb_cell 
+    gravity = cnfg.consts.gravity
 
-    gravity = flow.gravity
-
-    Xi_tide = variables.Xi_tide
-    Xi_self = variables.Xi_self
+    xi_tide = diag.xi_tide
+    xi_self = diag.xi_self
 
     # tidal forcing
-    Xi_tide = calc_tide(mesh, mats, cnfg, gravity, Xi_tide)
+    xi_tide = calc_tide(mesh, mats, cnfg, gravity, xi_tide)
     
-    Xi_self = calc_self(mesh, mats, cnfg, hh_cell, zb_cell, 
-                                          gravity, Xi_self)
+    xi_self = calc_self(mesh, mats, cnfg, hh_cell, zb_cell, 
+                                          gravity, xi_self)
     """
 
 
-def rhs_all_d(mesh, mats, flow, cnfg, hh_cell, uu_edge):
+def rhs_all_d(mesh, mats, cnfg, base, diag, hh_cell, uu_edge):
 
 #-- evaluate full tendency diagnostics
 
-    """
-    zb_cell = variables.zb_cell
+    zb_cell = base.zb_cell
 
-    gravity = flow.gravity
+    ff_cell = base.ff_cell
+    ff_edge = base.ff_edge
+    ff_dual = base.ff_vert
 
-    hE_prev = flow.prev.hE_edge
-    uE_prev = flow.prev.uE_edge
-    
-    hE_next = flow.next.hE_edge
-    uE_next = flow.next.uE_edge
+    gravity = cnfg.consts.gravity
 
-    ff_cell = variables.ff_cell
-    ff_edge = variables.ff_edge
-    ff_dual = variables.ff_vert
-
-    ke_diss = variables.ke_diss
-    ke_diss = set_x_vec(cnfg, ke_diss, 0.0)
+    hr_cell = hh_cell.astype(dtype=reals_t)
 
     # construct vel^\perp
     vv_edge = calc_perp(mesh, mats, cnfg, uu_edge)
     
     # construct thickness
     hh_dual, hh_edge, hh_quad, hh_bias = \
-              calc_hmap(mesh, mats, cnfg, gravity, hh_cell, 
+              calc_hmap(mesh, mats, cnfg, gravity, hr_cell, 
                                           uu_edge, vv_edge)
-
+    
+    """
     # do extrap. for OBCs
     hh_edge, uu_edge = \
               calc_obcs(mesh, mats, cnfg, hh_edge, uu_edge,
@@ -97,25 +85,23 @@ def rhs_all_d(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     uu_edge, vv_edge, nu_thin = \
               calc_udry(mesh, mats, cnfg, hh_edge, 
                                           uu_edge, vv_edge)
+    """
 
     # nonlinear variables: kinetic energy & curl
     ke_cell, ke_bias = calc_u_ke(
         mesh, mats, cnfg, 
-        hh_cell, hh_quad, hh_dual, 
-        uu_edge, vv_edge,
-        +1. / 2. * cnfg.time_step)
+        hr_cell, hh_quad, hh_dual, 
+        uu_edge, vv_edge, +1. / 2. * cnfg.params.time_step)
 
     rv_dual, pv_dual, rv_wide, pv_wide, \
     rv_cell, pv_cell, \
     pv_edge, pv_bias = calc_u_pv(
         mesh, mats, cnfg, 
-        hh_cell, hh_quad, hh_dual, 
-        uu_edge, vv_edge, 
+        hr_cell, hh_quad, hh_dual,
         ff_dual, ff_edge, ff_cell, 
-        +1. / 2. * cnfg.time_step)
+        uu_edge, vv_edge, +1. / 2. * cnfg.params.time_step)
 
-    if (cnfg.calc_fast is False): return
-
+    """
     # shock sub-grid
     nu_shoc = calc_hmix(mesh, mats, cnfg, hh_cell, zb_cell,
                                           gravity,
@@ -132,48 +118,47 @@ def rhs_all_d(mesh, mats, flow, cnfg, hh_cell, uu_edge):
     nu_turb = calc_umix(mesh, mats, cnfg, rv_wide, rv_cell)
     """
     
-    rk_diag = None
-    return rk_diag
+    return diag.replace(
+        vv_edge=vv_edge, 
+        hr_cell=hr_cell,
+        hh_dual=hh_dual, hh_edge=hh_edge, hh_quad=hh_quad,
+        ke_cell=ke_cell,
+        rv_dual=rv_dual, pv_dual=pv_dual,
+        rv_cell=rv_cell, pv_cell=pv_cell, 
+        pv_edge=pv_edge,
+        hh_bias=hh_bias, pv_bias=pv_bias
+    )
 
 
-def rhs_slw_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
+def rhs_slw_h(mesh, mats, cnfg, base, diag, hh_cell, uu_edge, hh_tend):
 
 #-- evaluate slow tendencies dH/dt = RHS(t,U,H)
-
-    hh_tend = jnp.zeros(hh_cell.size, dtype=htend_t)
-
-    """
-    if cnfg.no_h_tend or not cnfg.calc_slow:return hh_tend
-    """
 
     return hh_tend
 
 
-def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
+def rhs_fst_h(mesh, mats, cnfg, base, diag, hh_cell, uu_edge, hh_tend):
 
 #-- evaluate fast tendencies dH/dt = RHS(t,U,H)
 
-    hh_tend = jnp.zeros(hh_cell.size, dtype=htend_t)
+    zb_cell = base.zb_cell
 
-    """
-    if cnfg.no_h_tend or not cnfg.calc_fast:return hh_tend
-
-    zb_cell = variables.zb_cell
-
-    gravity = flow.gravity
+    gravity = cnfg.consts.gravity
     
-    hh_edge = variables.hh_edge
+    hr_cell = diag.hr_cell
+    hh_edge = diag.hh_edge
 
     # thickness advection
-    hh_tend = tend_hadv(mesh, mats, cnfg, hh_edge, hh_cell,
+    hh_tend = tend_hadv(mesh, mats, cnfg, hh_edge, hr_cell,
                                           uu_edge,
                                           gravity, 
                                           hh_tend)
 
-    nu_shoc = variables.nu_shoc
+    """
+    nu_shoc = diag.nu_shoc
 
     # del^k dissipation
-    hh_tend = tend_hmix(mesh, mats, cnfg, hh_cell, zb_cell, 
+    hh_tend = tend_hmix(mesh, mats, cnfg, hr_cell, zb_cell, 
                                           gravity,
                                           nu_shoc, 
                                           hh_tend)
@@ -182,52 +167,41 @@ def rhs_fst_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, hh_tend):
     return hh_tend
 
 
-def rhs_all_h(mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag):
+def rhs_all_h(mesh, mats, cnfg, base, diag, hh_cell, uu_edge, hh_tend):
     
 #-- evaluate full tendencies dH/dt = RHS(t,U,H)
     
-    hh_tend = jnp.zeros(hh_cell.size, dtype=htend_t)
-
-    hh_tend = hh_tend + rhs_fst_h(
-        mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag)
+    hh_tend = rhs_fst_h(
+        mesh, mats, cnfg, base, diag, hh_cell, uu_edge, hh_tend)
         
-    hh_tend = hh_tend + rhs_slw_h(
-        mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag)
+    hh_tend = rhs_slw_h(
+        mesh, mats, cnfg, base, diag, hh_cell, uu_edge, hh_tend)
         
     return hh_tend
 
 
-def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag):
+def rhs_slw_u(mesh, mats, cnfg, base, diag, hh_cell, uu_edge, uu_tend):
     
 #-- evaluate slow tendencies dU/dt = RHS(t,U,H)
 
-    uu_tend = jnp.zeros(uu_edge.size, dtype=utend_t)
+    zb_cell = base.zb_cell
 
-    """
-    if cnfg.no_u_tend or not cnfg.calc_slow:return uu_tend
+    ff_cell = base.ff_cell
+    ff_edge = base.ff_edge
+    ff_dual = base.ff_vert
 
-    zb_cell = variables.zb_cell
+    gravity = cnfg.consts.gravity
 
-    gravity = flow.gravity
+    xi_tide = diag.xi_tide
 
-    Xi_prev = flow.prev.Xi_cell
-    Xi_next = flow.next.Xi_cell
+    hr_cell = diag.hr_cell
 
-    Xi_tide = variables.Xi_tide
+    hh_dual = diag.hh_dual
+    hh_edge = diag.hh_edge
+    hh_quad = diag.hh_quad
 
-    Tu_prev = flow.prev.Tu_edge
-    Tu_next = flow.next.Tu_edge
- 
-    ff_cell = variables.ff_cell
-    ff_edge = variables.ff_edge
-    ff_dual = variables.ff_vert
-
-    hh_dual = variables.hh_dual
-    hh_edge = variables.hh_edge
-    hh_quad = variables.hh_quad
-
-    ke_cell = variables.ke_cell
-    pv_edge = variables.pv_edge
+    ke_cell = diag.ke_cell
+    pv_edge = diag.pv_edge
     
     # nonlinear advection
     uu_tend = tend_uadv(mesh, mats, cnfg, hh_edge, hh_quad,
@@ -235,7 +209,8 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag):
                                           pv_edge, ke_cell,
                                  ff_dual, ff_edge, ff_cell, 
                                           uu_tend)
-
+    
+    """
     # btr-bcl dissipation
     uu_tend = tend_uflt(mesh, mats, cnfg, uu_edge, hh_edge, 
                                           uu_tend)
@@ -248,7 +223,7 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag):
                                           uu_tend)
 
     # tide+SAL geo-pot.
-    uu_tend = tend_utde(mesh, mats, cnfg, Xi_tide,
+    uu_tend = tend_utde(mesh, mats, cnfg, xi_tide,
                                           hh_cell, zb_cell,
                                           gravity,
                                           uu_tend)
@@ -262,29 +237,29 @@ def rhs_slw_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag):
     return uu_tend
 
 
-def rhs_fst_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag):
+def rhs_fst_u(mesh, mats, cnfg, base, diag, hh_cell, uu_edge, uu_tend):
 
 #-- evaluate fast tendencies dU/dt = RHS(t,U,H)
-
-    uu_tend = jnp.zeros(uu_edge.size, dtype=utend_t)
 
     """
     if cnfg.no_u_tend or not cnfg.calc_fast:return uu_tend
 
-    zb_cell = variables.zb_cell
+    zb_cell = base.zb_cell
 
-    gravity = flow.gravity
+    gravity = cnfg.consts.gravity
 
-    hh_dual = variables.hh_dual
-    hh_edge = variables.hh_edge
-    hh_quad = variables.hh_quad
+    hr_cell = diag.hr_cell
+
+    hh_dual = diag.hh_dual
+    hh_edge = diag.hh_edge
+    hh_quad = diag.hh_quad
     
-    nu_turb = variables.nu_turb
-    nu_wave = variables.nu_wave
-    nu_thin = variables.nu_thin
+    nu_turb = diag.nu_turb
+    nu_wave = diag.nu_wave
+    nu_thin = diag.nu_thin
 
     # del^k dissipation
-    uu_tend = tend_umix(mesh, mats, cnfg, hh_cell, hh_edge, 
+    uu_tend = tend_umix(mesh, mats, cnfg, hr_cell, hh_edge, 
                                           hh_quad, hh_dual, 
                                           uu_edge,
                                           nu_turb, nu_wave,
@@ -295,44 +270,37 @@ def rhs_fst_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag):
     return uu_tend
 
 
-def rhs_pgf_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag):
+def rhs_pgf_u(mesh, mats, cnfg, base, diag, hh_cell, uu_edge, uu_tend):
 
 #-- evaluate hPGF tendencies dU/dt = RHS(t,U,H)
 
-    uu_tend = jnp.zeros(uu_edge.size, dtype=utend_t)
+    zb_cell = base.zb_cell
 
-    """
-    if cnfg.no_u_tend or not cnfg.calc_fast:return uu_tend
+    xi_self = diag.xi_self
 
-    zb_cell = variables.zb_cell
-
-    gravity = flow.gravity
-
-    Xi_self = variables.Xi_self
+    gravity = cnfg.consts.gravity
 
     # pressure gradient
     uu_tend = tend_upgf(mesh, mats, cnfg, hh_cell, zb_cell, 
-                                          gravity, Xi_self,
+                                          gravity, 
+                                          xi_self,
                                           uu_tend)
-    """
-
+    
     return uu_tend
 
 
-def rhs_all_u(mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag):
+def rhs_all_u(mesh, mats, cnfg, base, diag, hh_cell, uu_edge, uu_tend):
 
 #-- evaluate full tendencies dU/dt = RHS(t,U,H)
 
-    uu_tend = jnp.zeros(uu_edge.size, dtype=utend_t)
+    uu_tend = rhs_slw_u(
+        mesh, mats, cnfg, base, diag, hh_cell, uu_edge, uu_tend)
 
-    uu_tend = uu_tend + rhs_slw_u(
-        mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag)
+    uu_tend = rhs_fst_u(
+        mesh, mats, cnfg, base, diag, hh_cell, uu_edge, uu_tend)
 
-    uu_tend = uu_tend + rhs_fst_u(
-        mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag)
-
-    uu_tend = uu_tend + rhs_pgf_u(
-        mesh, mats, flow, cnfg, hh_cell, uu_edge, rk_diag)
+    uu_tend = rhs_pgf_u(
+        mesh, mats, cnfg, base, diag, hh_cell, uu_edge, uu_tend)
 
     return uu_tend
 

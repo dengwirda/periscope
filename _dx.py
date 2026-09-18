@@ -1,6 +1,8 @@
 
 import time
 import math
+import jax
+import jax.numpy as jnp
 import numpy as np
 
 """ SWE spatial discretisation using TRSK-like operators
@@ -13,28 +15,7 @@ import numpy as np
 from _fp import flt32_t, flt64_t
 from _fp import reals_t, index_t
 
-from log import tcpu
-
-from mem import variables
-
-def soft_step(xx, lo, up):
-
-#-- soft step function, using a Hermite-like polynomial
-#-- https://en.wikipedia.org/wiki/smoothstep
-
-    yy = np.minimum(1., 
-         np.maximum(0., (xx - lo) / (up - lo)))
-
-    return (
-    yy * yy * yy * (yy * (6. * yy - 15.) + 10.)
-           )
-
-def hrmn_mean(xone, xtwo):
-
-#-- harmonic mean of vectors (ie. biased toward lesser)
-
-    return 2. * xone * xtwo / (xone + xtwo)
-
+from _jo import op_product
 
 def scale_mix(mesh, mats, cnfg):
 
@@ -266,15 +247,59 @@ def calc_hmap(mesh, mats, cnfg,
 
 #-- compute discrete thickness
 
-    ttic = time.time()
-    
-    hh_dual, hh_edge, hh_quad, hh_bias = \
-        _calc_hmap(mesh, mats, cnfg, 
-            gravity, hh_cell, uu_edge, vv_edge)
-    
-    ttoc = time.time()
-    tcpu.calc_hmap = tcpu.calc_hmap + (ttoc - ttic)
+    if (cnfg.option.hh_scheme == "CENTRE"):
 
+        hh_dual = op_product(
+            mats.dual.kite_sums, hh_cell) / mesh.vert.area
+        hh_edge = op_product(
+            mats.edge.wing_sums, hh_cell) / mesh.edge.area
+
+        hh_quad =(4.0 * hh_edge + op_product(
+            mats.edge.dual_sums, hh_dual) ) / 6.0
+
+        hh_bias = jnp.zeros(hh_edge.size, dtype=reals_t)
+
+    else:  # option.hh_scheme == "UPWIND"
+
+        hh_dual = op_product(
+            mats.dual.kite_sums, hh_cell) / mesh.vert.area
+        hh_edge = op_product(
+            mats.edge.wing_sums, hh_cell) / mesh.edge.area
+
+        hh_quad =(4.0 * hh_edge + op_product(
+            mats.edge.dual_sums, hh_dual) ) / 6.0
+
+    #-- compute the upwind thickness blend
+        uu_wave = jnp.sqrt(uu_edge ** 2 + vv_edge ** 2)
+
+        cel1 = mesh.edge.cell[:, 0] - 1
+        cel2 = mesh.edge.cell[:, 1] - 1
+
+        cel1 = jnp.where(cel1 >= 0, cel1, cel2)
+        cel2 = jnp.where(cel2 >= 0, cel2, cel1)
+
+        h1_cell = hh_cell[cel1].astype(reals_t)
+        h2_cell = hh_cell[cel2].astype(reals_t)
+
+        c1_wave = uu_wave + jnp.sqrt(gravity * h1_cell)
+        c2_wave = uu_wave + jnp.sqrt(gravity * h2_cell)
+
+    #-- upwind if the wavespeed ratio >> 1
+        hh_bias = jnp.where(c2_wave>c1_wave, 
+            jnp.maximum(jnp.sqrt(c2_wave/c1_wave - 1.), 
+                                 h2_cell/h1_cell - 1.),
+            jnp.maximum(jnp.sqrt(c1_wave/c2_wave - 1.), 
+                                 h1_cell/h2_cell - 1.)
+        )
+        hh_bias = jnp.minimum(+1.0, hh_bias)
+
+        hh_bias = hh_bias ** 3
+
+        hh_edge = jnp.where(uu_edge >= 0.0, 
+            hh_bias * h1_cell + (1.-hh_bias) * hh_edge,
+            hh_bias * h2_cell + (1.-hh_bias) * hh_edge
+        )
+        
     return hh_dual, hh_edge, hh_quad, hh_bias
     
 
@@ -284,48 +309,64 @@ def calc_u_ke(mesh, mats, cnfg,
 
 #-- reconstruct kinetic energy
 
-    ttic = time.time()
+    method_ke = cnfg.consts.ke_method
+    weight_ke = cnfg.consts.ke_weight
 
-    up_edge = variables.ke_bias
- 
-    ke_cell = _calc_u_ke(
-        mesh, mats, cnfg, 
-        hh_cell, hh_edge, hh_dual, uu_edge, vv_edge)
+#-- calc. kinetic energy on edges: 1./2 * |u|^2
+    k1_edge = 1.0 * uu_edge ** 2
+    k2_edge = 0.5 *(uu_edge ** 2 + vv_edge ** 2)
 
-    ttoc = time.time()
-    tcpu.calc_u_ke = tcpu.calc_u_ke + (ttoc - ttic)
+    ke_edge =(1.0 - method_ke) * k1_edge + \
+             (0.0 + method_ke) * k2_edge
 
-    return ke_cell, up_edge
+#-- remap kinetic energy M_(c,e) * 1./2 * |u|^2
+    ke_edge = ke_edge / hh_edge ** 2
+    ke_cell = op_product(
+        mats.cell.wing_sums, ke_edge) / mesh.cell.area
+
+    ke_cell = ke_cell * hh_cell ** 2
+
+    ke_bias = jnp.zeros(hh_edge.size, dtype=reals_t)
+
+    return ke_cell, ke_bias
 
 
 def _build_pv(mesh, mats, cnfg, 
-        hh_cell, hh_quad, hh_dual, uu_edge, vv_edge, 
-        ff_dual, ff_edge, ff_cell,
+        hh_cell, hh_quad, hh_dual, ff_dual, ff_edge, ff_cell,
+        uu_edge, vv_edge, 
         delta_t):
            
 #-- compute discrete vorticity
               
-    ttic = time.time()
-              
-    rv_dual, pv_dual, rv_wide, pv_wide, pv_rms_, \
-    rv_cell, pv_cell, \
-    rv_edge, pv_edge = _calc_u_pv(
-        mesh, mats, cnfg, 
-        hh_cell, hh_quad, hh_dual, uu_edge, vv_edge, 
-        ff_dual, ff_edge, ff_cell)
-    
-    ttoc = time.time()
-    tcpu.calc_u_pv = tcpu.calc_u_pv + (ttoc - ttic)
+    rv_dual = op_product(mats.dual.curl_sums, uu_edge)
+   #rv_dual = rv_dual *  mesh.vert.slip
 
-    return rv_dual, pv_dual, \
-           rv_wide, pv_wide, pv_rms_, \
+    rv_edge = op_product(mats.edge.dual_sums, rv_dual)
+
+    rv_dual = rv_dual /  mesh.vert.area
+    rv_edge = rv_edge /  mesh.quad.area
+
+    pv_dual = rv_dual + ff_dual
+    pv_edge = rv_edge + ff_edge
+
+    rv_wide = op_product(mats.dual.edge_sums, rv_edge)
+    rv_wide = rv_wide /  3.0 #!!
+
+    rv_cell = op_product(mats.cell.kite_sums, rv_dual)
+    rv_cell = rv_cell /  mesh.cell.area
+
+    pv_wide = rv_wide + ff_dual
+    pv_cell = rv_cell + ff_cell
+
+    return rv_dual, pv_dual, rv_wide, pv_wide, \
+           jnp.sqrt( jnp.sum(pv_wide ** 2 ) ), \
            rv_cell, pv_cell, \
            rv_edge, pv_edge
               
               
 def calc_u_pv(mesh, mats, cnfg, 
-        hh_cell, hh_quad, hh_dual, uu_edge, vv_edge, 
-        ff_dual, ff_edge, ff_cell,
+        hh_cell, hh_quad, hh_dual, ff_dual, ff_edge, ff_cell,
+        uu_edge, vv_edge,
         delta_t):
   
 #-- compute discrete vorticity
@@ -334,85 +375,37 @@ def calc_u_pv(mesh, mats, cnfg,
     rv_cell, pv_cell, \
     rv_edge, pv_edge =  _build_pv(
         mesh, mats, cnfg, 
-        hh_cell, hh_quad, hh_dual, uu_edge, vv_edge, 
+        hh_cell, hh_quad, hh_dual, 
         ff_dual, ff_edge, ff_cell, 
-        delta_t)
+        uu_edge, vv_edge, delta_t)
     
-    up_edge = variables.pv_bias
-            
-    uu_tiny = cnfg.uu_tiny * 1.
-    pv_tiny = cnfg.pv_tiny * 1.
+    """
+    uu_tiny = cnfg.uu_tiny * 1
+    pv_tiny = cnfg.pv_tiny * 1
     pv_tiny = max (pv_tiny, 
         2.0 * np.finfo(reals_t).eps * pv_rms_)
 
-    pv_edge, up_edge =  upwinding(
+    pv_edge, pv_bias =  upwinding(
         mesh, mats, cnfg, 
         pv_wide, pv_dual, pv_cell, uu_edge, vv_edge, 
         pv_edge, up_edge,
         delta_t, pv_tiny, uu_tiny, 
-        cnfg.pv_scheme, cnfg.pv_upwind)
+        cnfg.option.pv_scheme, 
+        cnfg.consts.pv_upwind)
+    """
+
+    pv_bias = jnp.zeros(pv_edge.size, dtype=reals_t)
 
     return rv_dual, pv_dual, rv_wide, pv_wide, \
            rv_cell, pv_cell, \
-           pv_edge, up_edge
+           pv_edge, pv_bias
 
-
-def _build_qe(mesh, mats, cnfg, 
-        qq_cell, uu_edge, vv_edge, delta_t):
-
-#-- compute discrete transport
-
-    ttic = time.time()
-
-    qq_dual = mats.dual_kite_sums * qq_cell
-    qq_dual/= mesh.vert.area
-
-    qq_edge = mats.edge_wing_sums * qq_cell
-    qq_edge/= mesh.edge.area
-
-    ttoc = time.time()
-    tcpu.calc_qmap = tcpu.calc_qmap + (ttoc - ttic)
-
-    return qq_dual, qq_edge
-
-
-def calc_qmap(mesh, mats, cnfg, 
-        qq_cell, uu_edge, vv_edge, delta_t):
-  
-#-- compute discrete transport
-  
-    qq_dual, qq_edge = _build_qe(
-        mesh, mats, cnfg, 
-        qq_cell, uu_edge, vv_edge, delta_t)
-    
-    up_edge = variables.pv_bias
-            
-    uu_tiny = cnfg.uu_tiny * 1.
-    qq_rms_ = 0.0  # unused
-    qq_tint = 0.0
-    qq_tiny = max (qq_tiny, 
-        2.0 * np.finfo(reals_t).eps * qq_rms_)
-
-    qq_edge, up_edge =  upwinding(
-        mesh, mats, cnfg, 
-        qq_dual, qq_dual, qq_cell, uu_edge, vv_edge, 
-        qq_edge, up_edge,
-        delta_t, qq_tiny, uu_tiny, 
-        "LAXWENDROFF", 0.5)
-
-    return qq_edge, up_edge
-              
               
 def calc_perp(mesh, mats, cnfg, uu_edge):
 
 #-- get tangential velocity
 
-    ttic = time.time()
-
-    vv_edge = _calc_perp(mesh, mats, cnfg, uu_edge)
-
-    ttoc = time.time()
-    tcpu.calc_perp = tcpu.calc_perp + (ttoc - ttic)
+    vv_edge =-op_product(mats.edge.lsqr_perp, uu_edge)
 
     return vv_edge
               
@@ -424,36 +417,18 @@ def tend_hadv(mesh, mats, cnfg, hh_edge, hh_cell,
 
 #-- div. for thickness flux
 
-    ttic = time.time()
+    c0 = 0. #!! cnfg.sound_spd
+    gamma = (c0>0.) * gravity / (c0+1.)**2
 
-    hh_tend = _tend_hadv(
-        mesh, mats, cnfg, hh_edge, 
-            hh_cell, uu_edge, gravity, hh_tend)
+    uh_flux = uu_edge * hh_edge \
+            * (1.0 + 0.5 * gamma * hh_edge)
 
-    ttoc = time.time()
-    tcpu.tend_hadv = tcpu.tend_hadv + (ttoc - ttic)
+    hh_tend = hh_tend + ( op_product(
+        mats.cell.flux_sums, uh_flux) / mesh.cell.area
+            / (1.0 + 1.0 * gamma * hh_cell)
+    )
 
     return hh_tend
-
-
-def tend_qadv(mesh, mats, cnfg, hh_edge, hh_cell, 
-                                uu_edge, qq_edge,
-                                gravity, 
-                                qq_tend):
-
-#-- scalar transport flux
-
-    ttic = time.time()
-
-    qq_tend = _tend_qadv(
-        mesh, mats, cnfg, 
-        hh_edge, hh_cell, uu_edge, qq_edge, gravity, 
-        qq_tend)
-
-    ttoc = time.time()
-    tcpu.tend_qadv = tcpu.tend_qadv + (ttoc - ttic)
-
-    return qq_tend
     
 
 def tend_uadv(mesh, mats, cnfg, 
@@ -463,16 +438,25 @@ def tend_uadv(mesh, mats, cnfg,
 
 #-- energy-neutral UV. flux
 
-    ttic = time.time()
+    pv_weight = cnfg.consts.pv_weight
 
-    uu_tend = _tend_uadv(
-        mesh, mats, cnfg, 
-        hh_edge, hh_quad, uu_edge, pv_edge, ke_cell, 
-        ff_dual, ff_edge, ff_cell, 
-        uu_tend)
+#-- split linear & nonlinear (curl(u) + f) / h
+    pv_edge =(pv_edge - ff_edge*pv_weight) /  hh_quad
+    uh_flux = uu_edge * hh_edge
 
-    ttoc = time.time()
-    tcpu.tend_uadv = tcpu.tend_uadv + (ttoc - ttic)
+    fh_flux =(+2.00 * pv_weight * ff_edge) /  hh_quad
+
+
+    pv_flux = op_product(mats.edge.flux_perp, uh_flux * 
+                                   (pv_edge + fh_flux)
+        ) + \
+    pv_edge * op_product(mats.edge.flux_perp, uh_flux)
+
+
+    ke_grad = op_product(mats.edge.grad_norm, ke_cell)
+
+    uu_tend = uu_tend \
+        + mesh.edge.mask * (ke_grad - 0.500 * pv_flux)
 
     return uu_tend
     
@@ -484,17 +468,34 @@ def tend_upgf(mesh, mats, cnfg, hh_cell, zb_cell,
 
 #-- get z pressure gradient
 
-    ttic = time.time()
+    sal_const = 0.0; sal_scale = 1.0
 
-    hh_tiny = cnfg.hh_tiny * 1.
+    cel1 = mesh.edge.cell[:, 0] - 1
+    cel2 = mesh.edge.cell[:, 1] - 1
 
-    uu_tend = _tend_upgf(
-        mesh, mats, cnfg, 
-        hh_cell, zb_cell, xi_self, gravity, hh_tiny, 
-        uu_tend)
-        
-    ttoc = time.time()
-    tcpu.tend_upgf = tcpu.tend_upgf + (ttoc - ttic)
+    cel1 = jnp.where(cel1 >= 0, cel1, cel2)
+    cel2 = jnp.where(cel2 >= 0, cel2, cel1)
+
+    h1_cell = hh_cell[cel1].astype(reals_t)
+    h2_cell = hh_cell[cel2].astype(reals_t)
+
+    hh_min_ = 2.0 * ( h1_cell * h2_cell / 
+                    ( h1_cell + h2_cell ) )
+
+    zt_cell = zb_cell + hh_cell
+
+#-- surface pressure gradient g * G * (h + z_b)
+    zt_grad = op_product(mats.edge.grad_norm, zt_cell)
+
+#-- attract.+loading gradient g * G * filt(z_t)
+    xi_grad = op_product(mats.edge.grad_norm, xi_self)
+
+#-- scalar, depth-weighted SAL: alpha * G * xi
+    zt_grad = zt_grad - xi_grad * (sal_const * 
+        jnp.minimum(1.0, jnp.sqrt(hh_min_/sal_scale)))
+    
+    uu_tend = uu_tend + \
+        gravity * mesh.edge.mask * zt_grad
 
     return uu_tend
 

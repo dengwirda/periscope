@@ -67,9 +67,14 @@ def step_RK33(mesh, mats, flow, cnfg):
     b_33 = 1./4.; b_32 = 3./16; b_31 = 3./8.
     b_30 = 1.00 - b_33 - b_32 - b_31
 
-    
+
     uu_edge = flow.prognostic.uu_edge
     hh_cell = flow.prognostic.hh_cell
+
+    gravity = cnfg.consts.gravity
+
+    rk_base = flow.foundation
+    rk_diag = flow.diagnostic
 
     uk_edge = uu_edge.copy()
 
@@ -78,8 +83,6 @@ def step_RK33(mesh, mats, flow, cnfg):
     k1_step = (1.0 / 3.0) * dt_step
     k2_step = (2.0 / 3.0) * dt_step
     k3_step = (1.0 / 1.0) * dt_step
-    
-    gravity = 9.80616  #!! just for now
     
     dz_drag = flow.foundation.dz_drag
     c1_edge = flow.foundation.c1_edge
@@ -90,86 +93,89 @@ def step_RK33(mesh, mats, flow, cnfg):
 #-- 1st RK + FB stage
 
     rk_diag = rhs_all_d(  # eval. diagnostics 
-        mesh, mats, flow, cnfg, hh_cell, uk_edge)
+        mesh, mats, cnfg, rk_base, rk_diag, hh_cell, uk_edge)
     
+    h0_tend = jnp.zeros(hh_cell.size, dtype=htend_t)
     h0_tend = rhs_all_h(
-        mesh, mats, flow, cnfg, hh_cell, uk_edge, rk_diag)
+        mesh, mats, cnfg, rk_base, rk_diag, hh_cell, uk_edge, h0_tend)
 
     hk_tend = h0_tend.copy()
 
-    h1_cell = hh_cell - k1_step * hk_tend
+    h1_cell =(hh_cell - k1_step * hk_tend).astype(hdata_t)
 
     u0_tend = jnp.zeros(uu_edge.size, dtype=utend_t)
-    u0_tend = u0_tend + rhs_slw_u(
-        mesh, mats, flow, cnfg, hh_cell, uk_edge, rk_diag)
-    u0_tend = u0_tend + rhs_fst_u(
-        mesh, mats, flow, cnfg, hh_cell, uk_edge, rk_diag)
+    u0_tend = rhs_slw_u(
+        mesh, mats, cnfg, rk_base, rk_diag, hh_cell, uk_edge, u0_tend)
+    u0_tend = rhs_fst_u(
+        mesh, mats, cnfg, rk_base, rk_diag, hh_cell, uk_edge, u0_tend)
 
     hb_cell = b_11 * h1_cell + b_10 * hh_cell
 
     uk_tend = u0_tend.copy()
-    uk_tend = uk_tend + rhs_pgf_u(
-        mesh, mats, flow, cnfg, hb_cell, uk_edge, rk_diag)
+    uk_tend = rhs_pgf_u(
+        mesh, mats, cnfg, rk_base, rk_diag, hb_cell, uk_edge, uk_tend)
 
-    uk_edge = uu_edge - k1_step * uk_tend
+    uk_edge =(uu_edge - k1_step * uk_tend).astype(udata_t)
 
 
 #-- 2nd RK + FB stage
 
     rk_diag = rhs_all_d(  # eval. diagnostics 
-        mesh, mats, flow, cnfg, h1_cell, uk_edge)
+        mesh, mats, cnfg, rk_base, rk_diag, h1_cell, uk_edge)
 
+    hk_tend = jnp.zeros(hh_cell.size, dtype=htend_t)
     hk_tend = rhs_all_h(
-        mesh, mats, flow, cnfg, h1_cell, uk_edge, rk_diag)
+        mesh, mats, cnfg, rk_base, rk_diag, h1_cell, uk_edge, hk_tend)
 
-    h2_cell = hh_cell - k2_step * hk_tend
+    h2_cell =(hh_cell - k2_step * hk_tend).astype(hdata_t)
 
     uk_tend = jnp.zeros(uu_edge.size, dtype=utend_t)
-    uk_tend = uk_tend + rhs_slw_u(
-        mesh, mats, flow, cnfg, h1_cell, uk_edge, rk_diag)
-    uk_tend = uk_tend + rhs_fst_u(
-        mesh, mats, flow, cnfg, h1_cell, uk_edge, rk_diag)
+    uk_tend = rhs_slw_u(
+        mesh, mats, cnfg, rk_base, rk_diag, h1_cell, uk_edge, uk_tend)
+    uk_tend = rhs_fst_u(
+        mesh, mats, cnfg, rk_base, rk_diag, h1_cell, uk_edge, uk_tend)
     
     hb_cell = b_22 * h2_cell + b_21 * h1_cell \
             + b_20 * hh_cell
 
-    uk_tend = uk_tend + rhs_pgf_u(
-        mesh, mats, flow, cnfg, hb_cell, uk_edge, rk_diag)
+    uk_tend = rhs_pgf_u(
+        mesh, mats, cnfg, rk_base, rk_diag, hb_cell, uk_edge, uk_tend)
 
-    uk_edge = uu_edge - k2_step * uk_tend
+    uk_edge =(uu_edge - k2_step * uk_tend).astype(udata_t)
 
  
 #-- 3rd RK + FB stage
 
     rk_diag = rhs_all_d(  # eval. diagnostics 
-        mesh, mats, flow, cnfg, h2_cell, uk_edge)
+        mesh, mats, cnfg, rk_base, rk_diag, h2_cell, uk_edge)
 
+    hk_tend = jnp.zeros(hh_cell.size, dtype=htend_t)
     hk_tend = rhs_all_h(
-        mesh, mats, flow, cnfg, h2_cell, uk_edge, rk_diag)
+        mesh, mats, cnfg, rk_base, rk_diag, h2_cell, uk_edge, hk_tend)
 
     hk_tend = +1./4. * h0_tend + 3./4. * hk_tend
     
-    h3_cell = hh_cell - k3_step * hk_tend
+    h3_cell =(hh_cell - k3_step * hk_tend).astype(hdata_t)
     
     uk_tend = jnp.zeros(uu_edge.size, dtype=utend_t)
-    uk_tend = uk_tend + rhs_slw_u(
-        mesh, mats, flow, cnfg, h2_cell, uk_edge, rk_diag)
-    uk_tend = uk_tend + rhs_fst_u(
-        mesh, mats, flow, cnfg, h2_cell, uk_edge, rk_diag)
+    uk_tend = rhs_slw_u(
+        mesh, mats, cnfg, rk_base, rk_diag, h2_cell, uk_edge, uk_tend)
+    uk_tend = rhs_fst_u(
+        mesh, mats, cnfg, rk_base, rk_diag, h2_cell, uk_edge, uk_tend)
 
     hb_cell = b_33 * h3_cell + b_32 * h2_cell \
-            + b_31 * h1_cell + b_30 * hh_cell  
+            + b_31 * h1_cell + b_30 * hh_cell
 
     uk_tend = +1./4. * u0_tend + 3./4. * uk_tend
     
-    uk_tend = uk_tend + rhs_pgf_u(
-        mesh, mats, flow, cnfg, hb_cell, uk_edge, rk_diag)
+    uk_tend = rhs_pgf_u(
+        mesh, mats, cnfg, rk_base, rk_diag, hb_cell, uk_edge, uk_tend)
 
-    uk_edge = uu_edge - k3_step * uk_tend
+    uk_edge =(uu_edge - k3_step * uk_tend).astype(udata_t)
  
 
 
-    flow.replace(
+    flow = flow.replace(
         prognostic=flow.prognostic.replace(
             uu_edge=uk_edge,
             hh_cell=h3_cell,
