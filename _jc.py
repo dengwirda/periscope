@@ -15,6 +15,8 @@ class jxp_slv_params:
     timestart: float
     timeisnow: float
 
+@struct.dataclass
+class jxp_slv_consts:
     cfl_limit: float
     dt_margin: float
     dt_cycles: float
@@ -41,6 +43,8 @@ class jxp_slv_params:
 
     wetdry_h0: float
 
+    gravity:   float = 9.80616
+
 @struct.dataclass
 class jxp_usr_option:
     integrate: str = struct.field(pytree_node=False)
@@ -54,6 +58,7 @@ class jxp_usr_option:
 @struct.dataclass
 class jxp_parameters:
     params:     jxp_slv_params
+    consts:     jxp_slv_consts
     option:     jxp_usr_option
 
 
@@ -68,7 +73,8 @@ def usr_to_jax(mesh, mats, flow, cnfg):
             time_step=cnfg.time_step,
             timestart=cnfg.timestart,
             timeisnow=cnfg.timeisnow,
-
+        ),
+        consts = jxp_slv_consts(
             cfl_limit=cnfg.cfl_limit,
             dt_margin=cnfg.dt_margin,
             dt_cycles=cnfg.dt_cycles,
