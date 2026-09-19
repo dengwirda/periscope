@@ -21,6 +21,9 @@ class jxp_cell_tuple:
     cell:       jnp.ndarray
     topo:       jnp.ndarray
     mask:       jnp.ndarray
+    gate:       jnp.ndarray
+    open:       jnp.ndarray
+    wall:       jnp.ndarray
     area:       jnp.ndarray
 
 @struct.dataclass
@@ -51,6 +54,10 @@ class jxp_edge_tuple:
     edge:       jnp.ndarray
     topo:       jnp.ndarray
     mask:       jnp.ndarray
+    gate:       jnp.ndarray
+    slip:       jnp.ndarray
+    open:       jnp.ndarray
+    wall:       jnp.ndarray
     area:       jnp.ndarray
 
 @struct.dataclass
@@ -68,6 +75,10 @@ class jxp_vert_tuple:
     edge:       jnp.ndarray
     cell:       jnp.ndarray
     mask:       jnp.ndarray
+    gate:       jnp.ndarray
+    slip:       jnp.ndarray
+    open:       jnp.ndarray
+    wall:       jnp.ndarray
     area:       jnp.ndarray
 
 @struct.dataclass
@@ -95,6 +106,9 @@ def msh_to_jax(mesh, mats, flow, cnfg):
             cell=jnp.asarray(mesh.cell.cell),
             topo=jnp.asarray(mesh.cell.topo),
             mask=jnp.asarray(mesh.cell.mask),
+            gate=jnp.asarray(mesh.cell.gate),
+            open=jnp.asarray(mesh.cell.open),
+            wall=jnp.asarray(mesh.cell.wall),
             area=jnp.asarray(mesh.cell.area),
         ),
         edge= jxp_edge_tuple(
@@ -124,6 +138,10 @@ def msh_to_jax(mesh, mats, flow, cnfg):
             edge=jnp.asarray(mesh.edge.edge),
             topo=jnp.asarray(mesh.edge.topo),
             mask=jnp.asarray(mesh.edge.mask),
+            gate=jnp.asarray(mesh.edge.gate),
+            slip=jnp.asarray(mesh.edge.slip),            
+            open=jnp.asarray(mesh.edge.open),
+            wall=jnp.asarray(mesh.edge.wall),
             area=jnp.asarray(mesh.edge.area),
         ),
         quad= jxp_quad_tuple(
@@ -139,6 +157,10 @@ def msh_to_jax(mesh, mats, flow, cnfg):
             edge=jnp.asarray(mesh.vert.edge),
             cell=jnp.asarray(mesh.vert.cell),
             mask=jnp.asarray(mesh.vert.mask),
+            gate=jnp.asarray(mesh.vert.gate),
+            slip=jnp.asarray(mesh.vert.slip), 
+            open=jnp.asarray(mesh.vert.open),
+            wall=jnp.asarray(mesh.vert.wall),
             area=jnp.asarray(mesh.vert.area),
         ),
     )

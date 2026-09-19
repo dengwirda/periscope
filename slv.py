@@ -12,7 +12,6 @@ import numpy as np
 
 import jax
 
-XLA_FLAGS="--xla_cpu_use_thunk_runtime=false"
 jax.config.update("jax_enable_x64", True)
 
 from _fp import flt32_t, flt64_t
@@ -20,6 +19,7 @@ from _fp import reals_t, index_t
 from _fp import udata_t, hdata_t, qdata_t
 
 from _jx import all_to_jax
+from _jo import op_product
 
 from log import tcpu
 
@@ -142,6 +142,18 @@ def swe(cnfg):
 
     ttic = time.time(); next = +0; freq = +0
 
+
+    """
+    f = jax.jit(op_product)
+
+    compiled = f.lower(mats.jx.cell.flux_sums, uu_edge).compile()
+    print(compiled.as_text())
+
+    raise Exception()
+    """
+
+
+
     """
     flow.prev = flow.next  # if forc. time-invariant...
 
@@ -171,6 +183,11 @@ def swe(cnfg):
 
     print(np.min(hh_cell), np.max(hh_cell))
     print(np.min(uu_edge), np.max(uu_edge))
+
+
+    save_step(save, mesh, mats, flow, cnfg, 
+        step=1, hh_cell=hh_cell, uu_edge=uu_edge, qq_cell=None)
+
 
 
     """

@@ -115,18 +115,44 @@ def csr_to_jax(csr):
                           jnp.asarray(vals))
 
 
+def idx_gather(mat, idx):
+#-- JAX-based indexing operation, sans bounds checks
+    return mat.at[idx].get(
+        mode="promise_in_bounds", wrap_negative_indices=False,
+    )
+
+
 def op_product(mat, vec):
 #-- JAX-based stencil reduction for linear operators
 #-- sum M_ij * vec_j
+    """
     return jnp.sum(vec[mat.indx] * mat.vals, axis=1)
+    """
+
+    tmp = vec.at[mat.indx].get(
+        mode="promise_in_bounds", wrap_negative_indices=False,
+    )
+    return jnp.sum(tmp * mat.vals, axis=1)
 
 
 def pv_product(mat, flx, sub, add):
 #-- JAX-based stencil reduction for pv-adv operators
 #-- sum W_ij * flx_j * (sub_i + add_j)
+    """
     return jnp.sum(mat.vals * 
         flx[mat.indx] * (sub[:, None]+add[mat.indx]),
         axis=1,
+    )
+    """
+
+    _tf = flx.at[mat.indx].get(
+        mode="promise_in_bounds", wrap_negative_indices=False,
+    )
+    _ta = add.at[mat.indx].get(
+        mode="promise_in_bounds", wrap_negative_indices=False,
+    )
+    return jnp.sum(mat.vals * 
+        _tf * (sub[:,None] + _ta), axis=1,
     )
 
 

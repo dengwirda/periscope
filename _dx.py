@@ -16,6 +16,7 @@ from _fp import flt32_t, flt64_t
 from _fp import reals_t, index_t
 
 from _jo import op_product, pv_product
+from _jo import idx_gather
 
 def scale_mix(mesh, mats, cnfg):
 
@@ -65,11 +66,13 @@ def scale_mix(mesh, mats, cnfg):
     return s2_edge, s4_edge, sf_edge
 
  
-def calc_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge,
-                                      qq_cell):
+def calc_vars(mesh, mats, flow, cnfg):
 
 #-- compute diagnostic variables from the current state
 
+    return None
+
+    """
     ff_dual = variables.ff_vert
     ff_edge = variables.ff_edge
     ff_cell = variables.ff_cell
@@ -119,13 +122,15 @@ def calc_vars(mesh, mats, flow, cnfg, hh_cell, uu_edge,
            vv_edge, nu_turb, \
            nu_wave, os_wave, nu_shoc, os_shoc, \
            nu_thin, uu_filt, Xi_tide, Xi_self
+    """
 
-
-def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge,
-                                      qq_cell):
+def invariant(mesh, mats, flow, cnfg):
 
 #-- compute the discrete energy and enstrophy invariants
 
+    return None
+
+    """
     ff_dual = variables.ff_vert
     ff_edge = variables.ff_edge
     ff_cell = variables.ff_cell
@@ -171,8 +176,9 @@ def invariant(mesh, mats, flow, cnfg, hh_cell, uu_edge,
                        * (pv_dual ** 2 / hh_dual))
 
     return kp_sums, pv_sums
+    """
 
-
+"""
 def calc_obcs(mesh, mats, cnfg, 
         hh_edge, uu_edge, 
         gravity, hE_prev, uE_prev, hE_next, uE_next):
@@ -240,6 +246,7 @@ def upwinding(mesh, mats, cnfg,
     tcpu.upwinding = tcpu.upwinding + (ttoc - ttic)
 
     return ss_edge, up_bias
+"""
 
 
 def calc_hmap(mesh, mats, cnfg, 
@@ -278,8 +285,10 @@ def calc_hmap(mesh, mats, cnfg,
         cel1 = jnp.where(cel1 >= 0, cel1, cel2)
         cel2 = jnp.where(cel2 >= 0, cel2, cel1)
 
-        h1_cell = hh_cell[cel1].astype(reals_t)
-        h2_cell = hh_cell[cel2].astype(reals_t)
+        h1_cell = jnp.asarray(
+            idx_gather(hh_cell, cel1), dtype=reals_t)
+        h2_cell = jnp.asarray(
+            idx_gather(hh_cell, cel2), dtype=reals_t)
 
         c1_wave = uu_wave + jnp.sqrt(gravity * h1_cell)
         c2_wave = uu_wave + jnp.sqrt(gravity * h2_cell)
@@ -339,7 +348,7 @@ def _build_pv(mesh, mats, cnfg,
 #-- compute discrete vorticity
               
     rv_dual = op_product(mats.dual.curl_sums, uu_edge)
-   #rv_dual = rv_dual *  mesh.vert.slip
+    rv_dual = rv_dual*(1-mesh.vert.slip)
 
     rv_edge = op_product(mats.edge.dual_sums, rv_dual)
 
@@ -349,8 +358,8 @@ def _build_pv(mesh, mats, cnfg,
     pv_dual = rv_dual + ff_dual
     pv_edge = rv_edge + ff_edge
 
-    rv_wide = op_product(mats.dual.edge_sums, rv_edge)
-    rv_wide = rv_wide /  3.0 #!!
+    rv_wide = op_product(mats.dual.tail_sums, rv_edge)
+    rv_wide = rv_wide /  mesh.vert.area
 
     rv_cell = op_product(mats.cell.kite_sums, rv_dual)
     rv_cell = rv_cell /  mesh.cell.area
@@ -383,11 +392,12 @@ def calc_u_pv(mesh, mats, cnfg,
     uu_tiny = cnfg.uu_tiny * 1
     pv_tiny = cnfg.pv_tiny * 1
     pv_tiny = max (pv_tiny, 
-        2.0 * np.finfo(reals_t).eps * pv_rms_)
+        +2.0 * jnp.finfo(reals_t).eps * pv_rms_)
 
     pv_edge, pv_bias =  upwinding(
         mesh, mats, cnfg, 
-        pv_wide, pv_dual, pv_cell, uu_edge, vv_edge, 
+        pv_wide, pv_dual, pv_cell, 
+        uu_edge, vv_edge, 
         pv_edge, up_edge,
         delta_t, pv_tiny, uu_tiny, 
         cnfg.option.pv_scheme, 
@@ -440,8 +450,9 @@ def tend_uadv(mesh, mats, cnfg,
 
     pv_weight = cnfg.consts.pv_weight
 
-    pv_sub_ =(pv_edge - ff_edge * pv_weight) / hh_quad
-    pv_add_ =(pv_edge + ff_edge * pv_weight) / hh_quad
+    pv_sub_ =(pv_edge - ff_edge * pv_weight)/ hh_quad
+    pv_add_ =(pv_edge + ff_edge * pv_weight)/ hh_quad
+
     uh_flux = uu_edge * hh_edge
 
     pv_flux = pv_product(mats.edge.flux_perp, uh_flux, 
@@ -451,7 +462,7 @@ def tend_uadv(mesh, mats, cnfg,
     ke_grad = op_product(mats.edge.grad_norm, ke_cell)
 
     uu_tend = uu_tend \
-        + mesh.edge.mask * (ke_grad - 0.500 * pv_flux)
+        + mesh.edge.gate * (ke_grad - 0.500 * pv_flux)
 
     return uu_tend
     
@@ -471,8 +482,10 @@ def tend_upgf(mesh, mats, cnfg, hh_cell, zb_cell,
     cel1 = jnp.where(cel1 >= 0, cel1, cel2)
     cel2 = jnp.where(cel2 >= 0, cel2, cel1)
 
-    h1_cell = hh_cell[cel1].astype(reals_t)
-    h2_cell = hh_cell[cel2].astype(reals_t)
+    h1_cell = jnp.asarray(
+        idx_gather(hh_cell, cel1), dtype=reals_t)
+    h2_cell = jnp.asarray(
+        idx_gather(hh_cell, cel2), dtype=reals_t)
 
     hh_min_ = 2.0 * ( h1_cell * h2_cell / 
                     ( h1_cell + h2_cell ) )
@@ -490,11 +503,11 @@ def tend_upgf(mesh, mats, cnfg, hh_cell, zb_cell,
         jnp.minimum(1.0, jnp.sqrt(hh_min_/sal_scale)))
     
     uu_tend = uu_tend + \
-        gravity * mesh.edge.mask * zt_grad
+        gravity * mesh.edge.gate * zt_grad
 
     return uu_tend
 
-    
+"""    
 def calc_umix(mesh, mats, cnfg, rv_dual, rv_cell):
 
 #-- compute leith viscosities
@@ -782,5 +795,5 @@ def calc_drag(mesh, mats, cnfg, gravity, dz_drag,
     tcpu.calc_drag = tcpu.calc_drag + (ttoc - ttic)
 
     return cd_edge
-
+"""
 
