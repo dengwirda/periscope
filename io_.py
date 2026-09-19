@@ -51,6 +51,7 @@ out_.ke_filt = False
 def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge,
                                                   qq_cell):
 
+    """
     hh_edge, hh_dual, hh_bias, \
     ke_cell, ke_bias, \
     rv_cell, pv_cell, rv_dual, pv_dual, pv_edge, pv_bias, \
@@ -58,6 +59,7 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge,
     nu_thin, uu_filt, Xi_tide, Xi_self = calc_vars (
         mesh, mats, flow, cnfg, hh_cell, uu_edge, qq_cell
         )
+    """
 
     ttic = time.time()
 
@@ -72,7 +74,8 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge,
         data.variables["uu_edge"][step, :, :] = \
             np.reshape(uu_edge[
                 mesh.edge.irev - 1], (1, mesh.edge.size, 1))
-            
+       
+    """     
     if (out_.vv_edge):
         data.variables["vv_edge"][step, :, :] = \
             np.reshape(vv_edge[
@@ -85,12 +88,14 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge,
         data.variables["hh_bias"][step, :, :] = \
             np.reshape(_t_dual[
                 mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+    """
                 
     if (out_.hh_cell):         
         data.variables["hh_cell"][step, :, :] = \
             np.reshape(hh_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
-                
+          
+    """      
     if (out_.hh_edge):         
         data.variables["hh_edge"][step, :, :] = \
             np.reshape(hh_edge[
@@ -257,6 +262,7 @@ def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge,
         data.variables["ke_filt"][step, :, :] = \
             np.reshape(_t_cell[
                 mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+    """
 
     data.close()
     

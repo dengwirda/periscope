@@ -1348,9 +1348,9 @@ def init_obcs(mesh, flow, mats):
     mesh.edge.mask[mesh.edge.wall] = True
 
     # build multiplicative masks
-    mesh.cell.fmsk = reals_t(1.0 - mesh.cell.mask)
-    mesh.edge.fmsk = reals_t(1.0 - mesh.edge.mask)
-    mesh.vert.fmsk = reals_t(1.0 - mesh.vert.mask)
+    mesh.cell.gate = reals_t(1.0 - mesh.cell.mask)
+    mesh.edge.gate = reals_t(1.0 - mesh.edge.mask)
+    mesh.vert.gate = reals_t(1.0 - mesh.vert.mask)
 
     return mesh
 
