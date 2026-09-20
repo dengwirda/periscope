@@ -295,10 +295,12 @@ def calc_hmap(mesh, mats, cnfg,
 
     #-- upwind if the wavespeed ratio >> 1
         hh_bias = jnp.where(c2_wave>c1_wave, 
-            jnp.maximum(jnp.sqrt(c2_wave/c1_wave - 1.), 
-                                 h2_cell/h1_cell - 1.),
-            jnp.maximum(jnp.sqrt(c1_wave/c2_wave - 1.), 
-                                 h1_cell/h2_cell - 1.)
+            jnp.maximum(jnp.sqrt(
+                (c2_wave - c1_wave)/c1_wave), 
+                (h2_cell - h1_cell)/h1_cell),
+            jnp.maximum(jnp.sqrt(
+                (c1_wave - c2_wave)/c2_wave), 
+                (h1_cell - h2_cell)/h2_cell)
         )
         hh_bias = jnp.minimum(+1.0, hh_bias)
 
@@ -506,6 +508,7 @@ def tend_upgf(mesh, mats, cnfg, hh_cell, zb_cell,
         gravity * mesh.edge.gate * zt_grad
 
     return uu_tend
+
 
 """    
 def calc_umix(mesh, mats, cnfg, rv_dual, rv_cell):
