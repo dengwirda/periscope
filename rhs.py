@@ -202,14 +202,14 @@ def rhs_slw_u(mesh, mats, cnfg, base, diag, hh_cell, uu_edge, uu_tend):
 
     ke_cell = diag.ke_cell
     pv_edge = diag.pv_edge
-    
+
     # nonlinear advection
     uu_tend = tend_uadv(mesh, mats, cnfg, hh_edge, hh_quad,
                                           uu_edge,
                                           pv_edge, ke_cell,
                                  ff_dual, ff_edge, ff_cell, 
                                           uu_tend)
-    
+
     """
     # btr-bcl dissipation
     uu_tend = tend_uflt(mesh, mats, cnfg, uu_edge, hh_edge, 

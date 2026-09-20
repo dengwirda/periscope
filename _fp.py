@@ -20,7 +20,7 @@ udata_t = np.float32  # underlying
 hdata_t = np.float64
 qdata_t = np.float32
 
-utend_t = np.float64  # tendencies
-htend_t = np.float64
-qtend_t = np.float64
+utend_t = np.float32  # tendencies
+htend_t = np.float32
+qtend_t = np.float32
 

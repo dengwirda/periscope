@@ -11,7 +11,6 @@ import numpy as np
 #-- https://github.com/dengwirda/
 
 import jax
-
 jax.config.update("jax_enable_x64", True)
 
 from _fp import flt32_t, flt64_t
@@ -19,7 +18,6 @@ from _fp import reals_t, index_t
 from _fp import udata_t, hdata_t, qdata_t
 
 from _jx import all_to_jax
-from _jo import op_product
 
 from log import tcpu
 
@@ -135,25 +133,40 @@ def swe(cnfg):
     # start forward integrations
     flow, cnfg = pre (mesh, mats, flow, cnfg)
 
-    mesh, mats, flow, cnfg = \
-        all_to_jax(mesh, mats, flow, cnfg)
-
-    #raise Exception()
-
-    ttic = time.time(); next = +0; freq = +0
-
+    # do host-to-device transfer
+    mesh, mats, flow, cnfg = all_to_jax(
+                      mesh, mats, flow, cnfg)
 
     """
-    f = jax.jit(op_product)
+    # uncomment to inspect compiled XLA
+    from _jo.py import op_product, pv_product
 
+    # linear kernel
+    f = jax.jit(op_product)
     compiled = f.lower(mats.jx.cell.flux_sums, uu_edge).compile()
     print(compiled.as_text())
+
+    # pvflux kernel
+    p1_edge = uu_edge + 1.
+    p2_edge = uu_edge - 1.
+
+    g = jax.jit(pv_product)
+    compiled = g.lower(mats.jx.edge.flux_perp, uu_edge, 
+                                      p1_edge, p2_edge).compile()
+    print(compiled.as_text())
+
+    # full timestep
+    h = jax.jit(step_eqns, static_argnums=(4,))
+    compiled = h.lower(mesh.jx, mats.jx, 
+                       flow.jx, cnfg.jx, cnfg.iteration).compile()
+
+    with open("step_eqns_xla.txt", "w") as f:
+        f.write(compiled.as_text())
 
     raise Exception()
     """
 
-
-
+    ttic = time.time(); next = +0; freq = +0
     """
     flow.prev = flow.next  # if forc. time-invariant...
 
@@ -166,18 +179,27 @@ def swe(cnfg):
     cnfg.save_next = cnfg.timeisnow
     """
 
+    """
+    # uncomment to produce profile trace
+    opts = jax.profiler.ProfileOptions()
+    opts.gpu_enable_cupti_activity_graph_trace = True
+    opts.gpu_dump_graph_node_mapping = True
 
+    with jax.profiler.trace("/tmp/jpx_trace",
+                            create_perfetto_trace=True,
+                            profiler_options=opts):
+    """
 
+    # main time-stepping loop
     flow.jx, cnfg.jx = step_eqns(
         mesh.jx, mats.jx, flow.jx, cnfg.jx, cnfg.iteration)
-
         
     jax.block_until_ready(flow.jx)
-
 
     ttoc = time.time()
 
 
+    #WIP hacky device-to-host
     hh_cell = np.asarray(flow.jx.prognostic.hh_cell, dtype=hdata_t)
     uu_edge = np.asarray(flow.jx.prognostic.uu_edge, dtype=udata_t)
 
@@ -187,7 +209,6 @@ def swe(cnfg):
 
     save_step(save, mesh, mats, flow, cnfg, 
         step=1, hh_cell=hh_cell, uu_edge=uu_edge, qq_cell=None)
-
 
 
     """
