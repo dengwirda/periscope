@@ -201,7 +201,9 @@ def step_RK33(mesh, mats, flow, cnfg):
 
 
 @partial(
-    jax.jit, static_argnums=(4,)
+    jax.jit, 
+    static_argnums=(4,), # compile time nsteps
+    donate_argnums=(2,), # don't copy flow obj.
 )
 def step_eqns(mesh, mats, flow, cnfg, step):
 
