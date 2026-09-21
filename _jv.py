@@ -22,7 +22,7 @@ class jxp_diagnostic:
 
     hh_dual:    jnp.ndarray | None = None
     hh_edge:    jnp.ndarray | None = None
-    hh_quad:    jnp.ndarray | None = None           
+    hh_quad:    jnp.ndarray | None = None
 
     pv_edge:    jnp.ndarray | None = None
     rv_dual:    jnp.ndarray | None = None
@@ -40,6 +40,13 @@ class jxp_diagnostic:
     nu_wave:    jnp.ndarray | None = None
     nu_shoc:    jnp.ndarray | None = None
     nu_thin:    jnp.ndarray | None = None
+
+    os_wave:    jnp.ndarray | None = None
+    os_shoc:    jnp.ndarray | None = None
+
+    hh_tiny:    float = 0.0
+    uu_tiny:    float = 0.0
+    pv_tiny:    float = 0.0
 
     xi_self:    jnp.ndarray | None = None
     xi_tide:    jnp.ndarray | None = None
@@ -122,6 +129,13 @@ def var_to_jax(mesh, mats, flow, cnfg):
             nu_wave=jnp.zeros(edge_size, dtype=reals_t),
             nu_shoc=jnp.zeros(edge_size, dtype=reals_t),
             nu_thin=jnp.zeros(edge_size, dtype=reals_t),
+
+            os_wave=jnp.zeros(edge_size, dtype=reals_t),
+            os_shoc=jnp.zeros(edge_size, dtype=reals_t),
+
+            hh_tiny=hdata_t(flow.hh_tiny),
+            uu_tiny=reals_t(flow.uu_tiny),
+            pv_tiny=reals_t(flow.pv_tiny),
 
             xi_self=jnp.zeros(cell_size, dtype=reals_t),
             xi_tide=jnp.zeros(cell_size, dtype=reals_t),

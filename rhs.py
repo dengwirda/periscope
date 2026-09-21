@@ -67,10 +67,15 @@ def rhs_all_d(mesh, mats, cnfg, base, diag, hh_cell, uu_edge):
     # construct vel^\perp
     vv_edge = calc_perp(mesh, mats, cnfg, uu_edge)
     
+    uu_sqr_ = uu_edge ** 2 +  \
+              vv_edge ** 2
+    uu_mag_ = jnp.sqrt(uu_sqr_)
+
     # construct thickness
     hh_dual, hh_edge, hh_quad, hh_bias = \
               calc_hmap(mesh, mats, cnfg, gravity, hr_cell, 
-                                          uu_edge, vv_edge)
+                                          uu_edge, vv_edge,
+                                          uu_mag_)
     
     """
     # do extrap. for OBCs
@@ -91,7 +96,11 @@ def rhs_all_d(mesh, mats, cnfg, base, diag, hh_cell, uu_edge):
     ke_cell, ke_bias = calc_u_ke(
         mesh, mats, cnfg, 
         hr_cell, hh_quad, hh_dual, 
-        uu_edge, vv_edge, +1. / 2. * cnfg.params.time_step)
+        uu_edge, vv_edge, uu_sqr_,
+                          +1. / 2. * cnfg.params.time_step)
+
+    uu_tiny = diag.uu_tiny
+    pv_tiny = diag.pv_tiny
 
     rv_dual, pv_dual, rv_wide, pv_wide, \
     rv_cell, pv_cell, \
@@ -99,7 +108,8 @@ def rhs_all_d(mesh, mats, cnfg, base, diag, hh_cell, uu_edge):
         mesh, mats, cnfg, 
         hr_cell, hh_quad, hh_dual,
         ff_dual, ff_edge, ff_cell, 
-        uu_edge, vv_edge, +1. / 2. * cnfg.params.time_step)
+        uu_edge, vv_edge, uu_mag_,
+        uu_tiny, pv_tiny, +1. / 2. * cnfg.params.time_step)
 
     """
     # shock sub-grid

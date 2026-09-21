@@ -11,6 +11,8 @@ from _fp import udata_t, hdata_t, qdata_t
 
 @struct.dataclass
 class jxp_cell_tuple:
+    irev:       jnp.ndarray
+    ifwd:       jnp.ndarray
     xpos:       jnp.ndarray
     ypos:       jnp.ndarray
     zpos:       jnp.ndarray
@@ -28,6 +30,8 @@ class jxp_cell_tuple:
 
 @struct.dataclass
 class jxp_edge_tuple:
+    irev:       jnp.ndarray
+    ifwd:       jnp.ndarray
     xpos:       jnp.ndarray
     ypos:       jnp.ndarray
     zpos:       jnp.ndarray
@@ -56,6 +60,7 @@ class jxp_edge_tuple:
     mask:       jnp.ndarray
     gate:       jnp.ndarray
     slip:       jnp.ndarray
+    perp:       jnp.ndarray
     open:       jnp.ndarray
     wall:       jnp.ndarray
     area:       jnp.ndarray
@@ -66,6 +71,8 @@ class jxp_quad_tuple:
 
 @struct.dataclass
 class jxp_vert_tuple:
+    irev:       jnp.ndarray
+    ifwd:       jnp.ndarray
     xpos:       jnp.ndarray
     ypos:       jnp.ndarray
     zpos:       jnp.ndarray
@@ -96,6 +103,8 @@ def msh_to_jax(mesh, mats, flow, cnfg):
 
     mesh.jx = jxp_mesh_tuple(
         cell= jxp_cell_tuple(
+            irev=jnp.asarray(mesh.cell.irev),
+            ifwd=jnp.asarray(mesh.cell.ifwd),
             xpos=jnp.asarray(mesh.cell.xpos),
             ypos=jnp.asarray(mesh.cell.ypos),
             zpos=jnp.asarray(mesh.cell.zpos),
@@ -112,6 +121,8 @@ def msh_to_jax(mesh, mats, flow, cnfg):
             area=jnp.asarray(mesh.cell.area),
         ),
         edge= jxp_edge_tuple(
+            irev=jnp.asarray(mesh.edge.irev),
+            ifwd=jnp.asarray(mesh.edge.ifwd),
             xpos=jnp.asarray(mesh.edge.xpos),
             ypos=jnp.asarray(mesh.edge.ypos),
             zpos=jnp.asarray(mesh.edge.zpos),
@@ -139,7 +150,8 @@ def msh_to_jax(mesh, mats, flow, cnfg):
             topo=jnp.asarray(mesh.edge.topo),
             mask=jnp.asarray(mesh.edge.mask),
             gate=jnp.asarray(mesh.edge.gate),
-            slip=jnp.asarray(mesh.edge.slip),            
+            slip=jnp.asarray(mesh.edge.slip),
+            perp=jnp.asarray(mesh.edge.perp),
             open=jnp.asarray(mesh.edge.open),
             wall=jnp.asarray(mesh.edge.wall),
             area=jnp.asarray(mesh.edge.area),
@@ -148,6 +160,8 @@ def msh_to_jax(mesh, mats, flow, cnfg):
             area=jnp.asarray(mesh.quad.area),
         ),
         vert= jxp_vert_tuple(
+            irev=jnp.asarray(mesh.vert.irev),
+            ifwd=jnp.asarray(mesh.vert.ifwd),
             xpos=jnp.asarray(mesh.vert.xpos),
             ypos=jnp.asarray(mesh.vert.ypos),
             zpos=jnp.asarray(mesh.vert.zpos),

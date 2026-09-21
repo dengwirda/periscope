@@ -70,113 +70,143 @@ def calc_vars(mesh, mats, flow, cnfg):
 
 #-- compute diagnostic variables from the current state
 
-    return None
+    zb_cell = flow.foundation.zb_cell
 
-    """
-    ff_dual = variables.ff_vert
-    ff_edge = variables.ff_edge
-    ff_cell = variables.ff_cell
-    
-    Xi_tide = variables.Xi_tide  # lagged values
-    Xi_self = variables.Xi_self
+    ff_cell = flow.foundation.ff_cell
+    ff_edge = flow.foundation.ff_edge
+    ff_dual = flow.foundation.ff_vert
 
-    uu_filt = variables.uu_filt
+    gravity = cnfg.consts.gravity
 
-    zb_cell = variables.zb_cell
+    hh_cell = flow.prognostic.hh_cell
+    uu_edge = flow.prognostic.uu_edge
 
-    gravity = flow.gravity
+    hr_cell = hh_cell.astype(dtype=reals_t)
 
+    # construct vel^\perp
     vv_edge = calc_perp(mesh, mats, cnfg, uu_edge)
+    
+    uu_sqr_ = uu_edge ** 2 +  \
+              vv_edge ** 2
+    uu_mag_ = jnp.sqrt(uu_sqr_)
 
-    hh_dual, hh_edge, hh_quad, hh_bias = calc_hmap(
-        mesh, mats, cnfg, 
-        gravity, hh_cell, uu_edge, vv_edge)
+    # construct thickness
+    hh_dual, hh_edge, hh_quad, hh_bias= calc_hmap(
+        mesh, mats, cnfg, gravity,
+        hr_cell, uu_edge, vv_edge, uu_mag_)
 
+    # construct nonlinear
     ke_cell, ke_bias = calc_u_ke(
         mesh, mats, cnfg, 
-        hh_cell, hh_quad, hh_dual, uu_edge, vv_edge,
-        +1. / 2. * cnfg.time_step)
+        hr_cell, hh_quad, hh_dual, 
+        uu_edge, vv_edge, uu_sqr_,
+        (+1. / 2.) * cnfg.params.time_step)
 
-    rv_dual, pv_dual, r2_dual, p2_dual, \
-    rv_cell, pv_cell, \
-    pv_edge, pv_bias = calc_u_pv(
-        mesh, mats, cnfg, 
-        hh_cell, hh_quad, hh_dual, uu_edge, vv_edge,
-        ff_dual, ff_edge, ff_cell, 
-        +1. / 2. * cnfg.time_step)
-        
-    nu_turb = variables.nu_turb  # lagged values
-
-    nu_thin = variables.nu_thin
-
-    nu_wave = variables.nu_wave
-    os_wave = variables.os_wave
-
-    nu_shoc = variables.nu_shoc
-    os_shoc = variables.os_shoc
-
-    return hh_edge, hh_dual, hh_bias, \
-           ke_cell, ke_bias, \
-           rv_cell, pv_cell, \
-           rv_dual, pv_dual, pv_edge, pv_bias, \
-           vv_edge, nu_turb, \
-           nu_wave, os_wave, nu_shoc, os_shoc, \
-           nu_thin, uu_filt, Xi_tide, Xi_self
-    """
-
-def invariant(mesh, mats, flow, cnfg):
-
-#-- compute the discrete energy and enstrophy invariants
-
-    return None
-
-    """
-    ff_dual = variables.ff_vert
-    ff_edge = variables.ff_edge
-    ff_cell = variables.ff_cell
-
-    zb_cell = variables.zb_cell
-
-    gravity = flow.gravity
-
-    vv_edge = calc_perp(mesh, mats, cnfg, uu_edge)
-
-    hh_dual, hh_edge, hh_quad, hh_bias = calc_hmap(
-        mesh, mats, cnfg, 
-        gravity, hh_cell, uu_edge, vv_edge)
-
-    ke_edge = uu_edge ** 2
-    ke_edge*= hh_edge * mesh.edge.area
-    
-    pe_cell = flow.gravity * (
-        hh_cell * 0.5 + zb_cell - np.min(zb_cell))
-
-    pe_cell*= hh_cell * mesh.cell.area
-
-    kp_sums = math.fsum(ke_edge) \
-            + math.fsum(pe_cell)
+    uu_tiny = flow.diagnostic.uu_tiny
+    pv_tiny = flow.diagnostic.pv_tiny
 
     rv_dual, pv_dual, rv_wide, pv_wide, \
     rv_cell, pv_cell, \
     pv_edge, pv_bias = calc_u_pv(
         mesh, mats, cnfg, 
-        hh_cell, hh_quad, hh_dual, uu_edge, vv_edge,
+        hr_cell, hh_quad, hh_dual,
         ff_dual, ff_edge, ff_cell, 
-        +1. / 2. * cnfg.time_step)
+        uu_edge, vv_edge, uu_mag_,
+        uu_tiny, pv_tiny, 
+        (+1. / 2.) * cnfg.params.time_step)
+        
+    nu_turb = flow.diagnostic.nu_turb    # lagged values
+
+    nu_thin = flow.diagnostic.nu_thin
+
+    nu_wave = flow.diagnostic.nu_wave
+    os_wave = flow.diagnostic.os_wave
+
+    nu_shoc = flow.diagnostic.nu_shoc
+    os_shoc = flow.diagnostic.os_shoc
+
+    xi_tide = flow.diagnostic.xi_tide
+    xi_self = flow.diagnostic.xi_self
+
+    return uu_edge, hh_cell, \
+           hh_edge, hh_dual, hh_bias, \
+           ke_cell, ke_bias, \
+           rv_cell, pv_cell, \
+           rv_dual, pv_dual, pv_edge, pv_bias, \
+           vv_edge, nu_turb, \
+           nu_wave, os_wave, \
+           nu_shoc, os_shoc, nu_thin, \
+           xi_tide, xi_self
+    
+
+def invariant(mesh, mats, flow, cnfg):
+
+#-- compute the discrete energy and enstrophy invariants
+
+    zb_cell = flow.foundation.zb_cell
+
+    ff_cell = flow.foundation.ff_cell
+    ff_edge = flow.foundation.ff_edge
+    ff_dual = flow.foundation.ff_vert
+
+    gravity = cnfg.consts.gravity
+
+    hh_cell = flow.prognostic.hh_cell
+    uu_edge = flow.prognostic.uu_edge
+
+    hr_cell = hh_cell.astype(dtype=reals_t)
+
+    # construct vel^\perp
+    vv_edge = calc_perp(mesh, mats, cnfg, uu_edge)
+    
+    uu_sqr_ = uu_edge ** 2 +  \
+              vv_edge ** 2
+    uu_mag_ = jnp.sqrt(uu_sqr_)
+
+    # construct thickness
+    hh_dual, hh_edge, hh_quad, hh_bias= calc_hmap(
+        mesh, mats, cnfg, gravity,
+        hr_cell, uu_edge, vv_edge, uu_mag_)
+
+    # construct nonlinear
+    ke_edge = uu_edge ** 2
+    ke_edge*= hh_edge * mesh.edge.area
+    
+    pe_cell = gravity * (
+        hh_cell * 0.5 + zb_cell - np.min(zb_cell))
+    pe_cell*= hh_cell * mesh.cell.area
+
+    kp_sums = jnp.sum(ke_edge, dtype=flt64_t) \
+            + jnp.sum(pe_cell, dtype=flt64_t)
+
+    uu_tiny = flow.diagnostic.uu_tiny
+    pv_tiny = flow.diagnostic.pv_tiny
+
+    rv_dual, pv_dual, rv_wide, pv_wide, \
+    rv_cell, pv_cell, \
+    pv_edge, pv_bias = calc_u_pv(
+        mesh, mats, cnfg, 
+        hr_cell, hh_quad, hh_dual,
+        ff_dual, ff_edge, ff_cell, 
+        uu_edge, vv_edge, uu_mag_,
+        uu_tiny, pv_tiny, 
+        (+1. / 2.) * cnfg.params.time_step)
 
     # include wet-dry ramp in pv budget
-    hh_dtol = cnfg.wetdry_h0 + cnfg.hh_tiny
+    hh_dtol = cnfg.consts.wetdry_h0 + \
+              flow.diagnostic.hh_tiny
     hh_ramp = hh_dual / hh_dtol / 10. - .01
-    hh_ramp = np.maximum(+0.0, 
-              np.minimum(+1.0, hh_ramp))
+    hh_ramp = jnp.maximum(0.0, 
+              jnp.minimum(1.0, hh_ramp))
 
     # pv is curl(u)+f here, so factor hh dependence
-    pv_sums = 0.5 * math.fsum(
+    pv_sums = 0.5 * jnp.sum(
         mesh.vert.area * (hh_ramp ** 2)
-                       * (pv_dual ** 2 / hh_dual))
+                       * (pv_dual ** 2 / hh_dual), 
+              dtype=flt64_t)
 
     return kp_sums, pv_sums
-    """
+
 
 """
 def calc_obcs(mesh, mats, cnfg, 
@@ -223,34 +253,105 @@ def calc_udry(
     tcpu.calc_udry = tcpu.calc_udry + (ttoc - ttic)
         
     return uu_edge, vv_edge, nu_thin
+"""
 
 
 def upwinding(mesh, mats, cnfg, 
-        ss_wide, ss_dual, ss_cell, uu_edge, vv_edge, 
-        ss_edge, up_bias,
-        delta_t, sv_tiny, uu_tiny,
+        ss_wide, ss_dual, ss_cell, uu_edge, vv_edge, uu_mag_,
+        ss_edge, delta_t, ss_tiny, uu_tiny,
         up_kind, up_phi_):
 
 #-- streamline upwind eval.'s
 
-    ttic = time.time()
+    up_tiny = +0.01  # always some upwinding
+    up_bias = +0.00 * \
+            jnp.ones(ss_edge.size, dtype=reals_t)
 
-    ss_edge, up_bias = _upwinding(
-        mesh, mats, cnfg, 
-        ss_wide, ss_dual, ss_cell, uu_edge, vv_edge, 
-        ss_edge, up_bias, 
-        delta_t, sv_tiny, uu_tiny, 
-        up_kind, up_phi_)
+    if   (up_kind == "APVM" or 
+          up_kind == "LAX-WENDROFF"):
+              
+    #-- APVM: anticipated upstream method; lagrangian
+    #-- formulation. Upwind departure points, appears
+    #-- to be inconsistent in time for RK integrators
 
-    ttoc = time.time()
-    tcpu.upwinding = tcpu.upwinding + (ttoc - ttic)
+        dN_grad = op_product(mats.edge.grad_norm, ss_cell)
+        dP_grad = op_product(mats.edge.grad_perp, ss_dual)
+
+    #-- lagrangian APVM, scale w. flow vel
+        ss_edge = ss_edge - delta_t * (
+                ( uu_edge * dN_grad + 
+                  vv_edge * dP_grad ) )
+
+        up_bias = +0.50 * \
+            jnp.ones(ss_edge.size, dtype=reals_t)
+
+    elif (up_kind == "AUST-CONST"):
+
+    #-- AUST: anticipated upstream method; APVM meets
+    #-- LUST? Upwinds in multi-dimensional sense, vs.
+    #-- LUST, which upwinds via tangential dir. only.
+
+    #-- const. upwinding version
+
+        dN_grad = op_product(mats.edge.grad_norm, ss_cell)
+        dP_grad = op_product(mats.edge.grad_perp, ss_dual)
+
+    #-- upwind APVM, scale w. grid spacing
+        uu_mag_ = uu_tiny + uu_mag_
+        uu_dir_ = uu_edge / uu_mag_
+        vv_dir_ = vv_edge / uu_mag_
+
+        ss_edge = ss_edge - mesh.edge.slen * up_phi_ * (
+                ( uu_dir_ * dN_grad +
+                  vv_dir_ * dP_grad ) )
+
+        up_bias = up_phi_ * \
+            jnp.ones(ss_edge.size, dtype=reals_t)
+
+    elif (up_kind == "AUST-ADAPT"):
+        
+    #-- AUST: anticipated upstream method; APVM meets
+    #-- LUST? Upwinds in multi-dimensional sense, vs.
+    #-- LUST, which upwinds via tangential dir. only.
+
+    #-- adapt. upwinding version
+
+        dN_grad = op_product(mats.edge.grad_norm, ss_cell)
+        dP_grad = op_product(mats.edge.grad_perp, ss_dual)
+
+    #-- up_bias+= |large - small| stencils
+        ds_dual = jnp.abs(ss_wide - ss_dual)
+        up_sum_ = op_product(mats.edge.dual_sums, ds_dual)
+
+    #-- a measure of "difference" on edges
+        ds_edge = 0.50 * (jnp.abs(dN_grad) +
+                          jnp.abs(dP_grad) )
+        ds_edge = ss_tiny + \
+           mesh.edge.slen * ds_edge
+        
+        up_bias = up_phi_ * up_sum_ / ds_edge
+        
+    #-- up^k/(up^k+1.) polynomial limiting
+        up_bias = up_bias * up_bias
+        up_bias = up_bias /(up_bias + 1.0)
+
+    #-- always need to have some upwinding
+        up_bias = up_tiny + up_bias
+
+    #-- upwind APVM, scale w. grid spacing
+        uu_mag_ = uu_tiny + uu_mag_
+        uu_dir_ = uu_edge / uu_mag_
+        vv_dir_ = vv_edge / uu_mag_
+
+        ss_edge = ss_edge - mesh.edge.slen * up_bias * (
+                ( uu_dir_ * dN_grad +
+                  vv_dir_ * dP_grad ) )
 
     return ss_edge, up_bias
-"""
 
 
 def calc_hmap(mesh, mats, cnfg, 
-        gravity, hh_cell, uu_edge, vv_edge):
+        gravity, hh_cell, uu_edge, vv_edge, uu_mag_):
 
 #-- compute discrete thickness
 
@@ -277,8 +378,6 @@ def calc_hmap(mesh, mats, cnfg,
             mats.edge.dual_sums, hh_dual) ) / 6.0
 
     #-- compute the upwind thickness blend
-        uu_wave = jnp.sqrt(uu_edge ** 2 + vv_edge ** 2)
-
         cel1 = mesh.edge.cell[:, 0] - 1
         cel2 = mesh.edge.cell[:, 1] - 1
 
@@ -290,8 +389,8 @@ def calc_hmap(mesh, mats, cnfg,
         h2_cell = jnp.asarray(
             idx_gather(hh_cell, cel2), dtype=reals_t)
 
-        c1_wave = uu_wave + jnp.sqrt(gravity * h1_cell)
-        c2_wave = uu_wave + jnp.sqrt(gravity * h2_cell)
+        c1_wave = uu_mag_ + jnp.sqrt(gravity * h1_cell)
+        c2_wave = uu_mag_ + jnp.sqrt(gravity * h2_cell)
 
     #-- upwind if the wavespeed ratio >> 1
         hh_bias = jnp.where(c2_wave>c1_wave, 
@@ -315,7 +414,7 @@ def calc_hmap(mesh, mats, cnfg,
     
 
 def calc_u_ke(mesh, mats, cnfg, 
-        hh_cell, hh_edge, hh_dual, uu_edge, vv_edge,
+        hh_cell, hh_edge, hh_dual, uu_edge, vv_edge, uu_sqr_,
         delta_t):
 
 #-- reconstruct kinetic energy
@@ -325,7 +424,7 @@ def calc_u_ke(mesh, mats, cnfg,
 
 #-- calc. kinetic energy on edges: 1./2 * |u|^2
     k1_edge = 1.0 * uu_edge ** 2
-    k2_edge = 0.5 *(uu_edge ** 2 + vv_edge ** 2)
+    k2_edge = 0.5 * uu_sqr_
 
     ke_edge =(1.0 - method_ke) * k1_edge + \
              (0.0 + method_ke) * k2_edge
@@ -370,14 +469,15 @@ def _build_pv(mesh, mats, cnfg,
     pv_cell = rv_cell + ff_cell
 
     return rv_dual, pv_dual, rv_wide, pv_wide, \
-           jnp.sqrt( jnp.sum(pv_wide ** 2 ) ), \
+           jnp.sqrt(jnp.mean(pv_wide ** 2 ) ), \
            rv_cell, pv_cell, \
            rv_edge, pv_edge
               
               
 def calc_u_pv(mesh, mats, cnfg, 
         hh_cell, hh_quad, hh_dual, ff_dual, ff_edge, ff_cell,
-        uu_edge, vv_edge,
+        uu_edge, vv_edge, uu_mag_,
+        uu_tiny, pv_tiny,
         delta_t):
   
 #-- compute discrete vorticity
@@ -390,24 +490,18 @@ def calc_u_pv(mesh, mats, cnfg,
         ff_dual, ff_edge, ff_cell, 
         uu_edge, vv_edge, delta_t)
     
-    """
-    uu_tiny = cnfg.uu_tiny * 1
-    pv_tiny = cnfg.pv_tiny * 1
-    pv_tiny = max (pv_tiny, 
+    pv_tiny = (pv_tiny).astype(reals_t)
+    pv_tiny = jax.lax.max(pv_tiny, 
         +2.0 * jnp.finfo(reals_t).eps * pv_rms_)
 
     pv_edge, pv_bias =  upwinding(
         mesh, mats, cnfg, 
         pv_wide, pv_dual, pv_cell, 
-        uu_edge, vv_edge, 
-        pv_edge, up_edge,
-        delta_t, pv_tiny, uu_tiny, 
+        uu_edge, vv_edge, uu_mag_,
+        pv_edge, delta_t, pv_tiny, uu_tiny, 
         cnfg.option.pv_scheme, 
         cnfg.consts.pv_upwind)
-    """
-
-    pv_bias = jnp.zeros(pv_edge.size, dtype=reals_t)
-
+    
     return rv_dual, pv_dual, rv_wide, pv_wide, \
            rv_cell, pv_cell, \
            pv_edge, pv_bias
@@ -417,14 +511,13 @@ def calc_perp(mesh, mats, cnfg, uu_edge):
 
 #-- get tangential velocity
 
-    vv_edge =-op_product(mats.edge.lsqr_perp, uu_edge)
+    vv_edge = op_product(mats.edge.lsqr_perp, uu_edge)
 
-    return vv_edge
+    return vv_edge * mesh.edge.perp
               
               
 def tend_hadv(mesh, mats, cnfg, hh_edge, hh_cell, 
-                                uu_edge,
-                                gravity, 
+                                uu_edge, gravity, 
                                 hh_tend):
 
 #-- div. for thickness flux
@@ -470,8 +563,7 @@ def tend_uadv(mesh, mats, cnfg,
     
     
 def tend_upgf(mesh, mats, cnfg, hh_cell, zb_cell,
-                                gravity,
-                                xi_self,  
+                                gravity, xi_self,
                                 uu_tend):
 
 #-- get z pressure gradient
