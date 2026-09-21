@@ -179,6 +179,10 @@ def swe(cnfg):
     cnfg.save_next = cnfg.timeisnow
     """
 
+    save_step(save, 
+        mesh.jx, mats.jx, flow.jx, cnfg.jx, step=0)
+
+
     """
     # uncomment to produce profile trace
     opts = jax.profiler.ProfileOptions()
@@ -189,7 +193,6 @@ def swe(cnfg):
                             create_perfetto_trace=True,
                             profiler_options=opts):
     """
-
     # main time-stepping loop
     flow.jx, cnfg.jx = step_eqns(
         mesh.jx, mats.jx, flow.jx, cnfg.jx, cnfg.iteration)
@@ -197,6 +200,16 @@ def swe(cnfg):
     jax.block_until_ready(flow.jx)
 
     ttoc = time.time()
+
+
+    save_step(save, 
+        mesh.jx, mats.jx, flow.jx, cnfg.jx, step=1)
+
+    kp_sums, pv_sums = invariant(
+        mesh.jx, mats.jx, flow.jx, cnfg.jx)
+
+    print(np.float64(kp_sums), np.float64(pv_sums))
+
 
 
     #WIP hacky device-to-host
@@ -207,10 +220,7 @@ def swe(cnfg):
     print(np.min(uu_edge), np.max(uu_edge))
 
 
-    save_step(save, mesh, mats, flow, cnfg, 
-        step=1, hh_cell=hh_cell, uu_edge=uu_edge, qq_cell=None)
-
-
+    
     """
     save_last(save, mesh, mats, flow, cnfg, step, 
               kp_sum_, en_sum_,
@@ -303,15 +313,13 @@ def pre(mesh, mats, flow, cnfg):
     flow.c0_rms_ = flow.u0_rms_ + \
         np.sqrt (flow.gravity * flow.h0_rms_)
 
-    cnfg.hh_tiny = 100. * \
-        np.finfo(hdata_t).eps * flow.h0_rms_
-    cnfg.uu_tiny = 1. * \
+    flow.hh_tiny = 100. * \
+        np.finfo(flt64_t).eps * flow.h0_rms_
+    flow.uu_tiny = 100. * \
         np.finfo(flt64_t).eps * flow.c0_rms_
-    cnfg.pv_tiny = 1. * \
-        np.finfo(reals_t).eps * flow.p0_rms_
-    cnfg.pv_tiny+= cnfg.uu_tiny
-
-    cnfg.ke_tiny = np.sqrt(cnfg.uu_tiny)
+    flow.pv_tiny = 100. * \
+        np.finfo(flt64_t).eps * flow.p0_rms_
+    flow.pv_tiny+= flow.uu_tiny
 
     # const. scaling on drag param.
     cnfg.anylaw_cd = \

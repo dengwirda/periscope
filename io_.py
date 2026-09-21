@@ -17,9 +17,11 @@ from log import tcpu
 
 from _dx import calc_vars
 
+from _jo import op_product
+
 class base: pass
 out_ = base()
-out_.uu_edge = False  # True to write to file
+out_.uu_edge = False  # TRUE to write to file
 out_.vv_edge = False
 out_.hh_bias = False
 out_.hh_cell = False
@@ -48,221 +50,223 @@ out_.xi_self = False
 out_.uu_filt = False
 out_.ke_filt = False
 
-def save_step(save, mesh, mats, flow, cnfg, step, hh_cell, uu_edge,
-                                                  qq_cell):
+def save_step(save, mesh, mats, flow, cnfg, step):
 
-    """
-    hh_edge, hh_dual, hh_bias, \
-    ke_cell, ke_bias, \
+    uu_edge, hh_cell, \
+    hh_edge, hh_dual, hh_bias, ke_cell, ke_bias, \
     rv_cell, pv_cell, rv_dual, pv_dual, pv_edge, pv_bias, \
     vv_edge, nu_turb, nu_wave, os_wave, nu_shoc, os_shoc, \
-    nu_thin, uu_filt, Xi_tide, Xi_self = calc_vars (
-        mesh, mats, flow, cnfg, hh_cell, uu_edge, qq_cell
-        )
-    """
-
+    nu_thin, xi_tide, xi_self= \
+        calc_vars(mesh, mats, flow, cnfg)
+    
     ttic = time.time()
 
     data = nc.Dataset(save, "a", format="NETCDF4")
 
     # seconds elapsed since epoch
-    data.timeisnow = cnfg.timeisnow
+    data.timeisnow = cnfg.params.timeisnow
 
-    # xt variables are tmp scratch
+    # device-to-host on i/o write
+
+    cell_size = mesh.cell.irev.size
+    edge_size = mesh.edge.irev.size
+    vert_size = mesh.vert.irev.size
+
+    # xt variables == tmp scratch
 
     if (out_.uu_edge):
         data.variables["uu_edge"][step, :, :] = \
             np.reshape(uu_edge[
-                mesh.edge.irev - 1], (1, mesh.edge.size, 1))
+                mesh.edge.irev - 1], (1, edge_size, 1))
        
-    """     
     if (out_.vv_edge):
         data.variables["vv_edge"][step, :, :] = \
             np.reshape(vv_edge[
-                mesh.edge.irev - 1], (1, mesh.edge.size, 1))
+                mesh.edge.irev - 1], (1, edge_size, 1))
                 
     if (out_.hh_bias):
-        _t_dual = mats.dual_tail_sums * hh_bias
-        _t_dual/= mesh.vert.area
+        _t_dual = op_product(
+        mats.dual.tail_sums, hh_bias) / mesh.vert.area
 
         data.variables["hh_bias"][step, :, :] = \
             np.reshape(_t_dual[
-                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
-    """
+                mesh.vert.irev - 1], (1, vert_size, 1))
                 
     if (out_.hh_cell):         
         data.variables["hh_cell"][step, :, :] = \
             np.reshape(hh_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
-          
-    """      
+                mesh.cell.irev - 1], (1, cell_size, 1))
+            
     if (out_.hh_edge):         
         data.variables["hh_edge"][step, :, :] = \
             np.reshape(hh_edge[
-                mesh.edge.irev - 1], (1, mesh.edge.size, 1))
+                mesh.edge.irev - 1], (1, edge_size, 1))
                 
     if (out_.hh_dual):         
         data.variables["hh_dual"][step, :, :] = \
             np.reshape(hh_dual[
-                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                mesh.vert.irev - 1], (1, vert_size, 1))
     
     if (out_.zt_cell):
-        _t_cell = flow.zb_cell + hh_cell
+        _t_cell = flow.foundation.zb_cell + hh_cell
     
         data.variables["zt_cell"][step, :, :] = \
             np.reshape(_t_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+                mesh.cell.irev - 1], (1, cell_size, 1))
 
     if (out_.qq_cell):
         data.variables["qq_cell"][step, :, :] = \
             np.reshape(qq_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+                mesh.cell.irev - 1], (1, cell_size, 1))
 
     if (out_.du_cell):
-        _t_cell = mats.cell_flux_sums * uu_edge
-        _t_cell/= mesh.cell.area
+        _t_cell = op_product(
+        mats.cell.flux_sums, uu_edge) / mesh.cell.area
 
         data.variables["du_cell"][step, :, :] = \
             np.reshape(_t_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+                mesh.cell.irev - 1], (1, cell_size, 1))
 
     if (out_.uh_cell):
-        _t_edge = uu_edge * hh_edge
-        _t_cell = mats.cell_flux_sums * _t_edge
-        _t_cell/= mesh.cell.area
+        _t_edge = (uu_edge * hh_edge)
+        _t_cell = op_product(
+        mats.cell.flux_sums, _t_edge) / mesh.cell.area
 
         data.variables["uh_cell"][step, :, :] = \
             np.reshape(_t_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+                mesh.cell.irev - 1], (1, cell_size, 1))
 
     if (out_.ke_cell):
         data.variables["ke_cell"][step, :, :] = \
             np.reshape(ke_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1)) 
+                mesh.cell.irev - 1], (1, cell_size, 1)) 
 
     if (out_.pv_bias):
-        _t_dual = mats.dual_tail_sums * pv_bias
-        _t_dual/= mesh.vert.area
+        _t_dual = op_product(
+        mats.dual.tail_sums, pv_bias) / mesh.vert.area
 
         data.variables["pv_bias"][step, :, :] = \
             np.reshape(_t_dual[
-                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                mesh.vert.irev - 1], (1, vert_size, 1))
     
     if (out_.pv_dual):        
         data.variables["pv_dual"][step, :, :] = \
             np.reshape(pv_dual[
-                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                mesh.vert.irev - 1], (1, vert_size, 1))
     
     if (out_.rv_dual):
         data.variables["rv_dual"][step, :, :] = \
             np.reshape(rv_dual[
-                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                mesh.vert.irev - 1], (1, vert_size, 1))
                 
     if (out_.pv_cell):        
         data.variables["pv_cell"][step, :, :] = \
             np.reshape(pv_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+                mesh.cell.irev - 1], (1, cell_size, 1))
     
     if (out_.rv_cell):
         data.variables["rv_cell"][step, :, :] = \
             np.reshape(rv_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
-                
+                mesh.cell.irev - 1], (1, cell_size, 1))
+       
+    """         
     if (out_.ux_cell):
-        _t_cell = mats.cell_lsqr_xnrm * uu_edge
+        _t_cell = op_product(mats.cell.lsqr_xnrm, uu_edge)
 
         data.variables["ux_cell"][step, :, :] = \
             np.reshape(_t_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+                mesh.cell.irev - 1], (1, cell_size, 1))
                 
     if (out_.uy_cell):
-        _t_cell = mats.cell_lsqr_ynrm * uu_edge
+        _t_cell = op_product(mats.cell.lsqr_ynrm, uu_edge)
 
         data.variables["uy_cell"][step, :, :] = \
             np.reshape(_t_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+                mesh.cell.irev - 1], (1, cell_size, 1))
                 
     if (out_.uz_cell):
-        _t_cell = mats.cell_lsqr_znrm * uu_edge
+        _t_cell = op_product(mats.cell.lsqr_znrm, uu_edge)
 
         data.variables["uz_cell"][step, :, :] = \
             np.reshape(_t_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))   
+                mesh.cell.irev - 1], (1, cell_size, 1))   
+    """
                 
     if (out_.nu_turb):
-        _t_dual = mats.dual_tail_sums * nu_turb
-        _t_dual/= mesh.vert.area
+        _t_dual = op_product(
+        mats.dual.tail_sums, nu_turb) / mesh.vert.area
     
         data.variables["nu_turb"][step, :, :] = \
             np.reshape(_t_dual[
-                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                mesh.vert.irev - 1], (1, vert_size, 1))
 
     if (out_.nu_thin):
-        _t_dual = mats.dual_tail_sums * nu_thin
-        _t_dual/= mesh.vert.area
+        _t_dual = op_product(
+        mats.dual.tail_sums, nu_thin) / mesh.vert.area
     
         data.variables["nu_thin"][step, :, :] = \
             np.reshape(_t_dual[
-                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                mesh.vert.irev - 1], (1, vert_size, 1))
 
     if (out_.nu_wave):
-        _t_dual = mats.dual_tail_sums * nu_wave
-        _t_dual/= mesh.vert.area
+        _t_dual = op_product(
+        mats.dual.tail_sums, nu_wave) / mesh.vert.area
     
         data.variables["nu_wave"][step, :, :] = \
             np.reshape(_t_dual[
-                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                mesh.vert.irev - 1], (1, vert_size, 1))
 
-        _t_dual = mats.dual_tail_sums * os_wave
-        _t_dual/= mesh.vert.area
+        _t_dual = op_product(
+        mats.dual.tail_sums, os_wave) / mesh.vert.area
     
         data.variables["os_wave"][step, :, :] = \
             np.reshape(_t_dual[
-                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                mesh.vert.irev - 1], (1, vert_size, 1))
 
     if (out_.nu_shoc):
-        _t_dual = mats.dual_tail_sums * nu_shoc
-        _t_dual/= mesh.vert.area
+        _t_dual = op_product(
+        mats.dual.tail_sums, nu_shoc) / mesh.vert.area
     
         data.variables["nu_shoc"][step, :, :] = \
             np.reshape(_t_dual[
-                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                mesh.vert.irev - 1], (1, vert_size, 1))
 
-        _t_dual = mats.dual_kite_sums * os_shoc
-        _t_dual/= mesh.vert.area
+        _t_dual = op_product(
+        mats.dual.tail_sums, os_shoc) / mesh.vert.area
     
         data.variables["os_shoc"][step, :, :] = \
             np.reshape(_t_dual[
-                mesh.vert.irev - 1], (1, mesh.vert.size, 1))
+                mesh.vert.irev - 1], (1, vert_size, 1))
 
     if (out_.xi_tide):
-        data.variables["Xi_tide"][step, :, :] = \
-            np.reshape(Xi_tide[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+        data.variables["xi_tide"][step, :, :] = \
+            np.reshape(xi_tide[
+                mesh.cell.irev - 1], (1, cell_size, 1))
 
     if (out_.xi_self):
-        data.variables["Xi_self"][step, :, :] = \
-            np.reshape(Xi_self[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
+        data.variables["xi_self"][step, :, :] = \
+            np.reshape(xi_self[
+                mesh.cell.irev - 1], (1, cell_size, 1))
 
+    """
     if (out_.uu_filt):
         data.variables["uu_filt"][step, :, :] = \
             np.reshape(uu_filt[
-                mesh.edge.irev - 1], (1, mesh.edge.size, 1))
+                mesh.edge.irev - 1], (1, edge_size, 1))
 
     if (out_.ke_filt):
-        vv_filt = mats.edge_lsqr_perp * uu_filt
+        _t_edge = op_product(mats.edge.lsqr_perp, uu_filt)
 
         _t_edge = .5 * uu_filt ** 2 + \
                   .5 * vv_filt ** 2
 
-        _t_cell = mats.cell_wing_sums * _t_edge
-        _t_cell/= mesh.cell.area
+        _t_cell = op_product(
+        mats.dual.wing_sums, nu_shoc) / mesh.cell.area
 
         data.variables["ke_filt"][step, :, :] = \
             np.reshape(_t_cell[
-                mesh.cell.irev - 1], (1, mesh.cell.size, 1))
-    """
+                mesh.cell.irev - 1], (1, cell_size, 1))
+    """    
 
     data.close()
     
