@@ -244,6 +244,7 @@ def swe(cnfg):
     print("Run complete; runtime:")
     print("*wall-time (sec):", round(ttoc - ttic, 2))
     print("*file-i/o. (sec):", round(tcpu.filewrite, 2))
+    """
     print("*evaluate_ (sec):", round(tcpu.evaluate_, 2))    
     print("*thickness (sec):", round(tcpu.thickness, 2))
     print("*momentum_ (sec):", round(tcpu.momentum_, 2))
@@ -268,6 +269,7 @@ def swe(cnfg):
     print("*tend-ugeo (sec):", round(tcpu.tend_ugeo, 2))
     print("*tend-utau (sec):", round(tcpu.tend_utau, 2))
     print("*calc-drag (sec):", round(tcpu.calc_drag, 2))
+    """
 
 
 def out(done, freq, mark, step, time):
@@ -304,10 +306,6 @@ def pre(mesh, mats, flow, cnfg):
            flow.ff_edge, dtype=flt32_t)
     flow.ff_cell = np.asarray(
            flow.ff_cell, dtype=flt32_t)
-
-    flow.ff_cell*= (not cnfg.no_rotate)
-    flow.ff_edge*= (not cnfg.no_rotate)
-    flow.ff_vert*= (not cnfg.no_rotate)
 
     cnfg.ff_max_ = np.max(np.abs(flow.ff_edge))
 

@@ -392,34 +392,10 @@ if (__name__ == "__main__"):
 #-- misc. flags and config.
 
     parser.add_argument(
-        "--PGF-limit", dest="pgf_limit", 
-        type=lambda x: bool(strtobool(str(x.strip()))),
-        required=False, 
-        default=False, help="Enable PGF slope limit.")
-
-    parser.add_argument(
-        "--no-u-tend", dest="no_u_tend", 
-        type=lambda x: bool(strtobool(str(x.strip()))),
-        required=False, 
-        default=False, help="Disable uu-tend. terms.")
-        
-    parser.add_argument(
-        "--no-h-tend", dest="no_h_tend", 
-        type=lambda x: bool(strtobool(str(x.strip()))),
-        required=False, 
-        default=False, help="Disable hh-tend. terms.")
-
-    parser.add_argument(
-        "--no-advect", dest="no_advect", 
+        "--no-advrot", dest="no_advrot", 
         type=lambda x: bool(strtobool(str(x.strip()))),
         required=False, 
         default=False, help="Disable mom.-advection.")
-
-    parser.add_argument(
-        "--no-rotate", dest="no_rotate", 
-        type=lambda x: bool(strtobool(str(x.strip()))),
-        required=False, 
-        default=False, help="Disable coriolis terms.")
 
     parser.add_argument(
         "--no-geopot", dest="no_geopot", 
@@ -432,12 +408,6 @@ if (__name__ == "__main__"):
         type=lambda x: bool(strtobool(str(x.strip()))),
         required=False, 
         default=False, help="Disable stress forcing.")
-
-    parser.add_argument(
-        "--FB-weight", dest="fb_weight", type=float,
-        required=False,
-        nargs="*",
-        help="Forward-backward weights for integrators.")
 
     cnfg = parser.parse_args()
 
