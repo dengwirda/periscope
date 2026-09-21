@@ -171,21 +171,24 @@ def save_step(save, mesh, mats, flow, cnfg, step):
        
     """         
     if (out_.ux_cell):
-        _t_cell = op_product(mats.cell.lsqr_xnrm, uu_edge)
+        _t_cell = op_product(
+                    mats.cell.lsqr_xnrm, uu_edge)
 
         data.variables["ux_cell"][step, :, :] = \
             np.reshape(_t_cell[
                 mesh.cell.irev - 1], (1, cell_size, 1))
                 
     if (out_.uy_cell):
-        _t_cell = op_product(mats.cell.lsqr_ynrm, uu_edge)
+        _t_cell = op_product(
+                    mats.cell.lsqr_ynrm, uu_edge)
 
         data.variables["uy_cell"][step, :, :] = \
             np.reshape(_t_cell[
                 mesh.cell.irev - 1], (1, cell_size, 1))
                 
     if (out_.uz_cell):
-        _t_cell = op_product(mats.cell.lsqr_znrm, uu_edge)
+        _t_cell = op_product(
+                    mats.cell.lsqr_znrm, uu_edge)
 
         data.variables["uz_cell"][step, :, :] = \
             np.reshape(_t_cell[
@@ -255,7 +258,8 @@ def save_step(save, mesh, mats, flow, cnfg, step):
                 mesh.edge.irev - 1], (1, edge_size, 1))
 
     if (out_.ke_filt):
-        _t_edge = op_product(mats.edge.lsqr_perp, uu_filt)
+        _t_edge = op_product(
+                    mats.edge.lsqr_perp, uu_filt)
 
         _t_edge = .5 * uu_filt ** 2 + \
                   .5 * vv_filt ** 2

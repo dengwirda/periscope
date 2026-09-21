@@ -11,8 +11,8 @@ from _fp import udata_t, hdata_t, qdata_t
 
 @struct.dataclass
 class jxp_sparse_mat:
-    indx:       jnp.ndarray
-    vals:       jnp.ndarray
+    indx:       jnp.ndarray | None = None
+    vals:       jnp.ndarray | None = None
 
 @struct.dataclass
 class jxp_cell_coeff:

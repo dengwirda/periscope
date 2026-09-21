@@ -11,82 +11,84 @@ from _fp import udata_t, hdata_t, qdata_t
 
 @struct.dataclass
 class jxp_cell_tuple:
-    irev:       jnp.ndarray
-    ifwd:       jnp.ndarray
-    xpos:       jnp.ndarray
-    ypos:       jnp.ndarray
-    zpos:       jnp.ndarray
-    xlon:       jnp.ndarray
-    ylat:       jnp.ndarray
-    vert:       jnp.ndarray
-    edge:       jnp.ndarray
-    cell:       jnp.ndarray
-    topo:       jnp.ndarray
-    mask:       jnp.ndarray
-    gate:       jnp.ndarray
-    open:       jnp.ndarray
-    wall:       jnp.ndarray
-    area:       jnp.ndarray
+    irev:       jnp.ndarray | None = None
+    ifwd:       jnp.ndarray | None = None
+    xpos:       jnp.ndarray | None = None
+    ypos:       jnp.ndarray | None = None
+    zpos:       jnp.ndarray | None = None
+    xlon:       jnp.ndarray | None = None
+    ylat:       jnp.ndarray | None = None
+    vert:       jnp.ndarray | None = None
+    edge:       jnp.ndarray | None = None
+    cell:       jnp.ndarray | None = None
+    topo:       jnp.ndarray | None = None
+    mask:       jnp.ndarray | None = None
+    gate:       jnp.ndarray | None = None
+    open:       jnp.ndarray | None = None
+    wall:       jnp.ndarray | None = None
+    area:       jnp.ndarray | None = None
 
 @struct.dataclass
 class jxp_edge_tuple:
-    irev:       jnp.ndarray
-    ifwd:       jnp.ndarray
-    xpos:       jnp.ndarray
-    ypos:       jnp.ndarray
-    zpos:       jnp.ndarray
-    xprp:       jnp.ndarray
-    yprp:       jnp.ndarray
-    zprp:       jnp.ndarray
-    xnrm:       jnp.ndarray
-    ynrm:       jnp.ndarray
-    znrm:       jnp.ndarray
-    xlon:       jnp.ndarray
-    ylat:       jnp.ndarray
-    vlen:       jnp.ndarray
-    dlen:       jnp.ndarray
-    clen:       jnp.ndarray
-    slen:       jnp.ndarray
-    spac:       jnp.ndarray
-    beta:       jnp.ndarray
-    cos_:       jnp.ndarray
-    sin_:       jnp.ndarray
-    tail:       jnp.ndarray
-    wing:       jnp.ndarray
-    vert:       jnp.ndarray
-    cell:       jnp.ndarray
-    edge:       jnp.ndarray
-    topo:       jnp.ndarray
-    mask:       jnp.ndarray
-    gate:       jnp.ndarray
-    slip:       jnp.ndarray
-    perp:       jnp.ndarray
-    open:       jnp.ndarray
-    wall:       jnp.ndarray
-    area:       jnp.ndarray
+    irev:       jnp.ndarray | None = None
+    ifwd:       jnp.ndarray | None = None
+    xpos:       jnp.ndarray | None = None
+    ypos:       jnp.ndarray | None = None
+    zpos:       jnp.ndarray | None = None
+    xprp:       jnp.ndarray | None = None
+    yprp:       jnp.ndarray | None = None
+    zprp:       jnp.ndarray | None = None
+    xnrm:       jnp.ndarray | None = None
+    ynrm:       jnp.ndarray | None = None
+    znrm:       jnp.ndarray | None = None
+    xlon:       jnp.ndarray | None = None
+    ylat:       jnp.ndarray | None = None
+    vlen:       jnp.ndarray | None = None
+    dlen:       jnp.ndarray | None = None
+    clen:       jnp.ndarray | None = None
+    slen:       jnp.ndarray | None = None
+    spac:       jnp.ndarray | None = None
+    beta:       jnp.ndarray | None = None
+    cos_:       jnp.ndarray | None = None
+    sin_:       jnp.ndarray | None = None
+    tail:       jnp.ndarray | None = None
+    wing:       jnp.ndarray | None = None
+    lhs_:       jnp.ndarray | None = None
+    rhs_:       jnp.ndarray | None = None
+    vert:       jnp.ndarray | None = None
+    cell:       jnp.ndarray | None = None
+    edge:       jnp.ndarray | None = None
+    topo:       jnp.ndarray | None = None
+    mask:       jnp.ndarray | None = None
+    gate:       jnp.ndarray | None = None
+    slip:       jnp.ndarray | None = None
+    perp:       jnp.ndarray | None = None
+    open:       jnp.ndarray | None = None
+    wall:       jnp.ndarray | None = None
+    area:       jnp.ndarray | None = None
 
 @struct.dataclass
 class jxp_quad_tuple:
-    area:       jnp.ndarray
+    area:       jnp.ndarray | None = None
 
 @struct.dataclass
 class jxp_vert_tuple:
-    irev:       jnp.ndarray
-    ifwd:       jnp.ndarray
-    xpos:       jnp.ndarray
-    ypos:       jnp.ndarray
-    zpos:       jnp.ndarray
-    xlon:       jnp.ndarray
-    ylat:       jnp.ndarray
-    kite:       jnp.ndarray
-    edge:       jnp.ndarray
-    cell:       jnp.ndarray
-    mask:       jnp.ndarray
-    gate:       jnp.ndarray
-    slip:       jnp.ndarray
-    open:       jnp.ndarray
-    wall:       jnp.ndarray
-    area:       jnp.ndarray
+    irev:       jnp.ndarray | None = None
+    ifwd:       jnp.ndarray | None = None
+    xpos:       jnp.ndarray | None = None
+    ypos:       jnp.ndarray | None = None
+    zpos:       jnp.ndarray | None = None
+    xlon:       jnp.ndarray | None = None
+    ylat:       jnp.ndarray | None = None
+    kite:       jnp.ndarray | None = None
+    edge:       jnp.ndarray | None = None
+    cell:       jnp.ndarray | None = None
+    mask:       jnp.ndarray | None = None
+    gate:       jnp.ndarray | None = None
+    slip:       jnp.ndarray | None = None
+    open:       jnp.ndarray | None = None
+    wall:       jnp.ndarray | None = None
+    area:       jnp.ndarray | None = None
 
 @struct.dataclass
 class jxp_mesh_tuple:
@@ -100,6 +102,12 @@ def msh_to_jax(mesh, mats, flow, cnfg):
     cell_size = mesh.cell.size
     edge_size = mesh.edge.size
     dual_size = mesh.vert.size
+
+    # adj. cells used in local upwind stencils
+    edge_lhs_ = mesh.edge.cell[:, 0] - 1
+    edge_rhs_ = mesh.edge.cell[:, 1] - 1
+    edge_lhs_[edge_lhs_<0] = edge_rhs_[edge_lhs_<0]
+    edge_rhs_[edge_rhs_<0] = edge_lhs_[edge_rhs_<0]
 
     mesh.jx = jxp_mesh_tuple(
         cell= jxp_cell_tuple(
@@ -144,6 +152,8 @@ def msh_to_jax(mesh, mats, flow, cnfg):
             sin_=jnp.asarray(mesh.edge.sin_),
             tail=jnp.asarray(mesh.edge.tail),
             wing=jnp.asarray(mesh.edge.wing),
+            lhs_=jnp.asarray(edge_lhs_),
+            rhs_=jnp.asarray(edge_rhs_),
             vert=jnp.asarray(mesh.edge.vert),
             cell=jnp.asarray(mesh.edge.cell),
             edge=jnp.asarray(mesh.edge.edge),

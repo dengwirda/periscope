@@ -195,9 +195,9 @@ def invariant(mesh, mats, flow, cnfg):
     # include wet-dry ramp in pv budget
     hh_dtol = cnfg.consts.wetdry_h0 + \
               flow.diagnostic.hh_tiny
-    hh_ramp = hh_dual / hh_dtol / 10. - .01
+    hh_ramp = hh_dual / hh_dtol / 10.0 - 0.01
     hh_ramp = jnp.maximum(0.0, 
-              jnp.minimum(1.0, hh_ramp))
+              jnp.minimum(1.0, hh_ramp) )
 
     # pv is curl(u)+f here, so factor hh dependence
     pv_sums = 0.5 * jnp.sum(
@@ -229,31 +229,30 @@ def calc_obcs(mesh, mats, cnfg,
     tcpu.calc_obcs = tcpu.calc_obcs + (ttoc - ttic)
         
     return hh_edge, uu_edge
+"""
     
-    
+
 def calc_udry(
         mesh, mats, cnfg, hh_edge, uu_edge, vv_edge):
         
 #-- apply wet-dry velocity lim.
    
-    nu_thin = variables.nu_thin
+    nu_thin = jnp.zeros(uu_edge.size, dtype=reals_t)
 
-    if (cnfg.wetdry_h0 <= 0.): 
+    if not cnfg.option.wetdry_on: 
         return uu_edge, vv_edge, nu_thin
    
-    ttic = time.time()
-        
-    hh_tiny = cnfg.wetdry_h0 * 10.0
-    
-    uu_edge, vv_edge, nu_thin = _calc_udry(
-        mesh, mats, cnfg, 
-            hh_tiny, hh_edge, uu_edge, vv_edge)
-        
-    ttoc = time.time()
-    tcpu.calc_udry = tcpu.calc_udry + (ttoc - ttic)
-        
+    hh_tiny = cnfg.consts.wetdry_h0 * 10.0
+
+    uu_ramp = jnp.clip(
+        hh_edge / hh_tiny - 0.01, 0.0, 1.0)
+
+    uu_edge = uu_edge * uu_ramp
+    vv_edge = vv_edge * uu_ramp
+
+    nu_thin = 1.0 * (1.0 - uu_ramp) * mesh.edge.slen
+
     return uu_edge, vv_edge, nu_thin
-"""
 
 
 def upwinding(mesh, mats, cnfg, 
@@ -297,10 +296,10 @@ def upwinding(mesh, mats, cnfg,
         dP_grad = op_product(mats.edge.grad_perp, ss_dual)
 
     #-- upwind APVM, scale w. grid spacing
-        ss_edge = ss_edge - mesh.edge.slen * up_phi_ * (
+        ss_edge = ss_edge - ( mesh.edge.slen * up_phi_ * (
                 ( uu_dir_ * dN_grad +
                   vv_dir_ * dP_grad ) /
-                ( uu_mag_ + uu_tiny ) )
+                ( uu_mag_ + uu_tiny ) )  )
 
         up_bias = up_phi_ * \
             jnp.ones(ss_edge.size, dtype=reals_t)
@@ -321,12 +320,12 @@ def upwinding(mesh, mats, cnfg,
         up_sum_ = op_product(mats.edge.dual_sums, ds_dual)
 
     #-- a measure of "difference" on edges
-        ds_edge = +0.50 * (jnp.abs (dN_grad)+
-                           jnp.abs (dP_grad))
+        ds_edge = +0.50 * ( jnp.abs(dN_grad) +
+                            jnp.abs(dP_grad) )
         ds_edge = ss_tiny + \
            mesh.edge.slen * ds_edge
         
-        up_bias = up_phi_ * up_sum_ / ds_edge
+        up_bias = up_phi_ *(up_sum_/ds_edge)
         
     #-- up^k/(up^k+1.) polynomial limiting
         up_bias = up_bias * up_bias
@@ -336,10 +335,10 @@ def upwinding(mesh, mats, cnfg,
         up_bias = up_tiny + up_bias
 
     #-- upwind APVM, scale w. grid spacing
-        ss_edge = ss_edge - mesh.edge.slen * up_bias * (
+        ss_edge = ss_edge - ( mesh.edge.slen * up_bias * (
                 ( uu_edge * dN_grad +
                   vv_edge * dP_grad ) / 
-                ( uu_mag_ + uu_tiny ) )
+                ( uu_mag_ + uu_tiny ) )  )
 
     return ss_edge, up_bias
 
@@ -372,37 +371,32 @@ def calc_hmap(mesh, mats, cnfg,
             mats.edge.dual_sums, hh_dual) ) / 6.0
 
     #-- compute the upwind thickness blend
-        cel1 = mesh.edge.cell[:, 0] - 1
-        cel2 = mesh.edge.cell[:, 1] - 1
+        h1_cell = jnp.asarray(idx_gather(
+            hh_cell, mesh.edge.lhs_), dtype=reals_t)
+        h2_cell = jnp.asarray(idx_gather(
+            hh_cell, mesh.edge.rhs_), dtype=reals_t)
 
-        cel1 = jnp.where(cel1 >= 0, cel1, cel2)
-        cel2 = jnp.where(cel2 >= 0, cel2, cel1)
+        c1_wave = jnp.sqrt (gravity * h1_cell)
+        c2_wave = jnp.sqrt (gravity * h2_cell)
 
-        h1_cell = jnp.asarray(
-            idx_gather(hh_cell, cel1), dtype=reals_t)
-        h2_cell = jnp.asarray(
-            idx_gather(hh_cell, cel2), dtype=reals_t)
+        cc_less = uu_mag_ + \
+                  jnp.minimum(c1_wave,c2_wave)
+        hh_less = jnp.minimum(h1_cell,h2_cell)
 
-        c1_wave = uu_mag_ + jnp.sqrt(gravity * h1_cell)
-        c2_wave = uu_mag_ + jnp.sqrt(gravity * h2_cell)
-
-    #-- upwind if the wavespeed ratio >> 1
-        hh_bias = jnp.where(c2_wave>c1_wave, 
-            jnp.maximum(jnp.sqrt(
-                (c2_wave - c1_wave)/c1_wave), 
-                (h2_cell - h1_cell)/h1_cell),
-            jnp.maximum(jnp.sqrt(
-                (c1_wave - c2_wave)/c2_wave), 
-                (h1_cell - h2_cell)/h2_cell)
+        hh_bias = jnp.maximum(
+            jnp.sqrt(
+            jnp.abs(c2_wave-c1_wave) / cc_less
+            ),
+            jnp.abs(h2_cell-h1_cell) / hh_less
         )
-        hh_bias = jnp.minimum(+1.0, hh_bias)
+        hh_bias = jnp.minimum(1.0, hh_bias)
 
         hh_bias = hh_bias ** 3
 
-        hh_edge = jnp.where(uu_edge >= 0.0, 
-            hh_bias * h1_cell + (1.-hh_bias) * hh_edge,
-            hh_bias * h2_cell + (1.-hh_bias) * hh_edge
-        )
+        hh_wind = jnp.where(
+            uu_edge>=0.0, h1_cell, h2_cell)
+
+        hh_edge = hh_edge + hh_bias * (hh_wind - hh_edge)
         
     return hh_dual, hh_edge, hh_quad, hh_bias
     
@@ -480,8 +474,7 @@ def calc_u_pv(mesh, mats, cnfg,
     rv_cell, pv_cell, \
     rv_edge, pv_edge =  _build_pv(
         mesh, mats, cnfg, 
-        hh_cell, hh_quad, hh_dual, 
-        ff_dual, ff_edge, ff_cell, 
+        hh_cell, hh_quad, hh_dual, ff_dual, ff_edge, ff_cell, 
         uu_edge, vv_edge, delta_t)
     
     pv_tiny = (pv_tiny).astype(reals_t)
@@ -490,8 +483,7 @@ def calc_u_pv(mesh, mats, cnfg,
 
     pv_edge, pv_bias =  upwinding(
         mesh, mats, cnfg, 
-        pv_wide, pv_dual, pv_cell, 
-        uu_edge, vv_edge, uu_mag_,
+        pv_wide, pv_dual, pv_cell, uu_edge, vv_edge, uu_mag_,
         pv_edge, delta_t, pv_tiny, uu_tiny, 
         cnfg.option.pv_scheme, 
         cnfg.consts.pv_upwind)
@@ -516,8 +508,8 @@ def tend_hadv(mesh, mats, cnfg, hh_edge, hh_cell,
 
 #-- div. for thickness flux
 
-    c0 = 0. #!! cnfg.sound_spd
-    gamma = (c0>0.) * gravity / (c0+1.)**2
+    c0 = cnfg.consts.sound_spd
+    gamma = (c0>0.) * gravity / jax.lax.max(1., c0**2)
 
     uh_flux = uu_edge * hh_edge \
             * (1.0 + 0.5 * gamma * hh_edge)
@@ -536,6 +528,8 @@ def tend_uadv(mesh, mats, cnfg,
         uu_tend):
 
 #-- energy-neutral UV. flux
+
+    if cnfg.option.no_advrot: return uu_tend
 
     pv_weight = cnfg.consts.pv_weight
 
@@ -562,18 +556,14 @@ def tend_upgf(mesh, mats, cnfg, hh_cell, zb_cell,
 
 #-- get z pressure gradient
 
-    sal_const = 0.0; sal_scale = 1.0
+    sal_const = cnfg.consts.sal_const
+    sal_scale = cnfg.consts.sal_scale
 
-    cel1 = mesh.edge.cell[:, 0] - 1
-    cel2 = mesh.edge.cell[:, 1] - 1
-
-    cel1 = jnp.where(cel1 >= 0, cel1, cel2)
-    cel2 = jnp.where(cel2 >= 0, cel2, cel1)
-
-    h1_cell = jnp.asarray(
-        idx_gather(hh_cell, cel1), dtype=reals_t)
-    h2_cell = jnp.asarray(
-        idx_gather(hh_cell, cel2), dtype=reals_t)
+#-- reconstruct from adj. cell thicknesses
+    h1_cell = jnp.asarray(idx_gather(
+        hh_cell, mesh.edge.lhs_), dtype=reals_t)
+    h2_cell = jnp.asarray(idx_gather(
+        hh_cell, mesh.edge.rhs_), dtype=reals_t)
 
     hh_min_ = 2.0 * ( h1_cell * h2_cell / 
                     ( h1_cell + h2_cell ) )

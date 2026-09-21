@@ -19,12 +19,13 @@ from _jv import jxp_prognostic
 from _jv import jxp_diagnostic
 from _jv import jxp_foundation
 
+from _dx import calc_udry
 from _dx import calc_hmap, tend_hadv
 from _dx import calc_u_ke, calc_u_pv, calc_perp
 from _dx import tend_uadv, tend_upgf
 
 """
-from _dx import calc_obcs, calc_udry, \
+from _dx import calc_obcs, \
                 calc_umix, calc_uwav, calc_hmix, \
                 tend_umix, tend_hmix, \
                 tend_utde, calc_tide, calc_self
@@ -84,13 +85,13 @@ def rhs_all_d(mesh, mats, cnfg, base, diag, hh_cell, uu_edge):
                                           gravity, 
                                           hE_prev, uE_prev, 
                                           hE_next, uE_next)
+    """
 
     # apply wet-dry limit
     # here, so shall feedback on nonlinear terms
     uu_edge, vv_edge, nu_thin = \
               calc_udry(mesh, mats, cnfg, hh_edge, 
                                           uu_edge, vv_edge)
-    """
 
     # nonlinear variables: kinetic energy & curl
     ke_cell, ke_bias = calc_u_ke(
@@ -112,12 +113,6 @@ def rhs_all_d(mesh, mats, cnfg, base, diag, hh_cell, uu_edge):
         uu_tiny, pv_tiny, +1. / 2. * cnfg.params.time_step)
 
     """
-    # shock sub-grid
-    nu_shoc = calc_hmix(mesh, mats, cnfg, hh_cell, zb_cell,
-                                          gravity,
-                                          hh_edge,
-                                          uu_edge, vv_edge)
-
     # waves sub-grid
     nu_wave = calc_uwav(mesh, mats, cnfg, hh_cell, zb_cell,
                                           gravity,
@@ -165,12 +160,9 @@ def rhs_fst_h(mesh, mats, cnfg, base, diag, hh_cell, uu_edge, hh_tend):
                                           hh_tend)
 
     """
-    nu_shoc = diag.nu_shoc
-
     # del^k dissipation
     hh_tend = tend_hmix(mesh, mats, cnfg, hr_cell, zb_cell, 
-                                          gravity,
-                                          nu_shoc, 
+                                          gravity, 
                                           hh_tend)
     """
 
