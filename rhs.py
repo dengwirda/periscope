@@ -22,12 +22,12 @@ from _jv import jxp_foundation
 from _dx import calc_udry
 from _dx import calc_hmap, tend_hadv
 from _dx import calc_u_ke, calc_u_pv, calc_perp
-from _dx import tend_uadv, tend_upgf
+from _dx import calc_umix, calc_uwav
+from _dx import tend_uadv, tend_upgf, tend_umix
 
 """
 from _dx import calc_obcs, \
-                calc_umix, calc_uwav, calc_hmix, \
-                tend_umix, tend_hmix, \
+                tend_hmix, \
                 tend_utde, calc_tide, calc_self
 """
 
@@ -60,6 +60,9 @@ def rhs_all_d(mesh, mats, cnfg, base, diag, hh_cell, uu_edge):
     ff_cell = base.ff_cell
     ff_edge = base.ff_edge
     ff_dual = base.ff_vert
+
+    msh_nu2 = base.msh_nu2
+    msh_fix = base.msh_fix
 
     gravity = cnfg.consts.gravity
 
@@ -112,16 +115,17 @@ def rhs_all_d(mesh, mats, cnfg, base, diag, hh_cell, uu_edge):
         uu_edge, vv_edge, uu_mag_,
         uu_tiny, pv_tiny, +1. / 2. * cnfg.params.time_step)
 
-    """
     # waves sub-grid
-    nu_wave = calc_uwav(mesh, mats, cnfg, hh_cell, zb_cell,
+    nu_wave = calc_uwav(mesh, mats, cnfg, hr_cell, zb_cell,
                                           gravity,
                                           hh_edge,
-                                          uu_edge, vv_edge)
+                                          uu_mag_,
+                                          msh_nu2, msh_fix)
 
     # leith sub-grid
-    nu_turb = calc_umix(mesh, mats, cnfg, rv_wide, rv_cell)
-    """
+    nu_turb = calc_umix(mesh, mats, cnfg, rv_wide, rv_cell,
+                                          uu_mag_,
+                                          msh_nu2, msh_fix)
     
     return diag.replace(
         vv_edge=vv_edge, 
@@ -131,6 +135,7 @@ def rhs_all_d(mesh, mats, cnfg, base, diag, hh_cell, uu_edge):
         rv_dual=rv_dual, pv_dual=pv_dual,
         rv_cell=rv_cell, pv_cell=pv_cell, 
         pv_edge=pv_edge,
+        nu_turb=nu_turb, nu_wave=nu_wave, nu_thin=nu_thin,
         hh_bias=hh_bias, pv_bias=pv_bias
     )
 
@@ -243,9 +248,6 @@ def rhs_fst_u(mesh, mats, cnfg, base, diag, hh_cell, uu_edge, uu_tend):
 
 #-- evaluate fast tendencies dU/dt = RHS(t,U,H)
 
-    """
-    if cnfg.no_u_tend or not cnfg.calc_fast:return uu_tend
-
     zb_cell = base.zb_cell
 
     gravity = cnfg.consts.gravity
@@ -260,15 +262,18 @@ def rhs_fst_u(mesh, mats, cnfg, base, diag, hh_cell, uu_edge, uu_tend):
     nu_wave = diag.nu_wave
     nu_thin = diag.nu_thin
 
+    visc_u2 = base.visc_u2
+    visc_u4 = base.visc_u4
+
     # del^k dissipation
     uu_tend = tend_umix(mesh, mats, cnfg, hr_cell, hh_edge, 
                                           hh_quad, hh_dual, 
                                           uu_edge,
                                           nu_turb, nu_wave,
                                           nu_thin,
+                                          visc_u2, visc_u4,
                                           uu_tend)
-    """
-
+    
     return uu_tend
 
 

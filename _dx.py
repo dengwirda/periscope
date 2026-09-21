@@ -239,7 +239,7 @@ def calc_udry(
    
     nu_thin = jnp.zeros(uu_edge.size, dtype=reals_t)
 
-    if not cnfg.option.wetdry_on: 
+    if not cnfg.option.hlims_on_: 
         return uu_edge, vv_edge, nu_thin
    
     hh_tiny = cnfg.consts.wetdry_h0 * 10.0
@@ -538,14 +538,13 @@ def tend_uadv(mesh, mats, cnfg,
 
     uh_flux = uu_edge * hh_edge
 
-    pv_flux = pv_product(mats.edge.flux_perp, uh_flux, 
-                                              pv_sub_, 
-                                              pv_add_)
+    pv_flux = pv_product(mats.edge.flux_perp, 
+              uh_flux, pv_sub_, pv_add_)
 
     ke_grad = op_product(mats.edge.grad_norm, ke_cell)
 
-    uu_tend = uu_tend \
-        + mesh.edge.gate * (ke_grad - 0.500 * pv_flux)
+    uu_tend = uu_tend + \
+        mesh.edge.gate * (ke_grad - .5 * pv_flux)
 
     return uu_tend
     
@@ -586,22 +585,29 @@ def tend_upgf(mesh, mats, cnfg, hh_cell, zb_cell,
     return uu_tend
 
 
-"""    
-def calc_umix(mesh, mats, cnfg, rv_dual, rv_cell):
+def calc_umix(mesh, mats, cnfg, rv_dual, rv_cell,
+                                uu_mag_,
+                                msh_nu2, msh_fix):
 
 #-- compute leith viscosities
 
-    nu_turb = variables.nu_turb
+    nu_turb = jnp.zeros(uu_mag_.size, dtype=reals_t)
 
-    if (cnfg.leith_chi == 0): return nu_turb
+    if not cnfg.option.leith_on_: return nu_turb
 
-    ttic = time.time()
+    leith_max = cnfg.consts.leith_max
+    leith_chi = \
+        cnfg.consts.leith_chi * (2.0 / jnp.pi) ** 3
 
-    nu_turb = _calc_umix(
-        mesh, mats, cnfg, rv_dual, rv_cell)
-    
-    ttoc = time.time()
-    tcpu.calc_umix = tcpu.calc_umix + (ttoc - ttic)
+    dN_grad = op_product(mats.edge.grad_norm, rv_cell)
+
+    dP_grad = op_product(mats.edge.grad_perp, rv_dual)
+
+#-- nu = chi * len ^ 3 * |grad curl u|
+    nu_turb = leith_chi * mesh.edge.slen ** 3 * sqrt(
+        dN_grad * dN_grad + dP_grad * dP_grad)
+
+    nu_turb = jnp.minimum(nu_turb, leith_max* msh_nu2)
 
     return nu_turb
 
@@ -609,53 +615,44 @@ def calc_umix(mesh, mats, cnfg, rv_dual, rv_cell):
 def calc_uwav(mesh, mats, cnfg, hh_cell, zb_cell,
                                 gravity,
                                 hh_edge, 
-                                uu_edge, vv_edge):
+                                uu_mag_,
+                                msh_nu2, msh_fix):
 
 #-- compute waves dissipation
 
-    nu_wave = variables.nu_wave
+    nu_wave = jnp.zeros(uu_mag_.size, dtype=reals_t)
 
-    if (cnfg.waves_chi == 0): return nu_wave
+    if not cnfg.option.waves_on_: return nu_wave
 
-    ttic = time.time()
+    hh_tiny = cnfg.consts.wetdry_h0 * 10.0
 
-    hh_tiny = cnfg.wetdry_h0 * 10.0
+    waves_max = cnfg.consts.waves_max
+    waves_chi = cnfg.consts.waves_chi * .5
 
-    nu_wave = _calc_uwav(
-        mesh, mats, cnfg, 
-            hh_cell, zb_cell, gravity, 
-            hh_tiny, hh_edge, uu_edge, vv_edge)
-    
-    ttoc = time.time()
-    tcpu.calc_uwav = tcpu.calc_uwav + (ttoc - ttic)
+#-- diffusivity = 1/2 * w_chi * sensor * |u_wave|
+    h1_cell = jnp.asarray(idx_gather(
+        hh_cell, mesh.edge.lhs_), dtype=reals_t)
+    h2_cell = jnp.asarray(idx_gather(
+        hh_cell, mesh.edge.rhs_), dtype=reals_t)
+
+    h1_cell = jnp.maximum(hh_tiny, h1_cell)
+    h2_cell = jnp.maximum(hh_tiny, h2_cell)
+
+    sensor_ = 1.0 + msh_fix  # topol. fix
+
+#-- central-upwind scheme: hrm. average of waves
+    c1_wave = uu_mag_ + jnp.sqrt(gravity * h1_cell)
+    c2_wave = uu_mag_ + jnp.sqrt(gravity * h2_cell)
+
+    cc_wave = 2.0 * ( c1_wave * c2_wave / 
+                    ( c1_wave + c2_wave ) )
+
+    nu_wave = waves_chi * \
+        sensor_ * cc_wave * mesh.edge.clen
+
+    nu_wave = jnp.minimum(nu_wave, waves_max* msh_nu2)
 
     return nu_wave
-
-
-def calc_hmix(mesh, mats, cnfg, hh_cell, zb_cell,
-                                gravity,
-                                hh_edge, 
-                                uu_edge, vv_edge):
-
-#-- compute shock dissipation
-
-    nu_shoc = variables.nu_shoc
-
-    if (cnfg.shock_chi == 0): return nu_shoc
-
-    ttic = time.time()
-
-    hh_tiny = cnfg.wetdry_h0 * 10.0
-
-    nu_shoc = _calc_hmix(
-        mesh, mats, cnfg, 
-            hh_cell, zb_cell, gravity, 
-            hh_tiny, hh_edge, uu_edge, vv_edge)
-    
-    ttoc = time.time()
-    tcpu.calc_hmix = tcpu.calc_hmix + (ttoc - ttic)
-
-    return nu_shoc
 
 
 def tend_umix(mesh, mats, cnfg, hh_cell, hh_edge, 
@@ -663,29 +660,113 @@ def tend_umix(mesh, mats, cnfg, hh_cell, hh_edge,
                                 uu_edge,
                                 nu_turb, nu_wave,
                                 nu_thin,
+                                v2_visc, v4_visc,
                                 uu_tend):
 
 #-- viscous del^k operators
 
-    if (cnfg.uu_visc_k == 0): return uu_tend
+    if not cnfg.option.uvisc_on_: return uu_tend
 
-    ttic = time.time()
-            
-    hh_tiny = cnfg.wetdry_h0 * 100.
+    hh_tiny = cnfg.consts.wetdry_h0 * 100.0
 
-    uu_tend = _tend_umix(
-        mesh, mats, cnfg, 
-            hh_cell, hh_edge, hh_quad, hh_dual, 
-            uu_edge, 
-            nu_turb, nu_wave, nu_thin, 
-            hh_tiny, uu_tend)
+#-- D^2 = grad(div(h*u.n) * h^-1)
+#--     - grad(h*rot(u.n))* h^-1
+    hh_min_ = jnp.maximum(hh_tiny, hh_cell)
 
-    ttoc = time.time()
-    tcpu.tend_umix = tcpu.tend_umix + (ttoc - ttic)
+    uh_edge = uu_edge * hh_edge
+
+    du_cell = op_product(
+        mats.cell.flux_sums, uu_edge) / mesh.cell.area
+    dh_cell = op_product(
+        mats.cell.flux_sums, uh_edge) / mesh.cell.area
+
+    dh_cell = dh_cell / hh_min_
+
+    rv_dual = op_product(
+        mats.dual.curl_sums, uu_edge) / mesh.vert.area
+    rv_dual = rv_dual*(1. - mesh.vert.slip) 
+
+    du_grad = op_product(mats.edge.grad_norm, du_cell)
+    dh_grad = op_product(mats.edge.grad_norm, dh_cell)
+
+    hh_min_ = jnp.maximum(hh_tiny, hh_quad)
+
+    rh_dual = rv_dual * hh_dual
+
+    rv_grad = op_product(mats.edge.grad_perp, rv_dual)
+    rh_grad = op_product(mats.edge.grad_perp, rh_dual)
+
+    rh_grad = rh_grad / hh_min_
+
+#-- assemble nu_2 * del^2 tendencies
+    uh_div2 = dh_grad
+    uh_del2 = dh_grad - rh_grad
+    uu_del2 = du_grad - rv_grad
+
+    uu_visc = (
+    #-- set constant viscosities
+      + v2_visc * uh_del2
+    #-- set wet-dry sponge zones
+      + nu_thin * uh_del2
+    #-- turb. dissipative fluxes
+      + nu_turb * uh_del2
+    #-- div u dissipative fluxes
+      + nu_wave * uh_div2  )
+ 
+    uu_del2 = uu_del2 * mesh.edge.gate
+    uu_visc = uu_visc * mesh.edge.gate
+
+    uu_tend = uu_tend - uu_visc
+
+#-- D^4 = grad(div(h*D^2) * h^-1)
+#--     - grad(h*rot(D^2))* h^-1
+    hh_min_ = jnp.maximum(hh_tiny, hh_cell)
+
+    uh_edge = uu_del2 * hh_edge
+
+    dh_cell = op_product(
+        mats.cell.flux_sums, uh_edge) / mesh.cell.area
+
+    dh_cell = dh_cell / hh_min_
+
+    rv_dual = op_product(
+        mats.dual.curl_sums, uu_del2) / mesh.vert.area
+
+    dh_grad = op_product(mats.edge.grad_norm, dh_cell)
+
+    hh_min_ = jnp.maximum(hh_tiny, hh_quad)
+
+    rh_dual = rv_dual * hh_dual
+
+    rh_grad = op_product(mats.edge.grad_perp, rh_dual)
+
+    rh_grad = rh_grad / hh_min_
+
+#-- assemble nu_4 * del^4 tendencies
+    uh_div4 = dh_grad
+    uh_del4 = dh_grad - rh_grad
+
+    uu_visc = (
+    #-- set constant viscosities
+      - v4_visc * uh_del4
+    #-- turb. dissipative fluxes
+    #-- 32 leads to del^2 fraction of approx. 3%
+      - nu_turb * uh_del4
+                * mesh.edge.area * 4.0
+    #-- div u dissipative fluxes
+    #-- 1/8 accounts for nu_4 scaling per MITgcm
+    # - nu_wave * uh_div4 
+    #           * mesh.edge.area / 8.0
+        )
+
+    uu_visc = uu_visc * mesh.edge.gate
+
+    uu_tend = uu_tend - uu_visc
 
     return uu_tend
-    
-    
+   
+ 
+"""
 def tend_hmix(mesh, mats, cnfg, hh_cell, zb_cell, 
                                 gravity,
                                 nu_shoc, 

@@ -69,7 +69,13 @@ class jxp_usr_option:
     pv_scheme: str = struct.field(pytree_node=False)
     ke_scheme: str = struct.field(pytree_node=False)
 
-    wetdry_on: bool= struct.field(pytree_node=False)
+    uvisc_on_: bool= struct.field(pytree_node=False)
+    hdiff_on_: bool= struct.field(pytree_node=False)
+
+    leith_on_: bool= struct.field(pytree_node=False)
+    waves_on_: bool= struct.field(pytree_node=False)
+
+    hlims_on_: bool= struct.field(pytree_node=False)
 
     tidal_frc: str = struct.field(pytree_node=False)
     sal_solve: str = struct.field(pytree_node=False)
@@ -147,7 +153,13 @@ def usr_to_jax(mesh, mats, flow, cnfg):
             pv_scheme=cnfg.pv_scheme,
             ke_scheme=cnfg.ke_scheme,
 
-            wetdry_on=cnfg.wetdry_h0 > 0.0,
+            uvisc_on_=cnfg.uu_visc_k > 0.0,
+            hdiff_on_=cnfg.hh_diff_k > 0.0,
+
+            leith_on_=cnfg.leith_chi > 0.0,
+            waves_on_=cnfg.waves_chi > 0.0,
+
+            hlims_on_=cnfg.wetdry_h0 > 0.0,
 
             tidal_frc=cnfg.tidal_frc,
             sal_solve=cnfg.sal_solve,

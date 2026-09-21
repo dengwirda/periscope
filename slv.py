@@ -357,8 +357,6 @@ def pre(mesh, mats, flow, cnfg):
 
     cnfg.hh_diff_k = \
         max (cnfg.hh_diff_2, cnfg.hh_diff_4)
-    cnfg.hh_diff_k = \
-        max (cnfg.hh_diff_k, cnfg.shock_chi)
 
     s2_edge, s4_edge, msh_fix = \
         scale_mix(mesh, mats, cnfg)

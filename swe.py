@@ -273,21 +273,6 @@ if (__name__ == "__main__"):
         default=np.inf,
         required=False, help="Waves model max. damping.")
 
-    parser.add_argument(
-        "--shock-chi", dest="shock_chi", type=float,
-        default=0.E+00,
-        required=False, help="Shock model scalar coeff.")
-
-    parser.add_argument(
-        "--shock-max", dest="shock_max", type=float,
-        default=np.inf,
-        required=False, help="Shock model max. damping.")
-
-    parser.add_argument(
-        "--shock-cut", dest="shock_cut", type=float,
-        default=1.E+00,
-        required=False, help="Shock model cutoff value.")
-
 #-- drag parameterisations
 
     parser.add_argument(
