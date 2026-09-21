@@ -139,7 +139,7 @@ def swe(cnfg):
 
     """
     # uncomment to inspect compiled XLA
-    from _jo.py import op_product, pv_product
+    from _jo import op_product, pv_product
 
     # linear kernel
     f = jax.jit(op_product)
@@ -160,11 +160,16 @@ def swe(cnfg):
     compiled = h.lower(mesh.jx, mats.jx, 
                        flow.jx, cnfg.jx, cnfg.iteration).compile()
 
-    with open("step_eqns_xla.txt", "w") as f:
+    with open("step_eqns_xla_up.txt", "w") as f:
         f.write(compiled.as_text())
 
     raise Exception()
     """
+
+
+    save_step(save,
+        mesh.jx, mats.jx, flow.jx, cnfg.jx, step=0)
+
 
     ttic = time.time(); next = +0; freq = +0
     """
@@ -179,8 +184,11 @@ def swe(cnfg):
     cnfg.save_next = cnfg.timeisnow
     """
 
+    """
+    # device-to-host copy seems quite slow!
     save_step(save, 
         mesh.jx, mats.jx, flow.jx, cnfg.jx, step=0)
+    """
 
 
     """
