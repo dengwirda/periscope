@@ -297,13 +297,10 @@ def upwinding(mesh, mats, cnfg,
         dP_grad = op_product(mats.edge.grad_perp, ss_dual)
 
     #-- upwind APVM, scale w. grid spacing
-        uu_mag_ = uu_tiny + uu_mag_
-        uu_dir_ = uu_edge / uu_mag_
-        vv_dir_ = vv_edge / uu_mag_
-
         ss_edge = ss_edge - mesh.edge.slen * up_phi_ * (
                 ( uu_dir_ * dN_grad +
-                  vv_dir_ * dP_grad ) )
+                  vv_dir_ * dP_grad ) /
+                ( uu_mag_ + uu_tiny ) )
 
         up_bias = up_phi_ * \
             jnp.ones(ss_edge.size, dtype=reals_t)
@@ -324,8 +321,8 @@ def upwinding(mesh, mats, cnfg,
         up_sum_ = op_product(mats.edge.dual_sums, ds_dual)
 
     #-- a measure of "difference" on edges
-        ds_edge = 0.50 * (jnp.abs(dN_grad) +
-                          jnp.abs(dP_grad) )
+        ds_edge = +0.50 * (jnp.abs (dN_grad)+
+                           jnp.abs (dP_grad))
         ds_edge = ss_tiny + \
            mesh.edge.slen * ds_edge
         
@@ -339,13 +336,10 @@ def upwinding(mesh, mats, cnfg,
         up_bias = up_tiny + up_bias
 
     #-- upwind APVM, scale w. grid spacing
-        uu_mag_ = uu_tiny + uu_mag_
-        uu_dir_ = uu_edge / uu_mag_
-        vv_dir_ = vv_edge / uu_mag_
-
         ss_edge = ss_edge - mesh.edge.slen * up_bias * (
-                ( uu_dir_ * dN_grad +
-                  vv_dir_ * dP_grad ) )
+                ( uu_edge * dN_grad +
+                  vv_edge * dP_grad ) / 
+                ( uu_mag_ + uu_tiny ) )
 
     return ss_edge, up_bias
 
@@ -469,7 +463,7 @@ def _build_pv(mesh, mats, cnfg,
     pv_cell = rv_cell + ff_cell
 
     return rv_dual, pv_dual, rv_wide, pv_wide, \
-           jnp.sqrt(jnp.mean(pv_wide ** 2 ) ), \
+           jnp.sqrt(jnp.mean(pv_wide**2)), \
            rv_cell, pv_cell, \
            rv_edge, pv_edge
               
