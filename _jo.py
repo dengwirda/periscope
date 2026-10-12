@@ -105,8 +105,8 @@ def csr_to_jax(csr):
     ridx = np.repeat(np.arange(nrow), cnnz)
     rpos = np.arange(csr.indices.size) - csr.indptr[ridx]
 
-    indx = np.zeros((nrow, kmax), dtype=index_t)
-    vals = np.zeros((nrow, kmax), dtype=reals_t)
+    indx = np.zeros((nrow, kmax), dtype=index_t, order="F")
+    vals = np.zeros((nrow, kmax), dtype=reals_t, order="F")
 
     indx[ridx, rpos] = csr.indices
     vals[ridx, rpos] = csr.data
@@ -129,10 +129,18 @@ def op_product(mat, vec):
     return jnp.sum(vec[mat.indx] * mat.vals, axis=1)
     """
 
+    """
     tmp = vec.at[mat.indx].get(
         mode="promise_in_bounds", wrap_negative_indices=False,
     )
     return jnp.sum(tmp * mat.vals, axis=1)
+    """
+
+    out = 0.0
+    for jj in range(mat.vals.shape[1]):
+        out = out + mat.vals[:, jj] * vec[mat.indx[:, jj]]
+
+    return out
 
 
 def pv_product(mat, flx, sub, add):
@@ -145,6 +153,7 @@ def pv_product(mat, flx, sub, add):
     )
     """
 
+    """
     _tf = flx.at[mat.indx].get(
         mode="promise_in_bounds", wrap_negative_indices=False,
     )
@@ -154,5 +163,18 @@ def pv_product(mat, flx, sub, add):
     return jnp.sum(mat.vals * 
         _tf * (sub[:,None] + _ta), axis=1,
     )
+    """
+
+    out = 0.0
+    for jj in range(mat.vals.shape[1]):
+        out = out + mat.vals[:, jj] * flx[mat.indx[:, jj]]
+
+    out = out * sub
+    tmp = flx * add
+
+    for jj in range(mat.vals.shape[1]):
+        out = out + mat.vals[:, jj] * tmp[mat.indx[:, jj]]
+
+    return out
 
 
